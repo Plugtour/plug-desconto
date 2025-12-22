@@ -17,59 +17,44 @@ function normalize(value: string) {
   return safeDecode(value).trim();
 }
 
-function safeEncode(value: string) {
+// ✅ precisa ser exportado (seu erro estava aqui)
+export function safeEncode(value: string) {
   return encodeURIComponent(normalize(value));
 }
 
-/**
- * Retorna o identificador “oficial” (slug quando existir; senão id)
- * SEM encode, já normalizado.
- */
-export function benefitKey(offer: BenefitLike) {
-  const slug = normalize((offer?.slug ?? '').trim());
-  const id = normalize((offer?.id ?? '').trim());
-
-  if (slug) return slug;
-  if (id) return id;
-
-  return 'nao-encontrado';
+function getSlugOrId(input: BenefitLike | string) {
+  if (typeof input === 'string') return input;
+  return input.slug || input.id || '';
 }
 
 /**
- * Path interno SEM encode (bom p/ revalidatePath e comparações)
+ * Path interno do benefício.
+ * Aceita string (slug) ou objeto (Offer/ApiOffer/etc com slug/id).
  */
-export function benefitPath(offer: BenefitLike) {
-  return `/beneficio/${benefitKey(offer)}`;
-}
-
-/**
- * URL pronta p/ Link/redirect (com encode seguro)
- * REGRA: sempre usar slug quando existir.
- */
-export function benefitUrl(offer: BenefitLike) {
-  const key = benefitKey(offer);
-
-  // mantém fallback consistente
-  if (key === 'nao-encontrado') return '/beneficio/nao-encontrado';
-
+export function benefitPath(input: BenefitLike | string) {
+  const key = getSlugOrId(input);
   return `/beneficio/${safeEncode(key)}`;
 }
 
 /**
- * Canonical oficial (SEO): sempre slug quando existir.
- * Se não existir slug, usa id.
+ * URL absoluta do benefício (canônica).
  */
-export function benefitCanonicalUrl(offer: BenefitLike) {
-  // canonical pode ser path “bonito” (sem encode extra)
-  // mas como o Next aceita ambos, manteremos alinhado ao helper principal
-  return benefitUrl(offer);
+export function benefitCanonicalUrl(
+  input: BenefitLike | string,
+  baseUrl?: string
+) {
+  const siteUrl =
+    baseUrl?.replace(/\/+$/, '') ||
+    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, '') ||
+    process.env.SITE_URL?.replace(/\/+$/, '') ||
+    'http://localhost:3000';
+
+  return `${siteUrl}${benefitPath(input)}`;
 }
 
 /**
- * Para quando você tem só uma string (slug ou id).
+ * Alias (muitos arquivos acabam chamando "benefitUrl").
  */
-export function benefitUrlFromSlugOrId(slugOrId: string) {
-  const key = normalize(slugOrId);
-  if (!key) return '/beneficio/nao-encontrado';
-  return `/beneficio/${encodeURIComponent(key)}`;
+export function benefitUrl(input: BenefitLike | string, baseUrl?: string) {
+  return benefitCanonicalUrl(input, baseUrl);
 }

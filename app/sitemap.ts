@@ -1,62 +1,51 @@
 // app/sitemap.ts
 import type { MetadataRoute } from 'next';
 
-// Fonte de dados (mock)
-// Ajuste o import abaixo se, no seu projeto, o array estiver em outro caminho.
 import { OFFERS } from '@/config/offers';
+import { benefitPath } from '@/lib/urls';
 
-import { benefitUrl } from '@/lib/urls';
-
-function getSiteUrl() {
-  const raw =
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    process.env.SITE_URL ||
-    'http://localhost:3000';
-
-  return raw.replace(/\/+$/, '');
-}
+const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, '') ||
+  process.env.SITE_URL?.replace(/\/+$/, '') ||
+  'http://localhost:3000';
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const siteUrl = getSiteUrl();
-  const now = new Date();
-
-  // 1) Base: páginas estáticas principais
-  const items: MetadataRoute.Sitemap = [
-    {
-      url: `${siteUrl}/`,
-      lastModified: now,
-      changeFrequency: 'daily',
-      priority: 1,
-    },
-    {
-      url: `${siteUrl}/ofertas`,
-      lastModified: now,
-      changeFrequency: 'daily',
-      priority: 0.9,
-    },
-  ];
-
-  // 2) Benefícios: SOMENTE URLs oficiais (via helper benefitUrl -> /beneficio/{slug})
-  //    - ignora ofertas sem slug
-  //    - remove duplicados de slug
   const seen = new Set<string>();
+  const items: MetadataRoute.Sitemap = [];
 
-  for (const offer of OFFERS) {
-    const slug = (offer?.slug ?? '').trim();
-    if (!slug) continue;
+  // Home
+  items.push({
+    url: `${siteUrl}/`,
+    lastModified: new Date(),
+    changeFrequency: 'daily',
+    priority: 1,
+  });
 
-    const path = benefitUrl(offer); // garante /beneficio/{slug} (fallback para id, mas aqui slug existe)
+  // Páginas principais (se existirem no seu app, pode manter)
+  items.push({
+    url: `${siteUrl}/ofertas`,
+    lastModified: new Date(),
+    changeFrequency: 'daily',
+    priority: 0.8,
+  });
+
+  for (const offer of OFFERS as any[]) {
+    const path = benefitPath(offer); // /beneficio/{slug ou id}
+
+    // garante que só entram URLs de benefício
     if (!path.startsWith('/beneficio/')) continue;
 
-    // Dedupe: por path final
-    if (seen.has(path)) continue;
-    seen.add(path);
+    const fullUrl = `${siteUrl}${path}`;
+
+    // remove duplicados
+    if (seen.has(fullUrl)) continue;
+    seen.add(fullUrl);
 
     items.push({
-      url: `${siteUrl}${path}`,
-      lastModified: now,
+      url: fullUrl,
+      lastModified: new Date(),
       changeFrequency: 'weekly',
-      priority: 0.7,
+      priority: 0.6,
     });
   }
 

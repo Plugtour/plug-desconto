@@ -1,109 +1,141 @@
 // lib/offers.ts
-import { OFFERS, type Offer, type OfferCategory } from '@/config/offers';
+import { safeEncode } from '@/lib/urls';
+import { OFFERS as OFFERS_RAW } from '@/config/offers';
 
-export type CategoryItem = {
-  key: string;   // chave estável (slugificada)
-  label: string; // nome exibido
-  count: number; // quantidade
+export type FixedCategoryId =
+  | 'alimentacao'
+  | 'passeios'
+  | 'atracoes'
+  | 'hospedagem'
+  | 'compras'
+  | 'servicos'
+  | 'transporte'
+  | 'eventos';
+
+export type Offer = {
+  id?: string;
+  slug?: string;
+  title?: string;
+
+  // o sistema usa esses 2 para filtrar
+  city?: string;
+  categoryId?: string;
+
+  // qualquer outro campo do seu config/offers.ts pode vir junto
+  [key: string]: any;
 };
 
-function safeDecode(value: string) {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return value;
-  }
-}
-
-export function normalizeSlugOrId(value: string) {
-  return safeDecode(value).trim();
-}
-
-export function normalizeCat(value?: string) {
-  if (!value) return '';
-  return safeDecode(value).trim();
-}
-
-export function slugifyKey(value: string) {
-  return value
+/** Normaliza texto para comparar e filtrar */
+export function normalizeCat(value: string) {
+  return String(value ?? '')
+    .trim()
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '');
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
+/** Chave estável para slug (categoria, cidade, etc) */
+export function slugifyKey(value: string) {
+  const v = normalizeCat(value);
+  return safeEncode(v.replace(/\s+/g, '-'));
+}
+
+/** Pega o array bruto do config e força para array */
+function rawArray(): any[] {
+  const raw: any = OFFERS_RAW as any;
+  return Array.isArray(raw) ? raw : Array.isArray(raw?.OFFERS) ? raw.OFFERS : [];
+}
+
+/** Converte um item qualquer do config para o nosso Offer interno */
+function coerceOffer(o: any): Offer {
+  const city = o?.city ?? o?.cidade ?? o?.local ?? o?.location;
+  const categoryId = o?.categoryId ?? o?.category ?? o?.categoria ?? o?.cat;
+
+  return {
+    ...o,
+    city: city ? String(city) : undefined,
+    categoryId: categoryId ? String(categoryId) : undefined,
+    id: o?.id != null ? String(o.id) : undefined,
+    slug: o?.slug != null ? String(o.slug) : undefined,
+    title: o?.title ?? o?.titulo ?? o?.name,
+  };
+}
+
+/** Lista já normalizada */
+export function getAllOffers(): Offer[] {
+  return rawArray().map(coerceOffer);
+}
+
+export function getOffersByCity(city: string): Offer[] {
+  const c = normalizeCat(city);
+  return getAllOffers().filter((o) => normalizeCat(String(o.city ?? '')) === c);
+}
+
+export function getOffersByCityAndCategory(city: string, categoryId: string): Offer[] {
+  const c = normalizeCat(city);
+  const cat = normalizeCat(categoryId);
+  return getAllOffers().filter(
+    (o) =>
+      normalizeCat(String(o.city ?? '')) === c &&
+      normalizeCat(String(o.categoryId ?? '')) === cat
+  );
 }
 
 /**
- * Retorna ofertas filtrando por tenant (quando existir) e por categoria (opcional).
- * ✅ Regra do projeto: retorna somente itens com slug válido (para o frontend usar sempre slug).
+ * ✅ Mantém compatibilidade com o que você tentou usar no route.ts:
+ * getOffersByTenant (aqui tratamos tenant como "city")
  */
-export async function getOffersByTenant(
-  tenantId?: string | null,
-  category?: OfferCategory
-): Promise<Offer[]> {
-  const filtered = OFFERS.filter((offer) => {
-    if (tenantId && offer.tenantId !== tenantId) return false;
-    if (category && offer.category !== category) return false;
-    return true;
-  });
-
-  const withSlug = filtered.filter((o) => typeof o.slug === 'string' && o.slug.trim().length > 0);
-
-  // ajuda a detectar dados incompletos
-  const missing = filtered.filter((o) => !o.slug || !o.slug.trim());
-  for (const m of missing) {
-    console.warn(`[Plug Desconto] Oferta sem slug (não será listada): id=${m.id} title="${m.title}"`);
-  }
-
-  return withSlug;
+export function getOffersByTenant(tenantKey: string): Offer[] {
+  return getOffersByCity(tenantKey);
 }
 
-/**
- * Busca por SLUG ou pelo ID antigo (compatibilidade).
- * Retorna a oferta mesmo se acessar via id antigo.
- */
-export async function getOfferBySlugOrId(
-  tenantId: string | null | undefined,
-  slugOrId: string
-): Promise<Offer | null> {
-  const key = normalizeSlugOrId(slugOrId).toLowerCase();
-
-  const scope = OFFERS.filter((o) => (tenantId ? o.tenantId === tenantId : true));
-
-  // 1) slug (principal)
-  const bySlug = scope.find((o) => (o.slug || '').toLowerCase() === key);
-  if (bySlug) return bySlug;
-
-  // 2) id antigo (fallback)
-  const byId = scope.find((o) => (o.id || '').toLowerCase() === key);
-  return byId ?? null;
-}
-
-/**
- * Mantém compatibilidade com a função antiga, se você ainda usar em algum lugar.
- * (Agora é só um wrapper do método novo.)
- */
-export async function getOfferBySlug(
-  tenantId: string,
-  slug: string
-): Promise<Offer | undefined> {
-  const found = await getOfferBySlugOrId(tenantId, slug);
-  return found ?? undefined;
-}
-
-export async function getCategories(offers: Offer[]): Promise<CategoryItem[]> {
+/** Categorias com contagem (opcional, útil pro menu) */
+export async function getCategoriesWithCount(city?: string) {
+  const list = city ? getOffersByCity(city) : getAllOffers();
   const map = new Map<string, { label: string; count: number }>();
 
-  for (const offer of offers) {
-    const label = (offer.category || '').toString().trim() || 'Outros';
-    const key = slugifyKey(label);
+  for (const o of list) {
+    const key = normalizeCat(String(o.categoryId ?? ''));
+    if (!key) continue;
 
     const current = map.get(key);
     if (current) current.count += 1;
-    else map.set(key, { label, count: 1 });
+    else map.set(key, { label: String(o.categoryId ?? key), count: 1 });
   }
 
   return Array.from(map.entries())
     .map(([key, v]) => ({ key, label: v.label, count: v.count }))
     .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
+}
+
+/** Cidades com contagem (opcional) */
+export async function getCitiesWithCount() {
+  const list = getAllOffers();
+  const map = new Map<string, { label: string; count: number }>();
+
+  for (const o of list) {
+    const key = normalizeCat(String(o.city ?? ''));
+    if (!key) continue;
+
+    const current = map.get(key);
+    if (current) current.count += 1;
+    else map.set(key, { label: String(o.city ?? key), count: 1 });
+  }
+
+  return Array.from(map.entries())
+    .map(([key, v]) => ({ key, label: v.label, count: v.count }))
+    .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
+}
+
+/** Busca por slug OU id (pra página do benefício) */
+export function getOfferBySlugOrId(slugOrId: string): Offer | null {
+  const key = String(slugOrId ?? '').trim();
+  if (!key) return null;
+
+  const list = getAllOffers();
+  return (
+    list.find((o) => String(o.slug ?? '').trim() === key) ??
+    list.find((o) => String(o.id ?? '').trim() === key) ??
+    null
+  );
 }

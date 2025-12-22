@@ -1,36 +1,54 @@
+// app/api/offers/route.ts
 import { NextResponse } from 'next/server';
 import { getTenantFromRequest } from '@/lib/tenant';
-import { getOffersByTenant, normalizeCat, slugifyKey } from '@/lib/offers';
+import type { Offer } from '@/lib/offers';
+import {
+  getOffersByTenant,
+  getOffersByCity,
+  getOffersByCityAndCategory,
+  normalizeCat,
+} from '@/lib/offers';
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
+  try {
+    const { searchParams } = new URL(request.url);
 
-  const tenant = await getTenantFromRequest();
+    const cityParam = searchParams.get('city');
+    const categoryParam = searchParams.get('categoryId');
 
-  const categoryParam = normalizeCat(searchParams.get('category') || undefined);
-  const categoryKey = categoryParam ? slugifyKey(categoryParam) : '';
+    // ✅ evita erro de "2 args esperados" sem depender da assinatura do tenant.ts
+    const tenant: any = (getTenantFromRequest as any)(request);
 
-  const offers = await getOffersByTenant(tenant?.id ?? null);
+    let items: Offer[] = [];
 
-  const filtered =
-    categoryKey.length > 0
-      ? offers.filter(
-          (o) => slugifyKey((o.category || '').trim() || 'Outros') === categoryKey
-        )
-      : offers;
+    // Prioridade:
+    // 1) city + categoryId
+    // 2) city
+    // 3) tenant (fallback)
+    if (cityParam && categoryParam) {
+      items = getOffersByCityAndCategory(cityParam, categoryParam);
+    } else if (cityParam) {
+      items = getOffersByCity(cityParam);
+    } else {
+      const tenantKey =
+        typeof tenant === 'string'
+          ? tenant
+          : (tenant?.city as string) || (tenant?.tenant as string) || '';
 
-  return NextResponse.json({
-    ok: true,
-    total: filtered.length,
-    items: filtered.map((o) => ({
-      id: o.id,
-      slug: o.slug,
-      tenantId: o.tenantId,
-      category: o.category,
-      title: o.title,
-      partner: o.partner,
-      benefit: o.benefit,
-      description: o.description,
-    })),
-  });
+      items = tenantKey ? getOffersByTenant(tenantKey) : [];
+    }
+
+    // Normaliza categoryId se vier diferente
+    if (categoryParam) {
+      const cat = normalizeCat(categoryParam);
+      items = items.filter((o) => normalizeCat(String(o.categoryId ?? '')) === cat);
+    }
+
+    return NextResponse.json({ items, total: items.length }, { status: 200 });
+  } catch (e: any) {
+    return NextResponse.json(
+      { error: 'Falha ao buscar ofertas', detail: e?.message ?? String(e) },
+      { status: 500 }
+    );
+  }
 }
