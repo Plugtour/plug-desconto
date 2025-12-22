@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 
 export default async function MasterPanel() {
   try {
-    await requireRole(['admin']);
+  await requireRole(['master']);
 
     return (
       <div className="space-y-4">
