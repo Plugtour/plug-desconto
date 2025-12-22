@@ -2,17 +2,23 @@
 import { cookies } from 'next/headers';
 import crypto from 'crypto';
 
-export type SessionRole = 'guest' | 'visitor' | 'user' | 'partner' | 'admin';
+export type SessionRole =
+  | 'guest'
+  | 'visitor'
+  | 'user'
+  | 'partner'
+  | 'affiliate'
+  | 'admin';
 
-// Compatibilidade com imports antigos (lib/auth.ts)
+// Compatibilidade com imports antigos
 export type Role = SessionRole;
 
 export type Session = {
   role: SessionRole;
   planActive: boolean;
   tenantId?: string | null;
-  iat?: number; // unix seconds
-  exp?: number; // unix seconds
+  iat?: number;
+  exp?: number;
 };
 
 export const defaultGuestSession: Session = {
@@ -22,8 +28,6 @@ export const defaultGuestSession: Session = {
 };
 
 const COOKIE_NAME = 'pd_session';
-
-// Se definir SESSION_SECRET no Vercel, o cookie fica assinado (recomendado).
 const SECRET = process.env.SESSION_SECRET || '';
 
 function base64UrlEncode(input: string | Buffer) {
@@ -53,18 +57,16 @@ export function encodeSession(session: Session) {
     planActive: !!session.planActive,
     tenantId: session.tenantId ?? null,
     iat: session.iat ?? now,
-    exp: session.exp, // opcional
+    exp: session.exp,
   };
 
   const payloadB64 = base64UrlEncode(JSON.stringify(payload));
 
-  // Se tiver secret, assina: payload.sig
   if (SECRET) {
     const sig = sign(payloadB64);
     return `${payloadB64}.${sig}`;
   }
 
-  // Sem secret: só payload
   return payloadB64;
 }
 
@@ -80,7 +82,6 @@ export function decodeSession(value: string | null | undefined): Session | null 
 
       if (SECRET) {
         const expected = sign(payloadB64);
-        // timingSafeEqual exige buffers do mesmo tamanho
         if (sig.length !== expected.length) return null;
         if (
           !crypto.timingSafeEqual(Buffer.from(sig, 'utf8'), Buffer.from(expected, 'utf8'))
@@ -111,17 +112,23 @@ export function getSessionCookieName() {
   return COOKIE_NAME;
 }
 
-export function getSession(): Session {
-  const c = cookies().get(COOKIE_NAME)?.value ?? null;
-  const parsed = decodeSession(c);
+/** Next 16: cookies() é async */
+async function getCookieStore() {
+  return await cookies();
+}
 
+export async function getSession(): Promise<Session> {
+  const store = await getCookieStore();
+  const c = store.get(COOKIE_NAME)?.value ?? null;
+  const parsed = decodeSession(c);
   return parsed ?? defaultGuestSession;
 }
 
-export function setSession(session: Session) {
+export async function setSession(session: Session) {
+  const store = await getCookieStore();
   const value = encodeSession(session);
 
-  cookies().set(COOKIE_NAME, value, {
+  store.set(COOKIE_NAME, value, {
     httpOnly: true,
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
@@ -129,8 +136,10 @@ export function setSession(session: Session) {
   });
 }
 
-export function clearSession() {
-  cookies().set(COOKIE_NAME, '', {
+export async function clearSession() {
+  const store = await getCookieStore();
+
+  store.set(COOKIE_NAME, '', {
     httpOnly: true,
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
