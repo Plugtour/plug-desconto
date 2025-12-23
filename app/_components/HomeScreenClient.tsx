@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import BannerMobile from '@/components/BannerMobile';
+import HomeBanner from './HomeBanner';
 
 /* =========================
    TIPOS
@@ -150,7 +150,12 @@ function Icon({
             strokeWidth="2"
             strokeLinejoin="round"
           />
-          <path d="M8 12v-1.6M16 12v-1.6" stroke="#A855F7" strokeWidth="2" strokeLinecap="round" />
+          <path
+            d="M8 12v-1.6M16 12v-1.6"
+            stroke="#A855F7"
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
         </svg>
       );
 
@@ -181,7 +186,12 @@ function Icon({
             strokeWidth="2"
             strokeLinejoin="round"
           />
-          <path d="M6 11h12v6H6v-6z" stroke="#06B6D4" strokeWidth="2" strokeLinejoin="round" />
+          <path
+            d="M6 11h12v6H6v-6z"
+            stroke="#06B6D4"
+            strokeWidth="2"
+            strokeLinejoin="round"
+          />
           <path
             d="M8 17.2a1.2 1.2 0 1 0 0-2.4 1.2 1.2 0 0 0 0 2.4zM16 17.2a1.2 1.2 0 1 0 0-2.4 1.2 1.2 0 0 0 0 2.4z"
             stroke="#06B6D4"
@@ -510,6 +520,11 @@ export default function HomeScreenClient({
           }
         `}</style>
       </section>
+
+      {/* ✅ BANNER SEPARADO DO MENU (editar só em HomeBanner.tsx) */}
+      <HomeBanner className="mt-4 px-4" />
+
+      {/* Aqui você pode colocar o resto da Home depois (lista de ofertas etc.) */}
     </div>
   );
 }
