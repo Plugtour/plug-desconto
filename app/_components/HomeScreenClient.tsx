@@ -29,7 +29,7 @@ type IconKey =
    SCROLL SUAVE (resposta imediata ao clique)
 ========================= */
 
-function smoothScrollTo(el: HTMLElement, targetLeft: number, duration = 1050) {
+function smoothScrollTo(el: HTMLElement, targetLeft: number, duration = 900) {
   const start = el.scrollLeft;
   const change = targetLeft - start;
 
@@ -53,10 +53,10 @@ function smoothScrollTo(el: HTMLElement, targetLeft: number, duration = 1050) {
 }
 
 /* =========================
-   SETAS (duplas, abertas, sem fundo)
+   SETA ÚNICA (sem fundo)
 ========================= */
 
-function DoubleChevronOpen({
+function SingleChevronOpen({
   dir,
   className,
 }: {
@@ -69,12 +69,11 @@ function DoubleChevronOpen({
       <g
         transform={flip ? 'translate(28 0) scale(-1 1)' : undefined}
         stroke="currentColor"
-        strokeWidth="2.8"
+        strokeWidth="3.0"
         strokeLinecap="round"
         strokeLinejoin="round"
       >
-        <path d="M9 7.5 14.5 14 9 20.5" />
-        <path d="M15 7.5 20.5 14 15 20.5" />
+        <path d="M10 7.5 16.5 14 10 20.5" />
       </g>
     </svg>
   );
@@ -91,7 +90,7 @@ function Icon({
   iconKey: IconKey;
   className?: string;
 }) {
-  const common = 'h-5 w-5'; // ✅ um pouco menor para diminuir altura total
+  const common = 'h-5 w-5';
   const cls = className ? `${common} ${className}` : common;
 
   switch (iconKey) {
@@ -323,8 +322,13 @@ export default function HomeScreenClient({
     if (!el) return;
     const w = el.clientWidth;
     const target = dir === 'left' ? el.scrollLeft - w : el.scrollLeft + w;
-    smoothScrollTo(el, Math.max(0, target), 1050);
+    smoothScrollTo(el, Math.max(0, target), 900);
   }
+
+  // ✅ regra: sempre exibir apenas UMA seta
+  // - se dá pra ir pra direita: mostra seta direita
+  // - senão, se dá pra voltar: mostra seta esquerda
+  const arrowDir: 'left' | 'right' | null = canRight ? 'right' : canLeft ? 'left' : null;
 
   return (
     <div className="mx-auto w-full max-w-md bg-zinc-100">
@@ -340,46 +344,24 @@ export default function HomeScreenClient({
       </div>
 
       <section className="relative px-4 pt-4">
-        {/* ✅ Setas um pouco para fora, para NÃO “cortar” o primeiro/último botão */}
-        <button
-          type="button"
-          onClick={() => go('left')}
-          aria-label="Voltar"
-          className={[
-            'absolute -left-3 top-1/2 z-10 -translate-y-1/2',
-            canLeft ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0',
-            'transition-opacity duration-200',
-          ].join(' ')}
-        >
-          <span
+        {/* ✅ UMA seta por vez, com animação dependendo do lado */}
+        {arrowDir && (
+          <button
+            type="button"
+            onClick={() => go(arrowDir)}
+            aria-label={arrowDir === 'right' ? 'Avançar' : 'Voltar'}
             className={[
-              'block text-zinc-400 hover:text-zinc-600',
-              canLeft ? 'animate-arrow-in-left' : '',
+              'absolute top-1/2 z-10 -translate-y-1/2',
+              arrowDir === 'right' ? '-right-3' : '-left-3',
+              'transition-opacity duration-200',
+              'text-zinc-400 hover:text-zinc-600',
+              // animações diferentes: ao trocar de direção, entra do lado “contrário”
+              arrowDir === 'right' ? 'animate-arrow-in-from-left' : 'animate-arrow-in-from-right',
             ].join(' ')}
           >
-            <DoubleChevronOpen dir="left" className="h-14 w-14" />
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => go('right')}
-          aria-label="Avançar"
-          className={[
-            'absolute -right-3 top-1/2 z-10 -translate-y-1/2',
-            canRight ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0',
-            'transition-opacity duration-200',
-          ].join(' ')}
-        >
-          <span
-            className={[
-              'block text-zinc-400 hover:text-zinc-600',
-              canRight ? 'animate-arrow-in-right' : '',
-            ].join(' ')}
-          >
-            <DoubleChevronOpen dir="right" className="h-14 w-14" />
-          </span>
-        </button>
+            <SingleChevronOpen dir={arrowDir} className="h-14 w-14" />
+          </button>
+        )}
 
         {/* ✅ Scroller com padding lateral para evitar “corte” nas bordas */}
         <div
@@ -387,10 +369,7 @@ export default function HomeScreenClient({
           className="no-scrollbar grid auto-cols-[100%] grid-flow-col overflow-x-auto scroll-smooth snap-x snap-mandatory px-1"
         >
           {Array.from({ length: pagesCount }).map((_, pageIndex) => (
-            <div
-              key={pageIndex}
-              className="snap-start grid grid-cols-4 gap-3 py-2 px-1"
-            >
+            <div key={pageIndex} className="snap-start grid grid-cols-4 gap-3 py-2 px-1">
               {categories.slice(pageIndex * 8, pageIndex * 8 + 8).map((cat, i) => {
                 const isActive = pageIndex === 0 && i === 0;
 
@@ -399,16 +378,19 @@ export default function HomeScreenClient({
                     key={cat.id}
                     type="button"
                     className={[
-                      // ✅ menor altura: reduzindo padding e gap interno
-                      'rounded-xl bg-white py-1.5 shadow-sm',
-                      'flex flex-col items-center gap-0.5',
+                      // ✅ cantos mais arredondados (sugestão)
+                      'rounded-2xl bg-white',
+                      // ✅ apertar 2px (antes: py-1.5 / gap-0.5)
+                      'py-1 shadow-none',
+                      'flex flex-col items-center gap-0',
                       'border border-neutral-200/60',
+                      // ✅ sombra só embaixo (custom)
+                      'menu-shadow-bottom',
                       isActive ? 'ring-1 ring-amber-200' : '',
                     ].join(' ')}
                   >
                     <Icon iconKey={cat.iconKey} />
 
-                    {/* ✅ Gastronomia/Hospedagem com mais “respiro” e sem apertar nas bordas */}
                     <span className="w-full px-2 text-center text-[11px] font-semibold leading-[1.15] text-neutral-800">
                       {cat.title}
                     </span>
@@ -443,32 +425,40 @@ export default function HomeScreenClient({
             -ms-overflow-style: none;
           }
 
-          @keyframes arrowInLeft {
-            from {
-              transform: translateX(-22px);
-              opacity: 0;
-            }
-            to {
-              transform: translateX(0);
-              opacity: 0.85;
-            }
+          /* ✅ sombra apenas embaixo (sem halo nas laterais) */
+          .menu-shadow-bottom {
+            box-shadow: 0 6px 0 rgba(0, 0, 0, 0.06);
           }
-          @keyframes arrowInRight {
+
+          /* ✅ animações */
+          @keyframes arrowInFromLeft {
             from {
-              transform: translateX(22px);
+              transform: translate(-18px, -50%);
               opacity: 0;
             }
             to {
-              transform: translateX(0);
-              opacity: 0.85;
+              transform: translate(0, -50%);
+              opacity: 0.9;
             }
           }
 
-          .animate-arrow-in-left {
-            animation: arrowInLeft 240ms ease-out both;
+          @keyframes arrowInFromRight {
+            from {
+              transform: translate(18px, -50%);
+              opacity: 0;
+            }
+            to {
+              transform: translate(0, -50%);
+              opacity: 0.9;
+            }
           }
-          .animate-arrow-in-right {
-            animation: arrowInRight 240ms ease-out both;
+
+          .animate-arrow-in-from-left {
+            animation: arrowInFromLeft 240ms ease-out both;
+          }
+
+          .animate-arrow-in-from-right {
+            animation: arrowInFromRight 240ms ease-out both;
           }
         `}</style>
       </section>
