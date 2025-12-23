@@ -215,7 +215,6 @@ export default function HomeScreenClient({
 }) {
   const categories: CategoryItem[] = useMemo(
     () => [
-      // 16 (2 telas de 8)
       { id: 'passeios', title: 'Passeios', count: 23, iconKey: 'pin' },
       { id: 'ingressos', title: 'Ingressos', count: 31, iconKey: 'ticket' },
       { id: 'servicos', title: 'Serviços', count: 12, iconKey: 'spark' },
@@ -334,7 +333,6 @@ export default function HomeScreenClient({
     }
   }, [canRight, hasOverflow, renderRight]);
 
-  // ✅ agora funciona sempre: scrollBy
   function go(dir: 'left' | 'right') {
     const el = scrollerRef.current;
     if (!el) return;
@@ -342,10 +340,9 @@ export default function HomeScreenClient({
     const w = el.clientWidth || 1;
     el.scrollBy({
       left: dir === 'right' ? w : -w,
-      behavior: 'smooth', // fica fluido no clique
+      behavior: 'smooth',
     });
 
-    // garante atualização de estado mesmo antes do scroll terminar
     requestAnimationFrame(() => computeNavState());
     window.setTimeout(() => computeNavState(), 180);
     window.setTimeout(() => computeNavState(), 360);
@@ -373,7 +370,6 @@ export default function HomeScreenClient({
         </div>
 
         <div className="relative z-[2]">
-          {/* ✅ Setas clicáveis: pointer-events-auto + z alto */}
           {renderLeft && (
             <button
               type="button"
@@ -410,11 +406,11 @@ export default function HomeScreenClient({
             </button>
           )}
 
-          {/* ✅ Snap removido TOTALMENTE */}
+          {/* ✅ scrollbar escondida + continua rolando */}
           <div
             ref={scrollerRef}
             className={[
-              'no-scrollbar',
+              'menu-scroller', // ✅ classe nova para esconder scrollbar
               'grid auto-cols-[100%] grid-flow-col',
               'overflow-x-auto',
               'px-1',
@@ -444,10 +440,15 @@ export default function HomeScreenClient({
         </div>
 
         <style jsx global>{`
-          .no-scrollbar::-webkit-scrollbar {
+          /* ✅ ESCONDER scrollbar (Chrome/Edge/Safari) */
+          .menu-scroller::-webkit-scrollbar {
+            height: 0px;
+            width: 0px;
             display: none;
           }
-          .no-scrollbar {
+
+          /* ✅ ESCONDER scrollbar (Firefox) */
+          .menu-scroller {
             scrollbar-width: none;
             -ms-overflow-style: none;
             -webkit-overflow-scrolling: touch;
