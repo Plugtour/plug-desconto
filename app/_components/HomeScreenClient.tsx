@@ -334,7 +334,6 @@ export default function HomeScreenClient({
     }
   }, [canRight, hasOverflow, renderRight]);
 
-  // ✅ agora funciona sempre: scrollBy
   function go(dir: 'left' | 'right') {
     const el = scrollerRef.current;
     if (!el) return;
@@ -342,10 +341,9 @@ export default function HomeScreenClient({
     const w = el.clientWidth || 1;
     el.scrollBy({
       left: dir === 'right' ? w : -w,
-      behavior: 'smooth', // fica fluido no clique
+      behavior: 'smooth',
     });
 
-    // garante atualização de estado mesmo antes do scroll terminar
     requestAnimationFrame(() => computeNavState());
     window.setTimeout(() => computeNavState(), 180);
     window.setTimeout(() => computeNavState(), 360);
@@ -373,7 +371,6 @@ export default function HomeScreenClient({
         </div>
 
         <div className="relative z-[2]">
-          {/* ✅ Setas clicáveis: pointer-events-auto + z alto */}
           {renderLeft && (
             <button
               type="button"
@@ -410,41 +407,45 @@ export default function HomeScreenClient({
             </button>
           )}
 
-          {/* ✅ Snap removido TOTALMENTE */}
-          <div
-            ref={scrollerRef}
-            className={[
-              'no-scrollbar',
-              'grid auto-cols-[100%] grid-flow-col',
-              'overflow-x-auto',
-              'px-1',
-              'touch-pan-x',
-              'overscroll-x-contain',
-              'scroll-smooth',
-            ].join(' ')}
-          >
-            {Array.from({ length: pagesCount }).map((_, pageIndex) => (
-              <div key={pageIndex} className="grid grid-cols-4 gap-3 py-2 px-1">
-                {categories.slice(pageIndex * 8, pageIndex * 8 + 8).map((cat) => (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    className="rounded-lg bg-white py-1 flex flex-col items-center gap-0 border border-neutral-200/60"
-                  >
-                    <Icon iconKey={cat.iconKey} />
-                    <span className="w-full px-2 text-center text-[11px] font-semibold leading-[1.15] text-neutral-800 line-clamp-2">
-                      {cat.title}
-                    </span>
-                    <span className="text-[11px] text-neutral-500">{cat.count}</span>
-                  </button>
-                ))}
-              </div>
-            ))}
+          {/* ✅ wrapper que OCULTA a barra sem mexer no scroll */}
+          <div className="overflow-hidden">
+            <div
+              ref={scrollerRef}
+              className={[
+                'no-scrollbar',
+                'grid auto-cols-[100%] grid-flow-col',
+                'overflow-x-auto',
+                'px-1',
+                'touch-pan-x',
+                'overscroll-x-contain',
+                'scroll-smooth',
+              ].join(' ')}
+            >
+              {Array.from({ length: pagesCount }).map((_, pageIndex) => (
+                <div key={pageIndex} className="grid grid-cols-4 gap-3 py-2 px-1">
+                  {categories.slice(pageIndex * 8, pageIndex * 8 + 8).map((cat) => (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      className="rounded-lg bg-white py-1 flex flex-col items-center gap-0 border border-neutral-200/60"
+                    >
+                      <Icon iconKey={cat.iconKey} />
+                      <span className="w-full px-2 text-center text-[11px] font-semibold leading-[1.15] text-neutral-800 line-clamp-2">
+                        {cat.title}
+                      </span>
+                      <span className="text-[11px] text-neutral-500">{cat.count}</span>
+                    </button>
+                  ))}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
         <style jsx global>{`
           .no-scrollbar::-webkit-scrollbar {
+            width: 0;
+            height: 0;
             display: none;
           }
           .no-scrollbar {
