@@ -1,35 +1,28 @@
+// app/api/offers/[slug]/route.ts
 import { NextResponse } from 'next/server';
-import { getTenantFromRequest } from '@/lib/tenant';
 import { getOfferBySlugOrId, normalizeSlugOrId } from '@/lib/offers';
 
 type Params = Promise<{ slug: string }>;
 
-export async function GET(_request: Request, { params }: { params: Params }) {
-  const tenant = await getTenantFromRequest();
+export async function GET(_request: Request, context: { params: Params }) {
+  try {
+    const { slug } = await context.params;
 
-  const { slug } = await params;
-  const raw = normalizeSlugOrId(slug);
+    const key = normalizeSlugOrId(slug);
+    const offer = getOfferBySlugOrId(key);
 
-  const offer = await getOfferBySlugOrId(tenant?.id ?? null, raw);
+    if (!offer) {
+      return NextResponse.json(
+        { error: 'Oferta não encontrada' },
+        { status: 404 }
+      );
+    }
 
-  if (!offer) {
+    return NextResponse.json({ offer }, { status: 200 });
+  } catch (e: any) {
     return NextResponse.json(
-      { ok: false, error: 'Oferta não encontrada' },
-      { status: 404 }
+      { error: 'Falha ao buscar oferta', detail: e?.message ?? String(e) },
+      { status: 500 }
     );
   }
-
-  return NextResponse.json({
-    ok: true,
-    item: {
-      id: offer.id,
-      slug: offer.slug,
-      tenantId: offer.tenantId,
-      category: offer.category,
-      title: offer.title,
-      partner: offer.partner,
-      benefit: offer.benefit,
-      description: offer.description,
-    },
-  });
 }
