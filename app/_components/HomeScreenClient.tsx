@@ -38,12 +38,7 @@ function DoubleChevronOpen({
 }) {
   const flip = dir === 'left';
   return (
-    <svg
-      viewBox="0 0 28 28"
-      className={className}
-      aria-hidden="true"
-      fill="none"
-    >
+    <svg viewBox="0 0 28 28" className={className} aria-hidden="true" fill="none">
       <g
         transform={flip ? 'translate(28 0) scale(-1 1)' : undefined}
         stroke="currentColor"
@@ -154,12 +149,7 @@ function Icon({
             strokeWidth="2"
             strokeLinejoin="round"
           />
-          <path
-            d="M8 12v-1.6M16 12v-1.6"
-            stroke="#A855F7"
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
+          <path d="M8 12v-1.6M16 12v-1.6" stroke="#A855F7" strokeWidth="2" strokeLinecap="round" />
         </svg>
       );
 
@@ -190,12 +180,7 @@ function Icon({
             strokeWidth="2"
             strokeLinejoin="round"
           />
-          <path
-            d="M6 11h12v6H6v-6z"
-            stroke="#06B6D4"
-            strokeWidth="2"
-            strokeLinejoin="round"
-          />
+          <path d="M6 11h12v6H6v-6z" stroke="#06B6D4" strokeWidth="2" strokeLinejoin="round" />
           <path
             d="M8 17.2a1.2 1.2 0 1 0 0-2.4 1.2 1.2 0 0 0 0 2.4zM16 17.2a1.2 1.2 0 1 0 0-2.4 1.2 1.2 0 0 0 0 2.4z"
             stroke="#06B6D4"
@@ -221,9 +206,9 @@ function Icon({
   }
 }
 
-/* =========================
-   COMPONENTE
-========================= */
+function clamp(n: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, n));
+}
 
 export default function HomeScreenClient({
   regionLabel = 'Serra Gaúcha',
@@ -232,10 +217,9 @@ export default function HomeScreenClient({
   regionLabel?: string;
   offers: OfferLike[];
 }) {
-  // ✅ 16 botões (8 + 8) — garante 2 telas no carrossel
+  // ✅ 16 botões (2 telas de 8)
   const categories: CategoryItem[] = useMemo(
     () => [
-      // Tela 1 (8)
       { id: 'passeios', title: 'Passeios', count: 23, iconKey: 'pin' },
       { id: 'ingressos', title: 'Ingressos', count: 31, iconKey: 'ticket' },
       { id: 'servicos', title: 'Serviços', count: 12, iconKey: 'spark' },
@@ -245,7 +229,6 @@ export default function HomeScreenClient({
       { id: 'transfers', title: 'Transfers', count: 14, iconKey: 'car' },
       { id: 'atracoes', title: 'Atrações', count: 9, iconKey: 'star' },
 
-      // Tela 2 (mais 8)
       { id: 'passeios2', title: 'Passeios', count: 11, iconKey: 'pin' },
       { id: 'ingressos2', title: 'Ingressos', count: 7, iconKey: 'ticket' },
       { id: 'servicos2', title: 'Serviços', count: 6, iconKey: 'spark' },
@@ -289,7 +272,7 @@ export default function HomeScreenClient({
 
     const w = el.clientWidth || 1;
     const p = Math.round(el.scrollLeft / w);
-    setPage(Math.max(0, Math.min(pagesCount - 1, p)));
+    setPage(clamp(p, 0, pagesCount - 1));
 
     const tol = 10;
     const leftOk = el.scrollLeft > tol;
@@ -366,15 +349,18 @@ export default function HomeScreenClient({
     }
   }, [canRight, hasOverflow, renderRight]);
 
-  // ✅ rolagem IMEDIATA ao clique
+  // ✅ Clique: vai para a PRÓXIMA/PREV página certinho (snap não “puxa de volta”)
   function go(dir: 'left' | 'right') {
     const el = scrollerRef.current;
     if (!el) return;
 
-    const w = el.clientWidth;
-    const target = dir === 'left' ? el.scrollLeft - w : el.scrollLeft + w;
+    const w = el.clientWidth || 1;
+    const current = Math.round(el.scrollLeft / w);
+    const next = clamp(current + (dir === 'right' ? 1 : -1), 0, pagesCount - 1);
+    const targetLeft = next * w;
 
-    el.scrollLeft = Math.max(0, target);
+    // imediato
+    el.scrollTo({ left: targetLeft, behavior: 'auto' });
 
     computeNavState();
     requestAnimationFrame(() => computeNavState());
@@ -394,16 +380,15 @@ export default function HomeScreenClient({
       </div>
 
       <section className="relative px-4 pt-4">
-        {/* Esfumaçado/blur */}
+        {/* Esfumaçado */}
         <div className="pointer-events-none absolute inset-0 z-[1]">
           <div className="absolute left-0 top-0 h-full w-10 bg-gradient-to-r from-zinc-100 to-transparent" />
           <div className="absolute right-0 top-0 h-full w-10 bg-gradient-to-l from-zinc-100 to-transparent" />
           <div className="absolute bottom-0 left-0 h-10 w-full bg-gradient-to-t from-zinc-100 to-transparent blur-[2px]" />
         </div>
 
-        {/* Wrapper do MENU */}
         <div className="relative z-[2]">
-          {/* ✅ Setas MAIS PARA O FINAL da tela (quase na borda) */}
+          {/* Esquerda */}
           {renderLeft && (
             <button
               type="button"
@@ -417,12 +402,12 @@ export default function HomeScreenClient({
                   leftAnim === 'enter' ? 'arrow-enter-left' : 'arrow-exit-left',
                 ].join(' ')}
               >
-                {/* +25% */}
                 <DoubleChevronOpen dir="left" className="h-10 w-10 scale-125" />
               </span>
             </button>
           )}
 
+          {/* Direita */}
           {renderRight && (
             <button
               type="button"
@@ -436,45 +421,45 @@ export default function HomeScreenClient({
                   rightAnim === 'enter' ? 'arrow-enter-right' : 'arrow-exit-right',
                 ].join(' ')}
               >
-                {/* +25% */}
                 <DoubleChevronOpen dir="right" className="h-10 w-10 scale-125" />
               </span>
             </button>
           )}
 
-          {/* ✅ Scroller com 2 telas (16 botões) */}
+          {/* Scroller (mais fluido no dedo) */}
           <div
             ref={scrollerRef}
-            className="no-scrollbar grid auto-cols-[100%] grid-flow-col overflow-x-auto snap-x snap-mandatory px-1"
+            className={[
+              'no-scrollbar',
+              'grid auto-cols-[100%] grid-flow-col',
+              'overflow-x-auto',
+              'snap-x snap-proximity', // ✅ fluido no dedo, mas ainda encaixa
+              'px-1',
+              'touch-pan-x', // ✅ gesto horizontal melhor
+              'overscroll-x-contain',
+            ].join(' ')}
           >
             {Array.from({ length: pagesCount }).map((_, pageIndex) => (
-              <div
-                key={pageIndex}
-                className="snap-start grid grid-cols-4 gap-3 py-2 px-1"
-              >
-                {categories
-                  .slice(pageIndex * 8, pageIndex * 8 + 8)
-                  .map((cat) => (
-                    <button
-                      key={cat.id}
-                      type="button"
-                      className={[
-                        'rounded-lg bg-white',
-                        'py-1',
-                        'flex flex-col items-center',
-                        'gap-0',
-                        'border border-neutral-200/60',
-                      ].join(' ')}
-                    >
-                      <Icon iconKey={cat.iconKey} />
-                      <span className="w-full px-2 text-center text-[11px] font-semibold leading-[1.15] text-neutral-800 line-clamp-2">
-                        {cat.title}
-                      </span>
-                      <span className="text-[11px] text-neutral-500">
-                        {cat.count}
-                      </span>
-                    </button>
-                  ))}
+              <div key={pageIndex} className="snap-start grid grid-cols-4 gap-3 py-2 px-1">
+                {categories.slice(pageIndex * 8, pageIndex * 8 + 8).map((cat) => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    className={[
+                      'rounded-lg bg-white',
+                      'py-1',
+                      'flex flex-col items-center',
+                      'gap-0',
+                      'border border-neutral-200/60',
+                    ].join(' ')}
+                  >
+                    <Icon iconKey={cat.iconKey} />
+                    <span className="w-full px-2 text-center text-[11px] font-semibold leading-[1.15] text-neutral-800 line-clamp-2">
+                      {cat.title}
+                    </span>
+                    <span className="text-[11px] text-neutral-500">{cat.count}</span>
+                  </button>
+                ))}
               </div>
             ))}
           </div>
@@ -500,6 +485,7 @@ export default function HomeScreenClient({
           .no-scrollbar {
             scrollbar-width: none;
             -ms-overflow-style: none;
+            -webkit-overflow-scrolling: touch; /* ✅ iOS mais suave */
           }
 
           @keyframes arrowEnterLeft {
