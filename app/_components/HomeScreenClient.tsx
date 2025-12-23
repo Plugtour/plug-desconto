@@ -53,10 +53,10 @@ function smoothScrollTo(el: HTMLElement, targetLeft: number, duration = 900) {
 }
 
 /* =========================
-   SETA ÚNICA (sem fundo)
+   SETAS (duplas, abertas, sem fundo)
 ========================= */
 
-function SingleChevronOpen({
+function DoubleChevronOpen({
   dir,
   className,
 }: {
@@ -69,11 +69,12 @@ function SingleChevronOpen({
       <g
         transform={flip ? 'translate(28 0) scale(-1 1)' : undefined}
         stroke="currentColor"
-        strokeWidth="3.0"
+        strokeWidth="2.8"
         strokeLinecap="round"
         strokeLinejoin="round"
       >
-        <path d="M10 7.5 16.5 14 10 20.5" />
+        <path d="M9 7.5 14.5 14 9 20.5" />
+        <path d="M15 7.5 20.5 14 15 20.5" />
       </g>
     </svg>
   );
@@ -110,7 +111,6 @@ function Icon({
           />
         </svg>
       );
-
     case 'ticket':
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none">
@@ -123,7 +123,6 @@ function Icon({
           <path d="M12 9.5v7" stroke="#F59E0B" strokeWidth="2" />
         </svg>
       );
-
     case 'spark':
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none">
@@ -141,7 +140,6 @@ function Icon({
           />
         </svg>
       );
-
     case 'fork':
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none">
@@ -159,7 +157,6 @@ function Icon({
           />
         </svg>
       );
-
     case 'bed':
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none">
@@ -175,15 +172,9 @@ function Icon({
             strokeWidth="2"
             strokeLinejoin="round"
           />
-          <path
-            d="M8 12v-1.6M16 12v-1.6"
-            stroke="#A855F7"
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
+          <path d="M8 12v-1.6M16 12v-1.6" stroke="#A855F7" strokeWidth="2" strokeLinecap="round" />
         </svg>
       );
-
     case 'bag':
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none">
@@ -201,7 +192,6 @@ function Icon({
           />
         </svg>
       );
-
     case 'car':
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none">
@@ -211,12 +201,7 @@ function Icon({
             strokeWidth="2"
             strokeLinejoin="round"
           />
-          <path
-            d="M6 11h12v6H6v-6z"
-            stroke="#06B6D4"
-            strokeWidth="2"
-            strokeLinejoin="round"
-          />
+          <path d="M6 11h12v6H6v-6z" stroke="#06B6D4" strokeWidth="2" strokeLinejoin="round" />
           <path
             d="M8 17.2a1.2 1.2 0 1 0 0-2.4 1.2 1.2 0 0 0 0 2.4zM16 17.2a1.2 1.2 0 1 0 0-2.4 1.2 1.2 0 0 0 0 2.4z"
             stroke="#06B6D4"
@@ -224,7 +209,6 @@ function Icon({
           />
         </svg>
       );
-
     case 'star':
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none">
@@ -236,7 +220,6 @@ function Icon({
           />
         </svg>
       );
-
     default:
       return null;
   }
@@ -279,35 +262,71 @@ export default function HomeScreenClient({
   );
 
   const scrollerRef = useRef<HTMLDivElement | null>(null);
+
   const [page, setPage] = useState(0);
+
+  // estado real: pode rolar?
+  const [hasOverflow, setHasOverflow] = useState(false);
   const [canLeft, setCanLeft] = useState(false);
-  const [canRight, setCanRight] = useState(true);
+  const [canRight, setCanRight] = useState(false);
+
+  // estado visual (para permitir animação de saída antes de desmontar)
+  const [renderLeft, setRenderLeft] = useState(false);
+  const [renderRight, setRenderRight] = useState(false);
+  const [leftAnim, setLeftAnim] = useState<'enter' | 'exit'>('enter');
+  const [rightAnim, setRightAnim] = useState<'enter' | 'exit'>('enter');
 
   const pagesCount = Math.max(1, Math.ceil(categories.length / 8));
 
-  function updateFromScroll() {
+  function computeNavState() {
     const el = scrollerRef.current;
     if (!el) return;
+
+    const overflow = el.scrollWidth > el.clientWidth + 1;
+    setHasOverflow(overflow);
+
+    if (!overflow) {
+      setCanLeft(false);
+      setCanRight(false);
+      setPage(0);
+      return;
+    }
 
     const w = el.clientWidth || 1;
     const p = Math.round(el.scrollLeft / w);
     setPage(Math.max(0, Math.min(pagesCount - 1, p)));
 
-    const tol = 2;
-    setCanLeft(el.scrollLeft > tol);
-    setCanRight(el.scrollLeft + el.clientWidth < el.scrollWidth - tol);
+    // tolerância um pouco maior para evitar “falso positivo” no início
+    const tol = 10;
+
+    const leftOk = el.scrollLeft > tol;
+    const rightOk = el.scrollLeft + el.clientWidth < el.scrollWidth - tol;
+
+    setCanLeft(leftOk);
+    setCanRight(rightOk);
   }
+
+  // garante que inicia no começo e calcula (evita bug de carregar no meio)
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+
+    el.scrollLeft = 0;
+    computeNavState();
+    requestAnimationFrame(() => computeNavState());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const el = scrollerRef.current;
     if (!el) return;
 
-    const onScroll = () => updateFromScroll();
+    const onScroll = () => computeNavState();
     el.addEventListener('scroll', onScroll, { passive: true });
 
-    updateFromScroll();
+    computeNavState();
 
-    const ro = new ResizeObserver(() => updateFromScroll());
+    const ro = new ResizeObserver(() => computeNavState());
     ro.observe(el);
 
     return () => {
@@ -317,6 +336,47 @@ export default function HomeScreenClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pagesCount]);
 
+  // controla render/animação (ESQUERDA)
+  useEffect(() => {
+    if (!hasOverflow) {
+      setRenderLeft(false);
+      return;
+    }
+
+    if (canLeft) {
+      setRenderLeft(true);
+      setLeftAnim('enter');
+      return;
+    }
+
+    // se estava renderizando, faz saída e desmonta depois
+    if (renderLeft) {
+      setLeftAnim('exit');
+      const t = window.setTimeout(() => setRenderLeft(false), 220);
+      return () => window.clearTimeout(t);
+    }
+  }, [canLeft, hasOverflow, renderLeft]);
+
+  // controla render/animação (DIREITA)
+  useEffect(() => {
+    if (!hasOverflow) {
+      setRenderRight(false);
+      return;
+    }
+
+    if (canRight) {
+      setRenderRight(true);
+      setRightAnim('enter');
+      return;
+    }
+
+    if (renderRight) {
+      setRightAnim('exit');
+      const t = window.setTimeout(() => setRenderRight(false), 220);
+      return () => window.clearTimeout(t);
+    }
+  }, [canRight, hasOverflow, renderRight]);
+
   function go(dir: 'left' | 'right') {
     const el = scrollerRef.current;
     if (!el) return;
@@ -324,11 +384,6 @@ export default function HomeScreenClient({
     const target = dir === 'left' ? el.scrollLeft - w : el.scrollLeft + w;
     smoothScrollTo(el, Math.max(0, target), 900);
   }
-
-  // ✅ regra: sempre exibir apenas UMA seta
-  // - se dá pra ir pra direita: mostra seta direita
-  // - senão, se dá pra voltar: mostra seta esquerda
-  const arrowDir: 'left' | 'right' | null = canRight ? 'right' : canLeft ? 'left' : null;
 
   return (
     <div className="mx-auto w-full max-w-md bg-zinc-100">
@@ -344,29 +399,55 @@ export default function HomeScreenClient({
       </div>
 
       <section className="relative px-4 pt-4">
-        {/* ✅ UMA seta por vez, com animação dependendo do lado */}
-        {arrowDir && (
+        {/* Esfumaçado/blur (fade) nas laterais + inferior */}
+        <div className="pointer-events-none absolute inset-0 z-[1]">
+          <div className="absolute left-0 top-0 h-full w-10 bg-gradient-to-r from-zinc-100 to-transparent" />
+          <div className="absolute right-0 top-0 h-full w-10 bg-gradient-to-l from-zinc-100 to-transparent" />
+          <div className="absolute bottom-0 left-0 h-10 w-full bg-gradient-to-t from-zinc-100 to-transparent blur-[2px]" />
+        </div>
+
+        {/* ESQUERDA: só aparece depois que começar a rolar */}
+        {renderLeft && (
           <button
             type="button"
-            onClick={() => go(arrowDir)}
-            aria-label={arrowDir === 'right' ? 'Avançar' : 'Voltar'}
-            className={[
-              'absolute top-1/2 z-10 -translate-y-1/2',
-              arrowDir === 'right' ? '-right-3' : '-left-3',
-              'transition-opacity duration-200',
-              'text-zinc-400 hover:text-zinc-600',
-              // animações diferentes: ao trocar de direção, entra do lado “contrário”
-              arrowDir === 'right' ? 'animate-arrow-in-from-left' : 'animate-arrow-in-from-right',
-            ].join(' ')}
+            onClick={() => go('left')}
+            aria-label="Voltar"
+            className="absolute -left-3 top-1/2 z-10 -translate-y-1/2"
           >
-            <SingleChevronOpen dir={arrowDir} className="h-14 w-14" />
+            <span
+              className={[
+                'block text-zinc-400 hover:text-zinc-600',
+                leftAnim === 'enter' ? 'arrow-enter-left' : 'arrow-exit-left',
+              ].join(' ')}
+            >
+              <DoubleChevronOpen dir="left" className="h-12 w-12" />
+            </span>
           </button>
         )}
 
-        {/* ✅ Scroller com padding lateral para evitar “corte” nas bordas */}
+        {/* DIREITA: aparece no início (se tiver rolagem) e some no final */}
+        {renderRight && (
+          <button
+            type="button"
+            onClick={() => go('right')}
+            aria-label="Avançar"
+            className="absolute -right-3 top-1/2 z-10 -translate-y-1/2"
+          >
+            <span
+              className={[
+                'block text-zinc-400 hover:text-zinc-600',
+                rightAnim === 'enter' ? 'arrow-enter-right' : 'arrow-exit-right',
+              ].join(' ')}
+            >
+              <DoubleChevronOpen dir="right" className="h-12 w-12" />
+            </span>
+          </button>
+        )}
+
+        {/* Scroller */}
         <div
           ref={scrollerRef}
-          className="no-scrollbar grid auto-cols-[100%] grid-flow-col overflow-x-auto scroll-smooth snap-x snap-mandatory px-1"
+          className="no-scrollbar relative z-[2] grid auto-cols-[100%] grid-flow-col overflow-x-auto scroll-smooth snap-x snap-mandatory px-1"
         >
           {Array.from({ length: pagesCount }).map((_, pageIndex) => (
             <div key={pageIndex} className="snap-start grid grid-cols-4 gap-3 py-2 px-1">
@@ -378,23 +459,18 @@ export default function HomeScreenClient({
                     key={cat.id}
                     type="button"
                     className={[
-                      // ✅ cantos mais arredondados (sugestão)
-                      'rounded-2xl bg-white',
-                      // ✅ apertar 2px (antes: py-1.5 / gap-0.5)
-                      'py-1 shadow-none',
-                      'flex flex-col items-center gap-0',
+                      'rounded-xl bg-white',
+                      'py-1',
+                      'flex flex-col items-center',
+                      'gap-0',
                       'border border-neutral-200/60',
-                      // ✅ sombra só embaixo (custom)
-                      'menu-shadow-bottom',
-                      isActive ? 'ring-1 ring-amber-200' : '',
+                      isActive ? 'ring-1 ring-amber-200 bg-amber-50/40' : '',
                     ].join(' ')}
                   >
                     <Icon iconKey={cat.iconKey} />
-
-                    <span className="w-full px-2 text-center text-[11px] font-semibold leading-[1.15] text-neutral-800">
+                    <span className="w-full px-2 text-center text-[11px] font-semibold leading-[1.15] text-neutral-800 line-clamp-2">
                       {cat.title}
                     </span>
-
                     <span className="text-[11px] text-neutral-500">{cat.count}</span>
                   </button>
                 );
@@ -425,40 +501,62 @@ export default function HomeScreenClient({
             -ms-overflow-style: none;
           }
 
-          /* ✅ sombra apenas embaixo (sem halo nas laterais) */
-          .menu-shadow-bottom {
-            box-shadow: 0 6px 0 rgba(0, 0, 0, 0.06);
-          }
-
-          /* ✅ animações */
-          @keyframes arrowInFromLeft {
+          /* ENTER: seta aparece vindo da lateral */
+          @keyframes arrowEnterLeft {
             from {
-              transform: translate(-18px, -50%);
+              transform: translateX(-18px);
               opacity: 0;
             }
             to {
-              transform: translate(0, -50%);
+              transform: translateX(0);
+              opacity: 0.9;
+            }
+          }
+          @keyframes arrowEnterRight {
+            from {
+              transform: translateX(18px);
+              opacity: 0;
+            }
+            to {
+              transform: translateX(0);
               opacity: 0.9;
             }
           }
 
-          @keyframes arrowInFromRight {
+          /* EXIT: seta desaparece saindo pela lateral */
+          @keyframes arrowExitLeft {
             from {
-              transform: translate(18px, -50%);
-              opacity: 0;
-            }
-            to {
-              transform: translate(0, -50%);
+              transform: translateX(0);
               opacity: 0.9;
             }
+            to {
+              transform: translateX(-18px);
+              opacity: 0;
+            }
+          }
+          @keyframes arrowExitRight {
+            from {
+              transform: translateX(0);
+              opacity: 0.9;
+            }
+            to {
+              transform: translateX(18px);
+              opacity: 0;
+            }
           }
 
-          .animate-arrow-in-from-left {
-            animation: arrowInFromLeft 240ms ease-out both;
+          .arrow-enter-left {
+            animation: arrowEnterLeft 220ms ease-out both;
+          }
+          .arrow-enter-right {
+            animation: arrowEnterRight 220ms ease-out both;
           }
 
-          .animate-arrow-in-from-right {
-            animation: arrowInFromRight 240ms ease-out both;
+          .arrow-exit-left {
+            animation: arrowExitLeft 220ms ease-in both;
+          }
+          .arrow-exit-right {
+            animation: arrowExitRight 220ms ease-in both;
           }
         `}</style>
       </section>
