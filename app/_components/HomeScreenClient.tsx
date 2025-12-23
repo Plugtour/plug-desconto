@@ -215,6 +215,7 @@ export default function HomeScreenClient({
 }) {
   const categories: CategoryItem[] = useMemo(
     () => [
+      // 16 (2 telas de 8)
       { id: 'passeios', title: 'Passeios', count: 23, iconKey: 'pin' },
       { id: 'ingressos', title: 'Ingressos', count: 31, iconKey: 'ticket' },
       { id: 'servicos', title: 'Serviços', count: 12, iconKey: 'spark' },
@@ -333,6 +334,7 @@ export default function HomeScreenClient({
     }
   }, [canRight, hasOverflow, renderRight]);
 
+  // ✅ agora funciona sempre: scrollBy
   function go(dir: 'left' | 'right') {
     const el = scrollerRef.current;
     if (!el) return;
@@ -340,9 +342,10 @@ export default function HomeScreenClient({
     const w = el.clientWidth || 1;
     el.scrollBy({
       left: dir === 'right' ? w : -w,
-      behavior: 'smooth',
+      behavior: 'smooth', // fica fluido no clique
     });
 
+    // garante atualização de estado mesmo antes do scroll terminar
     requestAnimationFrame(() => computeNavState());
     window.setTimeout(() => computeNavState(), 180);
     window.setTimeout(() => computeNavState(), 360);
@@ -370,6 +373,7 @@ export default function HomeScreenClient({
         </div>
 
         <div className="relative z-[2]">
+          {/* ✅ Setas clicáveis: pointer-events-auto + z alto */}
           {renderLeft && (
             <button
               type="button"
@@ -406,11 +410,11 @@ export default function HomeScreenClient({
             </button>
           )}
 
-          {/* ✅ Detalhe extra: empurra a área da scrollbar para fora */}
+          {/* ✅ Snap removido TOTALMENTE */}
           <div
             ref={scrollerRef}
             className={[
-              'menu-scroller',
+              'no-scrollbar',
               'grid auto-cols-[100%] grid-flow-col',
               'overflow-x-auto',
               'px-1',
@@ -440,28 +444,13 @@ export default function HomeScreenClient({
         </div>
 
         <style jsx global>{`
-          /* ✅ Detalhe extra (funciona quando o Windows insiste em mostrar barra) */
-          .menu-scroller {
-            /* continua rolando, mas a barra fica "fora do frame" */
-            padding-bottom: 16px;
-            margin-bottom: -16px;
-
-            scrollbar-width: none; /* Firefox */
-            -ms-overflow-style: none; /* IE/Edge antigo */
-            -webkit-overflow-scrolling: touch;
-          }
-
-          .menu-scroller::-webkit-scrollbar {
-            height: 0px;
-            width: 0px;
+          .no-scrollbar::-webkit-scrollbar {
             display: none;
           }
-
-          .menu-scroller::-webkit-scrollbar-thumb {
-            background: transparent;
-          }
-          .menu-scroller::-webkit-scrollbar-track {
-            background: transparent;
+          .no-scrollbar {
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            -webkit-overflow-scrolling: touch;
           }
 
           @keyframes arrowEnterLeft {
