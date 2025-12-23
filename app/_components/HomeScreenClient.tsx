@@ -206,10 +206,6 @@ function Icon({
   }
 }
 
-function clamp(n: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, n));
-}
-
 export default function HomeScreenClient({
   regionLabel = 'Serra Gaúcha',
   offers = [],
@@ -217,9 +213,9 @@ export default function HomeScreenClient({
   regionLabel?: string;
   offers: OfferLike[];
 }) {
-  // ✅ 16 botões (2 telas de 8)
   const categories: CategoryItem[] = useMemo(
     () => [
+      // 16 (2 telas de 8)
       { id: 'passeios', title: 'Passeios', count: 23, iconKey: 'pin' },
       { id: 'ingressos', title: 'Ingressos', count: 31, iconKey: 'ticket' },
       { id: 'servicos', title: 'Serviços', count: 12, iconKey: 'spark' },
@@ -243,11 +239,9 @@ export default function HomeScreenClient({
 
   const scrollerRef = useRef<HTMLDivElement | null>(null);
 
-  const [page, setPage] = useState(0);
-
-  const [hasOverflow, setHasOverflow] = useState(false);
   const [canLeft, setCanLeft] = useState(false);
   const [canRight, setCanRight] = useState(false);
+  const [hasOverflow, setHasOverflow] = useState(false);
 
   const [renderLeft, setRenderLeft] = useState(false);
   const [renderRight, setRenderRight] = useState(false);
@@ -266,15 +260,10 @@ export default function HomeScreenClient({
     if (!overflow) {
       setCanLeft(false);
       setCanRight(false);
-      setPage(0);
       return;
     }
 
-    const w = el.clientWidth || 1;
-    const p = Math.round(el.scrollLeft / w);
-    setPage(clamp(p, 0, pagesCount - 1));
-
-    const tol = 10;
+    const tol = 6;
     const leftOk = el.scrollLeft > tol;
     const rightOk = el.scrollLeft + el.clientWidth < el.scrollWidth - tol;
 
@@ -316,13 +305,11 @@ export default function HomeScreenClient({
       setRenderLeft(false);
       return;
     }
-
     if (canLeft) {
       setRenderLeft(true);
       setLeftAnim('enter');
       return;
     }
-
     if (renderLeft) {
       setLeftAnim('exit');
       const t = window.setTimeout(() => setRenderLeft(false), 220);
@@ -335,13 +322,11 @@ export default function HomeScreenClient({
       setRenderRight(false);
       return;
     }
-
     if (canRight) {
       setRenderRight(true);
       setRightAnim('enter');
       return;
     }
-
     if (renderRight) {
       setRightAnim('exit');
       const t = window.setTimeout(() => setRenderRight(false), 220);
@@ -349,21 +334,21 @@ export default function HomeScreenClient({
     }
   }, [canRight, hasOverflow, renderRight]);
 
-  // ✅ Clique: vai para a PRÓXIMA/PREV página certinho (snap não “puxa de volta”)
+  // ✅ agora funciona sempre: scrollBy
   function go(dir: 'left' | 'right') {
     const el = scrollerRef.current;
     if (!el) return;
 
     const w = el.clientWidth || 1;
-    const current = Math.round(el.scrollLeft / w);
-    const next = clamp(current + (dir === 'right' ? 1 : -1), 0, pagesCount - 1);
-    const targetLeft = next * w;
+    el.scrollBy({
+      left: dir === 'right' ? w : -w,
+      behavior: 'smooth', // fica fluido no clique
+    });
 
-    // imediato
-    el.scrollTo({ left: targetLeft, behavior: 'auto' });
-
-    computeNavState();
+    // garante atualização de estado mesmo antes do scroll terminar
     requestAnimationFrame(() => computeNavState());
+    window.setTimeout(() => computeNavState(), 180);
+    window.setTimeout(() => computeNavState(), 360);
   }
 
   return (
@@ -388,13 +373,13 @@ export default function HomeScreenClient({
         </div>
 
         <div className="relative z-[2]">
-          {/* Esquerda */}
+          {/* ✅ Setas clicáveis: pointer-events-auto + z alto */}
           {renderLeft && (
             <button
               type="button"
               onClick={() => go('left')}
               aria-label="Voltar"
-              className="absolute left-1 top-1/2 z-10 -translate-y-1/2"
+              className="pointer-events-auto absolute left-1 top-1/2 z-[50] -translate-y-1/2"
             >
               <span
                 className={[
@@ -407,13 +392,12 @@ export default function HomeScreenClient({
             </button>
           )}
 
-          {/* Direita */}
           {renderRight && (
             <button
               type="button"
               onClick={() => go('right')}
               aria-label="Avançar"
-              className="absolute right-1 top-1/2 z-10 -translate-y-1/2"
+              className="pointer-events-auto absolute right-1 top-1/2 z-[50] -translate-y-1/2"
             >
               <span
                 className={[
@@ -426,32 +410,26 @@ export default function HomeScreenClient({
             </button>
           )}
 
-          {/* Scroller (mais fluido no dedo) */}
+          {/* ✅ Snap removido TOTALMENTE */}
           <div
             ref={scrollerRef}
             className={[
               'no-scrollbar',
               'grid auto-cols-[100%] grid-flow-col',
               'overflow-x-auto',
-              'snap-x snap-proximity', // ✅ fluido no dedo, mas ainda encaixa
               'px-1',
-              'touch-pan-x', // ✅ gesto horizontal melhor
+              'touch-pan-x',
               'overscroll-x-contain',
+              'scroll-smooth',
             ].join(' ')}
           >
             {Array.from({ length: pagesCount }).map((_, pageIndex) => (
-              <div key={pageIndex} className="snap-start grid grid-cols-4 gap-3 py-2 px-1">
+              <div key={pageIndex} className="grid grid-cols-4 gap-3 py-2 px-1">
                 {categories.slice(pageIndex * 8, pageIndex * 8 + 8).map((cat) => (
                   <button
                     key={cat.id}
                     type="button"
-                    className={[
-                      'rounded-lg bg-white',
-                      'py-1',
-                      'flex flex-col items-center',
-                      'gap-0',
-                      'border border-neutral-200/60',
-                    ].join(' ')}
+                    className="rounded-lg bg-white py-1 flex flex-col items-center gap-0 border border-neutral-200/60"
                   >
                     <Icon iconKey={cat.iconKey} />
                     <span className="w-full px-2 text-center text-[11px] font-semibold leading-[1.15] text-neutral-800 line-clamp-2">
@@ -465,19 +443,6 @@ export default function HomeScreenClient({
           </div>
         </div>
 
-        {/* Indicador */}
-        <div className="mt-4 flex justify-center">
-          <div className="h-2 w-10 rounded-full bg-zinc-300/80">
-            <div
-              className="h-2 rounded-full bg-zinc-700 transition-all duration-200"
-              style={{
-                width: `${100 / pagesCount}%`,
-                transform: `translateX(${page * 100}%)`,
-              }}
-            />
-          </div>
-        </div>
-
         <style jsx global>{`
           .no-scrollbar::-webkit-scrollbar {
             display: none;
@@ -485,7 +450,7 @@ export default function HomeScreenClient({
           .no-scrollbar {
             scrollbar-width: none;
             -ms-overflow-style: none;
-            -webkit-overflow-scrolling: touch; /* ✅ iOS mais suave */
+            -webkit-overflow-scrolling: touch;
           }
 
           @keyframes arrowEnterLeft {
