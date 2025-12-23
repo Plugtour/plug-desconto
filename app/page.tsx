@@ -1,6 +1,7 @@
 // app/page.tsx
 import { apiGetOffers } from '@/lib/api';
 import HomeScreenClient from './_components/HomeScreenClient';
+import BannerMobile from './BannerMobile';
 
 export default async function HomePage() {
   const offers = await apiGetOffers(); // usa sua API/lib atual

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import BannerMobile from '@/components/BannerMobile';
 
 /* =========================
    TIPOS
