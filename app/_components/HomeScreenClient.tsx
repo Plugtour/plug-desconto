@@ -406,11 +406,11 @@ export default function HomeScreenClient({
             </button>
           )}
 
-          {/* ✅ scrollbar escondida + continua rolando */}
+          {/* ✅ Detalhe extra: empurra a área da scrollbar para fora */}
           <div
             ref={scrollerRef}
             className={[
-              'menu-scroller', // ✅ classe nova para esconder scrollbar
+              'menu-scroller',
               'grid auto-cols-[100%] grid-flow-col',
               'overflow-x-auto',
               'px-1',
@@ -440,18 +440,28 @@ export default function HomeScreenClient({
         </div>
 
         <style jsx global>{`
-          /* ✅ ESCONDER scrollbar (Chrome/Edge/Safari) */
+          /* ✅ Detalhe extra (funciona quando o Windows insiste em mostrar barra) */
+          .menu-scroller {
+            /* continua rolando, mas a barra fica "fora do frame" */
+            padding-bottom: 16px;
+            margin-bottom: -16px;
+
+            scrollbar-width: none; /* Firefox */
+            -ms-overflow-style: none; /* IE/Edge antigo */
+            -webkit-overflow-scrolling: touch;
+          }
+
           .menu-scroller::-webkit-scrollbar {
             height: 0px;
             width: 0px;
             display: none;
           }
 
-          /* ✅ ESCONDER scrollbar (Firefox) */
-          .menu-scroller {
-            scrollbar-width: none;
-            -ms-overflow-style: none;
-            -webkit-overflow-scrolling: touch;
+          .menu-scroller::-webkit-scrollbar-thumb {
+            background: transparent;
+          }
+          .menu-scroller::-webkit-scrollbar-track {
+            background: transparent;
           }
 
           @keyframes arrowEnterLeft {
