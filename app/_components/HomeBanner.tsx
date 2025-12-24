@@ -467,7 +467,12 @@ export default function HomeBanner({ className }: Props) {
 
     return (
       <div className="absolute inset-0 z-[35] px-14 pb-4 pt-6 -translate-y-[0px]">
-        <div className={[`flex h-full w-full flex-col justify-end gap-1 ${contentAlign}`, centerLiftClass].join(' ')}>
+        <div
+          className={[
+            `flex h-full w-full flex-col justify-end gap-1 ${contentAlign}`,
+            centerLiftClass,
+          ].join(' ')}
+        >
           <div
             className="text-[11px] font-semibold tracking-wide"
             style={{ color: '#7CFFB2', textShadow: '0 2px 16px rgba(0,0,0,0.55)' }}
@@ -475,7 +480,10 @@ export default function HomeBanner({ className }: Props) {
             {item.tag}
           </div>
 
-          <div className={titleClass} style={{ textShadow: '0 2px 18px rgba(0,0,0,0.65)' }}>
+          <div
+            className={titleClass}
+            style={{ textShadow: '0 2px 18px rgba(0,0,0,0.65)' }}
+          >
             {item.title}
           </div>
 
@@ -533,6 +541,7 @@ export default function HomeBanner({ className }: Props) {
               <div className="absolute inset-0">
                 <picture>
                   <source srcSet={withWebp(current.imageUrl)} type="image/webp" />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={current.imageUrl}
                     alt={current.title}
@@ -556,6 +565,7 @@ export default function HomeBanner({ className }: Props) {
               >
                 <picture>
                   <source srcSet={withWebp(fadeItem.imageUrl)} type="image/webp" />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={fadeItem.imageUrl}
                     alt={fadeItem.title}
@@ -566,7 +576,10 @@ export default function HomeBanner({ className }: Props) {
                   />
                 </picture>
 
-                <div className="absolute inset-0" style={{ animation: `fadeIn ${FADE_MS}ms ease-out both` }}>
+                <div
+                  className="absolute inset-0"
+                  style={{ animation: `fadeIn ${FADE_MS}ms ease-out both` }}
+                >
                   <SlideContent item={fadeItem} />
                 </div>
               </div>
@@ -584,6 +597,7 @@ export default function HomeBanner({ className }: Props) {
               >
                 <picture>
                   <source srcSet={withWebp(prevForSlide.imageUrl)} type="image/webp" />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={prevForSlide.imageUrl}
                     alt={prevForSlide.title}
@@ -607,6 +621,7 @@ export default function HomeBanner({ className }: Props) {
               >
                 <picture>
                   <source srcSet={withWebp(current.imageUrl)} type="image/webp" />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={current.imageUrl}
                     alt={current.title}
@@ -630,6 +645,7 @@ export default function HomeBanner({ className }: Props) {
               >
                 <picture>
                   <source srcSet={withWebp(nextForSlide.imageUrl)} type="image/webp" />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={nextForSlide.imageUrl}
                     alt={nextForSlide.title}
@@ -677,7 +693,11 @@ export default function HomeBanner({ className }: Props) {
               className="p2"
               style={{ touchAction: 'manipulation' }}
             >
-              {userPaused ? <PlayIcon className="h-10 w-10 text-white" /> : <PauseIcon className="h-10 w-10 text-white" />}
+              {userPaused ? (
+                <PlayIcon className="h-10 w-10 text-white" />
+              ) : (
+                <PauseIcon className="h-10 w-10 text-white" />
+              )}
             </button>
 
             <button
@@ -698,7 +718,11 @@ export default function HomeBanner({ className }: Props) {
               style={{ touchAction: 'manipulation' }}
             >
               <HeartIcon
-                className={['h-8 w-8', isFav ? 'text-red-500' : 'text-white', heartPop ? 'heart-pop' : ''].join(' ')}
+                className={[
+                  'h-8 w-8',
+                  isFav ? 'text-red-500' : 'text-white',
+                  heartPop ? 'heart-pop' : '',
+                ].join(' ')}
                 active={isFav}
               />
             </button>
