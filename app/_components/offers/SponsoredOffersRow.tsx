@@ -20,7 +20,7 @@ function Star({ fillPct }: { fillPct: number }) {
   const pct = Math.max(0, Math.min(100, fillPct));
 
   return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4">
+    <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
       <path
         d="M12 3.6l2.5 5.3 5.8.5-4.4 3.8 1.4 5.7L12 16.1 6.7 18.9l1.4-5.7-4.4-3.8 5.8-.5L12 3.6z"
         className="fill-zinc-300"
@@ -44,20 +44,68 @@ function StarsRow({ rating }: { rating: number }) {
   return (
     <div className="flex items-center gap-[1px]">
       {Array.from({ length: 5 }).map((_, i) => {
-        const fill =
-          r <= i ? 0 : r >= i + 1 ? 100 : Math.round((r - i) * 100);
+        const fill = r <= i ? 0 : r >= i + 1 ? 100 : Math.round((r - i) * 100);
         return <Star key={i} fillPct={fill} />;
       })}
     </div>
   );
 }
 
+/* =========================
+   META (Linha 2)
+========================= */
+
 function buildMeta(item: any) {
+  // prioridade: metaText -> city|category|kind -> subtitle
+  const metaText = (item?.metaText ?? '').toString().trim();
+  if (metaText) return metaText;
+
   const parts: string[] = [];
-  if (item?.city) parts.push(item.city);
-  if (item?.category) parts.push(item.category);
-  if (item?.kind) parts.push(item.kind);
-  return parts.join(' | ');
+  const city = (item?.city ?? item?.cidade ?? '').toString().trim();
+  const category = (item?.category ?? item?.categoria ?? '').toString().trim();
+  const kind = (item?.kind ?? item?.tipo ?? '').toString().trim();
+
+  if (city) parts.push(city);
+  if (category) parts.push(category);
+  if (kind) parts.push(kind);
+
+  if (parts.length) return parts.join(' | ');
+
+  const subtitle = (item?.subtitle ?? '').toString().trim();
+  if (subtitle) return subtitle;
+
+  return '';
+}
+
+/* =========================
+   CORAÇÃO
+========================= */
+
+function HeartIcon({
+  filled,
+  className,
+}: {
+  filled: boolean;
+  className?: string;
+}) {
+  // "gordinho": stroke mais forte quando vazado
+  const strokeWidth = filled ? 0 : 2.2;
+
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      aria-hidden="true"
+      fill={filled ? 'currentColor' : 'none'}
+    >
+      <path
+        d="M12 21s-7.2-4.6-9.5-8.9C.6 9.1 2.3 6.2 5.6 5.8c1.9-.2 3.7.7 4.7 2.2 1-1.5 2.8-2.4 4.7-2.2 3.3.4 5 3.3 3.1 6.3C19.2 16.4 12 21 12 21z"
+        stroke="currentColor"
+        strokeWidth={strokeWidth}
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
 }
 
 export default function SponsoredOffersRow({
@@ -67,7 +115,6 @@ export default function SponsoredOffersRow({
   viewAllHref,
 }: Props) {
   const shown = useMemo(() => items.slice(0, 5), [items]);
-
   const [favIds, setFavIds] = useState<Record<string, boolean>>({});
 
   function toggleFav(id: string) {
@@ -97,23 +144,27 @@ export default function SponsoredOffersRow({
           const anyItem: any = item;
           const isFav = !!favIds[item.id];
 
+          // Linha 2
           const meta = buildMeta(anyItem);
-          const economy = item.priceText
-            ? `Economia de ${item.priceText}`
-            : '';
+
+          // Linha 3 (bold)
+          // Aceita:
+          // - economyText: "R$80 a R$120" ou "R$80 - R$120"
+          // - priceText: "R$80 a R$120"
+          const range =
+            (anyItem?.economyText ?? item.priceText ?? '').toString().trim();
+
+          const economyLine = range ? `Economia de ${range}` : '';
 
           const rating = Number(anyItem?.rating ?? 4.8);
           const reviews = Number(anyItem?.reviews ?? 275);
 
           return (
             <div key={item.id} className="relative">
-              <Link
-                href={item.href}
-                className="block py-3 active:scale-[0.995]"
-              >
+              <Link href={item.href} className="block py-3 active:scale-[0.995]">
                 <div className="flex gap-3">
-                  {/* FOTO – +25%, canto md */}
-                  <div className="h-20 w-20 flex-none overflow-hidden rounded-md bg-zinc-200">
+                  {/* FOTO – +20% (80 -> 96), canto md */}
+                  <div className="h-24 w-24 flex-none overflow-hidden rounded-md bg-zinc-200">
                     <img
                       src={item.imageUrl}
                       alt={item.title}
@@ -122,76 +173,68 @@ export default function SponsoredOffersRow({
                     />
                   </div>
 
-                  {/* CONTEÚDO */}
                   <div className="min-w-0 flex-1">
-                    {/* TÍTULO */}
-                    <div className="pr-12 text-[14px] font-semibold leading-snug text-zinc-900 line-clamp-2">
+                    {/* TÍTULO (2 linhas max, com espaço pro coração) */}
+                    <div className="pr-14 text-[14px] font-semibold leading-snug text-zinc-900 line-clamp-2">
                       {item.title}
                     </div>
 
-                    {/* META (linha 2) */}
-                    {meta ? (
-                      <div className="-mt-0.5 text-[12px] text-zinc-500 line-clamp-1">
-                        {meta}
+                    {/* Linha 2: meta */}
+                    <div className="mt-0 text-[12px] text-zinc-500 line-clamp-1">
+                      {meta || ' '}
+                    </div>
+
+                    {/* Linha 3: economia (bold) — aproximar da linha 2 */}
+                    {economyLine ? (
+                      <div className="-mt-0.5 text-[13px] font-semibold text-zinc-900">
+                        {economyLine}
                       </div>
                     ) : null}
 
-                    {/* ECONOMIA (linha 3 – mais próxima da 2) */}
-                    {economy ? (
-                      <div className="mt-0.5 text-[13px] font-semibold text-zinc-900">
-                        {economy}
-                      </div>
-                    ) : null}
-
-                    {/* AVALIAÇÃO + VER MAIS */}
+                    {/* Avaliação + Ver mais */}
                     <div className="mt-1.5 flex items-end justify-between">
                       <div>
-                        {/* estrelas bem juntas */}
                         <StarsRow rating={rating} />
-
-                        {/* nota + avaliações (ambos mesmo peso) */}
                         <div className="-mt-0.5 text-[12px] text-zinc-500">
                           <span className="font-semibold text-zinc-700">
-                            {rating.toFixed(1)}
+                            {Number.isFinite(rating) ? rating.toFixed(1) : '0.0'}
                           </span>{' '}
                           de{' '}
                           <span className="font-semibold text-zinc-700">
-                            {reviews}
+                            {Number.isFinite(reviews) ? reviews : 0}
                           </span>{' '}
                           avaliações
                         </div>
                       </div>
 
-                      <span className="text-[13px] font-semibold text-green-600">
+                      {/* Ver mais +1px */}
+                      <span className="text-[14px] font-semibold text-green-600">
                         Ver mais
                       </span>
                     </div>
                   </div>
                 </div>
 
-                {/* CORAÇÃO – maior, gordinho, canto superior direito */}
+                {/* CORAÇÃO – +25% (maior), vazado -> cheio vermelho */}
                 <button
                   type="button"
-                  aria-label="Favoritar"
+                  aria-label={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
                     toggleFav(item.id);
                   }}
-                  className="absolute right-2 top-2"
+                  className="absolute right-2 top-2 inline-flex h-10 w-10 items-center justify-center"
                 >
-                  <svg
-                    viewBox="0 0 24 24"
+                  <HeartIcon
+                    filled={isFav}
                     className={[
-                      'h-7 w-7 transition',
+                      'h-9 w-9 transition',
                       isFav
                         ? 'text-red-500'
                         : 'text-zinc-300 hover:text-zinc-400',
                     ].join(' ')}
-                    fill="currentColor"
-                  >
-                    <path d="M12 21s-7.2-4.6-9.5-8.9C.6 9.1 2.3 6.2 5.6 5.8c1.9-.2 3.7.7 4.7 2.2 1-1.5 2.8-2.4 4.7-2.2 3.3.4 5 3.3 3.1 6.3C19.2 16.4 12 21 12 21z" />
-                  </svg>
+                  />
                 </button>
               </Link>
 
