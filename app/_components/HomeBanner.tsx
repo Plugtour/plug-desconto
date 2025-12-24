@@ -9,9 +9,9 @@ type Props = { className?: string };
 
 const DURATION_MS = 6500;
 const SWIPE_THRESHOLD = 45;
-const DEADZONE_PX = 10; // evita cancelar tap por micro-movimento
-const SLIDE_MS = 420; // swipe
-const FADE_MS = 280; // setas + autoplay
+const DEADZONE_PX = 10;
+const SLIDE_MS = 420;
+const FADE_MS = 280;
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -145,11 +145,11 @@ export default function HomeBanner({ className }: Props) {
   const [favorites, setFavorites] = useState<Record<string, boolean>>({});
   const [heartPop, setHeartPop] = useState(false);
 
-  // ===== Autoplay “sem React” (timeout + tempo restante) =====
+  // autoplay (timeout + tempo restante)
   const timeoutRef = useRef<number | null>(null);
   const startedAtRef = useRef<number>(0);
   const remainingRef = useRef<number>(DURATION_MS);
-  const [barKey, setBarKey] = useState(0); // força reiniciar animação CSS quando necessário
+  const [barKey, setBarKey] = useState(0);
 
   const current = items[active];
   const prevIndex = (active - 1 + count) % count;
@@ -252,7 +252,6 @@ export default function HomeBanner({ className }: Props) {
     }, Math.max(0, remainingRef.current));
   }
 
-  // quando troca o banner (ou conclui transição), reseta relógio + barra
   function resetAutoplayClock() {
     clearAutoplayTimer();
     remainingRef.current = DURATION_MS;
@@ -260,7 +259,6 @@ export default function HomeBanner({ className }: Props) {
     setBarKey((k) => k + 1);
   }
 
-  // controla start/pause do autoplay sem re-render contínuo
   useEffect(() => {
     if (count <= 1) return;
 
@@ -269,16 +267,10 @@ export default function HomeBanner({ className }: Props) {
       return;
     }
 
-    // se voltar a rodar, retoma com tempo restante
     resumeAutoplayClock();
-
-    return () => {
-      // não limpa sempre aqui pra não “matar” o timer em mudanças de render irrelevantes
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoplayPaused, active, count]);
 
-  // ao montar / quando active muda por transições, reinicia
   useEffect(() => {
     if (count <= 1) return;
     resetAutoplayClock();
@@ -303,7 +295,6 @@ export default function HomeBanner({ className }: Props) {
     if (isSlideAnimating || isFading) return;
     if (slideTimerRef.current) window.clearTimeout(slideTimerRef.current);
 
-    // “fecha” barra atual visualmente (CSS: vira 100% no pause automático via autoplayPaused)
     pauseAutoplayClock();
     remainingRef.current = 0;
 
@@ -325,7 +316,6 @@ export default function HomeBanner({ className }: Props) {
     const safe = ((targetIndex % count) + count) % count;
     if (safe === active) return;
 
-    // reseta swipe
     setIsDragging(false);
     draggingRef.current = false;
     hasMovedRef.current = false;
@@ -386,7 +376,6 @@ export default function HomeBanner({ className }: Props) {
     );
   }
 
-  // Swipe handlers (deadzone)
   function onPointerDown(e: React.PointerEvent) {
     if (shouldIgnoreGesture(e.target)) return;
     if (isSlideAnimating || isFading) return;
@@ -464,6 +453,11 @@ export default function HomeBanner({ className }: Props) {
 
   const stop = (e: React.SyntheticEvent) => e.stopPropagation();
 
+  // ✅ Sombras mais fortes + subtítulo branco sem opacidade
+  const SHADOW_STRONG = '0 3px 22px rgba(0,0,0,0.92)';
+  const SHADOW_MED = '0 3px 18px rgba(0,0,0,0.88)';
+  const SHADOW_SOFT = '0 2px 16px rgba(0,0,0,0.82)';
+
   function SlideContent({ item }: { item: BannerItem }) {
     const contentAlign = alignClasses(item.align);
     const centerLiftClass = item.align === 'center' ? '-translate-y-[15px]' : '';
@@ -486,25 +480,25 @@ export default function HomeBanner({ className }: Props) {
         >
           <div
             className="text-[11px] font-semibold tracking-wide"
-            style={{ color: '#7CFFB2', textShadow: '0 2px 16px rgba(0,0,0,0.55)' }}
+            style={{ color: '#7CFFB2', textShadow: SHADOW_SOFT }}
           >
             {item.tag}
           </div>
 
-          <div className={titleClass} style={{ textShadow: '0 2px 18px rgba(0,0,0,0.65)' }}>
+          <div className={titleClass} style={{ textShadow: SHADOW_STRONG }}>
             {item.title}
           </div>
 
           <div
-            className="text-[16px] font-medium text-white/90"
-            style={{ textShadow: '0 2px 14px rgba(0,0,0,0.55)' }}
+            className="text-[16px] font-semibold text-white" // ✅ era white/90
+            style={{ textShadow: SHADOW_MED }}
           >
             {item.subtitle}
           </div>
 
           <div
             className="text-[15px] font-semibold -mt-[8px]"
-            style={{ color: '#7CCBFF', textShadow: '0 2px 14px rgba(0,0,0,0.55)' }}
+            style={{ color: '#7CCBFF', textShadow: SHADOW_SOFT }}
           >
             {item.highlight}
           </div>
@@ -514,7 +508,7 @@ export default function HomeBanner({ className }: Props) {
               <Link
                 href={item.href}
                 className="inline-flex text-[15px] font-semibold text-white -translate-y-[10px]"
-                style={{ textShadow: '0 2px 14px rgba(0,0,0,0.55)' }}
+                style={{ textShadow: SHADOW_MED }}
               >
                 Ver ofertas →
               </Link>
@@ -527,7 +521,6 @@ export default function HomeBanner({ className }: Props) {
 
   const fadeItem = fadeTo != null ? items[fadeTo] : null;
 
-  // ===== Barra ativa via CSS: delay negativo simula progresso já decorrido =====
   const elapsedMs = clamp(DURATION_MS - remainingRef.current, 0, DURATION_MS);
 
   return (
@@ -542,10 +535,8 @@ export default function HomeBanner({ className }: Props) {
           onPointerCancel={onPointerUp}
           style={{ touchAction: 'pan-y' }}
         >
-          {/* IMAGENS + TEXTO */}
           {isFading && fadeItem ? (
             <>
-              {/* BASE: só imagem */}
               <div className="absolute inset-0">
                 <picture>
                   <source srcSet={withWebp(current.imageUrl)} type="image/webp" />
@@ -560,7 +551,6 @@ export default function HomeBanner({ className }: Props) {
                 </picture>
               </div>
 
-              {/* TOP: imagem + texto */}
               <div
                 className={[
                   'absolute inset-0',
@@ -589,7 +579,6 @@ export default function HomeBanner({ className }: Props) {
             </>
           ) : (
             <>
-              {/* PREV */}
               <div
                 className={['absolute inset-0 will-change-transform', slideTransitionClass].join(' ')}
                 style={{
@@ -612,7 +601,6 @@ export default function HomeBanner({ className }: Props) {
                 <SlideContent item={prevItem} />
               </div>
 
-              {/* CURRENT */}
               <div
                 className={['absolute inset-0 will-change-transform', slideTransitionClass].join(' ')}
                 style={{
@@ -635,7 +623,6 @@ export default function HomeBanner({ className }: Props) {
                 <SlideContent item={current} />
               </div>
 
-              {/* NEXT */}
               <div
                 className={['absolute inset-0 will-change-transform', slideTransitionClass].join(' ')}
                 style={{
@@ -660,11 +647,11 @@ export default function HomeBanner({ className }: Props) {
             </>
           )}
 
-          {/* overlays */}
+          {/* overlays (mantidos) */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/25 to-black/10" />
           <div className="absolute inset-0 bg-black/10" />
 
-          {/* progress (CSS animation) */}
+          {/* progress */}
           <div className="absolute left-0 right-0 top-0 z-[60] px-3 pt-2">
             <div className="flex gap-1.5">
               {items.map((_, i) => {
@@ -673,12 +660,11 @@ export default function HomeBanner({ className }: Props) {
 
                 return (
                   <div key={i} className="h-[3px] flex-1 overflow-hidden rounded-full bg-white/35">
-                    {/* fundo preenchido */}
                     {isPast ? (
                       <div className="h-full w-full bg-white" />
                     ) : isActive ? (
                       <div
-                        key={barKey} // ✅ reinicia animação quando troca/retoma
+                        key={barKey}
                         className="h-full bg-white"
                         style={{
                           width: '100%',
