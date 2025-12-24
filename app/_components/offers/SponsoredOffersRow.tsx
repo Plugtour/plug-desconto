@@ -20,7 +20,7 @@ function Star({ fillPct }: { fillPct: number }) {
   const pct = Math.max(0, Math.min(100, fillPct));
 
   return (
-    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" aria-hidden="true">
+    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5">
       <path
         d="M12 3.6l2.5 5.3 5.8.5-4.4 3.8 1.4 5.7L12 16.1 6.7 18.9l1.4-5.7-4.4-3.8 5.8-.5L12 3.6z"
         className="fill-zinc-300"
@@ -42,9 +42,10 @@ function Star({ fillPct }: { fillPct: number }) {
 function StarsRow({ rating }: { rating: number }) {
   const r = Math.max(0, Math.min(5, rating));
   return (
-    <div className="flex items-center gap-[1px]">
+    <div className="flex items-center gap-[0.5px]">
       {Array.from({ length: 5 }).map((_, i) => {
-        const fill = r <= i ? 0 : r >= i + 1 ? 100 : Math.round((r - i) * 100);
+        const fill =
+          r <= i ? 0 : r >= i + 1 ? 100 : Math.round((r - i) * 100);
         return <Star key={i} fillPct={fill} />;
       })}
     </div>
@@ -60,13 +61,9 @@ function buildMeta(item: any) {
   if (metaText) return metaText;
 
   const parts: string[] = [];
-  const city = (item?.city ?? item?.cidade ?? '').toString().trim();
-  const category = (item?.category ?? item?.categoria ?? '').toString().trim();
-  const kind = (item?.kind ?? item?.tipo ?? '').toString().trim();
-
-  if (city) parts.push(city);
-  if (category) parts.push(category);
-  if (kind) parts.push(kind);
+  if (item?.city) parts.push(item.city);
+  if (item?.category) parts.push(item.category);
+  if (item?.kind) parts.push(item.kind);
 
   if (parts.length) return parts.join(' | ');
 
@@ -77,7 +74,7 @@ function buildMeta(item: any) {
 }
 
 /* =========================
-   CORAÇÃO
+   CORAÇÃO (novo, simétrico, gordinho)
 ========================= */
 
 function HeartIcon({
@@ -87,21 +84,16 @@ function HeartIcon({
   filled: boolean;
   className?: string;
 }) {
-  const strokeWidth = filled ? 0 : 2.2;
-
   return (
     <svg
       viewBox="0 0 24 24"
       className={className}
-      aria-hidden="true"
       fill={filled ? 'currentColor' : 'none'}
+      stroke="currentColor"
+      strokeWidth={filled ? 0 : 2}
+      strokeLinejoin="round"
     >
-      <path
-        d="M12 21s-7.2-4.6-9.5-8.9C.6 9.1 2.3 6.2 5.6 5.8c1.9-.2 3.7.7 4.7 2.2 1-1.5 2.8-2.4 4.7-2.2 3.3.4 5 3.3 3.1 6.3C19.2 16.4 12 21 12 21z"
-        stroke="currentColor"
-        strokeWidth={strokeWidth}
-        strokeLinejoin="round"
-      />
+      <path d="M12 21c-.3 0-7-4.2-9.4-8.2C.7 9.6 2.3 6.8 5.4 6.5c1.7-.2 3.4.7 4.4 2.1 1-1.4 2.7-2.3 4.4-2.1 3.1.3 4.7 3.1 2.8 6.3C19 16.8 12.3 21 12 21z" />
     </svg>
   );
 }
@@ -151,7 +143,7 @@ export default function SponsoredOffersRow({
 
           return (
             <div key={item.id} className="relative">
-              <Link href={item.href} className="block py-3 active:scale-[0.995]">
+              <Link href={item.href} className="block py-3">
                 <div className="flex gap-3">
                   {/* FOTO */}
                   <div className="h-24 w-24 flex-none overflow-hidden rounded-md bg-zinc-200">
@@ -159,29 +151,28 @@ export default function SponsoredOffersRow({
                       src={item.imageUrl}
                       alt={item.title}
                       className="h-full w-full object-cover"
-                      loading="lazy"
                     />
                   </div>
 
                   <div className="min-w-0 flex-1">
-                    {/* TÍTULO */}
-                    <div className="pr-14 text-[13px] font-semibold leading-snug text-zinc-900 line-clamp-2">
+                    {/* LINHA 1 – título */}
+                    <div className="pr-14 text-[11px] font-extrabold leading-snug text-zinc-900 line-clamp-2">
                       {item.title}
                     </div>
 
-                    {/* LINHA 2 */}
-                    <div className="mt-0 text-[11px] text-zinc-500 line-clamp-1">
+                    {/* LINHA 2 – meta (1px mais próxima) */}
+                    <div className="-mt-[1px] text-[11px] text-zinc-500 line-clamp-1">
                       {meta || ' '}
                     </div>
 
-                    {/* LINHA 3 */}
+                    {/* LINHA 3 – economia (peso menor, 3px mais baixa) */}
                     {economyLine ? (
-                      <div className="-mt-0.5 text-[12px] font-semibold text-zinc-900">
+                      <div className="mt-[3px] text-[11px] font-medium text-zinc-900">
                         {economyLine}
                       </div>
                     ) : null}
 
-                    {/* AVALIAÇÃO + VER MAIS */}
+                    {/* ESTRELAS + NOTAS */}
                     <div className="mt-1.5 flex items-end justify-between">
                       <div>
                         <StarsRow rating={rating} />
@@ -197,7 +188,7 @@ export default function SponsoredOffersRow({
                         </div>
                       </div>
 
-                      {/* VER MAIS (mantido) */}
+                      {/* VER MAIS (inalterado) */}
                       <span className="text-[14px] font-semibold text-green-600">
                         Ver mais
                       </span>
