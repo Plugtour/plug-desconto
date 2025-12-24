@@ -245,8 +245,7 @@ export default function HomeBanner({ className }: Props) {
         const np = p + inc;
 
         if (np >= 100) {
-          // ✅ troca automática = FADE
-          setTimeout(() => goNextFade(), 0);
+          setTimeout(() => goNextFade(), 0); // ✅ autoplay = fade
           return 100;
         }
         return np;
@@ -281,7 +280,7 @@ export default function HomeBanner({ className }: Props) {
     requestAnimationFrame(() => setSnapping(false));
   }
 
-  // ===== SLIDE (somente para swipe) =====
+  // ===== SLIDE (somente swipe) =====
   function commitSwipe(dir: 'next' | 'prev') {
     if (isSlideAnimating || isFading) return;
     if (slideTimerRef.current) window.clearTimeout(slideTimerRef.current);
@@ -298,7 +297,7 @@ export default function HomeBanner({ className }: Props) {
     }, SLIDE_MS);
   }
 
-  // ===== FADE (somente para setas + autoplay) =====
+  // ===== FADE (somente setas + autoplay) =====
   function startFadeTo(targetIndex: number) {
     if (isFading || isSlideAnimating) return;
     if (fadeTimerRef.current) window.clearTimeout(fadeTimerRef.current);
@@ -306,7 +305,6 @@ export default function HomeBanner({ className }: Props) {
     const safe = ((targetIndex % count) + count) % count;
     if (safe === active) return;
 
-    // encerra qualquer gesto
     setIsDragging(false);
     draggingRef.current = false;
     startXRef.current = null;
@@ -314,7 +312,6 @@ export default function HomeBanner({ className }: Props) {
     setDragX(0);
 
     setProgress(100);
-
     setFadeTo(safe);
     setIsFading(true);
 
@@ -361,7 +358,6 @@ export default function HomeBanner({ className }: Props) {
     } catch {}
   }
 
-  // ✅ ignora swipe quando o toque vem de controles
   function shouldIgnoreGesture(target: EventTarget | null) {
     const el = target as HTMLElement | null;
     if (!el) return false;
@@ -392,7 +388,6 @@ export default function HomeBanner({ className }: Props) {
     const dx = e.clientX - startXRef.current;
     const dy = e.clientY - startYRef.current;
 
-    // se vertical domina, libera scroll
     if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 8) {
       draggingRef.current = false;
       setIsDragging(false);
@@ -424,22 +419,17 @@ export default function HomeBanner({ className }: Props) {
       return;
     }
 
-    // dx < 0 => next; dx > 0 => prev
-    commitSwipe(dx < 0 ? 'next' : 'prev');
+    if (dx < 0) commitSwipe('next');
+    else commitSwipe('prev');
   }
 
   if (!current) return null;
 
-  // barras
-  const progressForActive = (isSlideAnimating || isFading) ? 100 : clamp(progress, 0, 100);
+  const progressForActive = isSlideAnimating || isFading ? 100 : clamp(progress, 0, 100);
 
-  // transição do swipe
   const slideTransitionClass =
-    !isDragging && !snapping
-      ? `transition-transform duration-[${SLIDE_MS}ms]`
-      : '';
+    !isDragging && !snapping ? `transition-transform duration-[${SLIDE_MS}ms]` : '';
 
-  // ✅ helper pra botões super sensíveis
   const stop = (e: React.SyntheticEvent) => e.stopPropagation();
 
   function SlideContent({ item }: { item: BannerItem }) {
@@ -512,11 +502,10 @@ export default function HomeBanner({ className }: Props) {
           onPointerCancel={onPointerUp}
           style={{ touchAction: 'pan-y' }}
         >
-          {/* ======== AREA DE IMAGENS + TEXTO ======== */}
-          {/* ✅ Se estiver em FADE (setas/autoplay), renderiza 2 camadas com opacidade */}
+          {/* ======== IMAGENS + TEXTO ======== */}
           {isFading && fadeItem ? (
             <>
-              {/* BASE (atual) */}
+              {/* BASE (atual): ✅ SOMENTE IMAGEM (sem texto) */}
               <div className="absolute inset-0">
                 <picture>
                   <source srcSet={withWebp(current.imageUrl)} type="image/webp" />
@@ -529,10 +518,9 @@ export default function HomeBanner({ className }: Props) {
                     decoding="async"
                   />
                 </picture>
-                <SlideContent item={current} />
               </div>
 
-              {/* TOP (entrando com fade) */}
+              {/* TOP (entrando): ✅ IMAGEM + TEXTO */}
               <div
                 className={[
                   'absolute inset-0',
@@ -551,25 +539,18 @@ export default function HomeBanner({ className }: Props) {
                     loading="lazy"
                     draggable={false}
                     decoding="async"
-                    style={{
-                      // garante que a camada existe antes e só varia opacidade (sem “piscar”)
-                      opacity: 1,
-                    }}
                   />
                 </picture>
-                {/* ✅ texto acompanha o fade */}
+
                 <div
                   className="absolute inset-0"
-                  style={{
-                    animation: `fadeIn ${FADE_MS}ms ease-out both`,
-                  }}
+                  style={{ animation: `fadeIn ${FADE_MS}ms ease-out both` }}
                 >
                   <SlideContent item={fadeItem} />
                 </div>
               </div>
             </>
           ) : (
-            /* ✅ Modo SWIPE (emendado): 3 slides com translate */
             <>
               {/* PREV */}
               <div
@@ -710,7 +691,7 @@ export default function HomeBanner({ className }: Props) {
             </button>
           </div>
 
-          {/* arrows (✅ clique = FADE) */}
+          {/* arrows (fade) */}
           <button
             type="button"
             aria-label="Banner anterior"
