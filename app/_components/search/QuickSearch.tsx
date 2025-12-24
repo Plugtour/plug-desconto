@@ -254,6 +254,7 @@ export default function QuickSearch({
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [closing, setClosing] = useState(false); // ✅ novo: animação de saída
   const [value, setValue] = useState('');
   const [active, setActive] = useState(0);
 
@@ -283,9 +284,20 @@ export default function QuickSearch({
     return () => window.clearTimeout(t);
   }, [sheetOpen]);
 
+  function openSheet() {
+    setClosing(false);
+    setSheetOpen(true);
+  }
+
   function closeSheet() {
-    setSheetOpen(false);
-    setActive(0);
+    // ✅ fecha com animação (desliza para baixo)
+    if (closing) return;
+    setClosing(true);
+    window.setTimeout(() => {
+      setSheetOpen(false);
+      setClosing(false);
+      setActive(0);
+    }, 260);
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -321,11 +333,10 @@ export default function QuickSearch({
       <div className="flex items-stretch gap-2">
         <button
           type="button"
-          onClick={() => setSheetOpen(true)}
+          onClick={openSheet}
           className="flex-1"
           aria-label="Abrir busca"
         >
-          {/* ✅ (1) LUPA REMOVIDA + ✅ (2) MENOS ESPAÇAMENTO DO TEXTO */}
           <div className="h-10 flex items-center rounded-md bg-white/95 shadow-sm ring-1 ring-black/10 px-3 py-0">
             <div className="flex-1 text-left text-[14px] leading-none text-black/45">
               {placeholder}
@@ -333,10 +344,9 @@ export default function QuickSearch({
           </div>
         </button>
 
-        {/* mesma altura fixa do campo */}
         <button
           type="button"
-          onClick={() => setSheetOpen(true)}
+          onClick={openSheet}
           className="h-10 flex items-center justify-center rounded-md bg-emerald-600 px-3 py-0 text-[13px] font-semibold text-white shadow-sm hover:bg-emerald-700"
           aria-label="Buscar"
         >
@@ -347,17 +357,25 @@ export default function QuickSearch({
       {/* bottom sheet */}
       {sheetOpen && (
         <div className="fixed inset-0 z-[999]">
-          {/* backdrop com blur */}
+          {/* backdrop com blur (também anima na saída) */}
           <button
             type="button"
             aria-label="Fechar"
             onClick={closeSheet}
-            className="absolute inset-0 rounded-md bg-black/35 backdrop-blur-[6px]"
+            className={[
+              'absolute inset-0 rounded-md bg-black/35 backdrop-blur-[6px]',
+              closing ? 'backdrop-exit' : 'backdrop-enter',
+            ].join(' ')}
           />
 
           {/* painel */}
           <div className="absolute inset-x-0 bottom-0">
-            <div className="sheet-enter mx-auto w-full max-w-md px-[5px] pb-[5px] relative">
+            <div
+              className={[
+                'mx-auto w-full max-w-md px-[5px] pb-[5px] relative',
+                closing ? 'sheet-exit' : 'sheet-enter',
+              ].join(' ')}
+            >
               <button
                 type="button"
                 onClick={closeSheet}
@@ -438,6 +456,7 @@ export default function QuickSearch({
                   </div>
                 </div>
 
+                {/* modal com altura fixa (não encolhe) */}
                 <div className="h-[72vh] px-4 pb-5 overflow-hidden">
                   <div className="h-full overflow-auto">
                     {hasQuery && (
@@ -455,7 +474,7 @@ export default function QuickSearch({
                           <div className="mt-2 overflow-hidden rounded-xl bg-white/90 ring-1 ring-black/10">
                             {results.map((o, idx) => {
                               const isActive = idx === active;
-                              const href = buildOfferHref(o); // ✅ correção (era buildOfferHref(item))
+                              const href = buildOfferHref(o);
 
                               return (
                                 <Link
@@ -502,6 +521,7 @@ export default function QuickSearch({
                       </div>
                     )}
 
+                    {/* categorias */}
                     <div className={hasQuery ? 'pt-4' : 'pt-3'}>
                       <div className="text-[12px] font-semibold text-black/60">
                         Categorias
@@ -539,10 +559,11 @@ export default function QuickSearch({
               </div>
             </div>
 
+            {/* ✅ animações: abrir (subir) + fechar (descer), suaves */}
             <style jsx global>{`
               @keyframes sheetEnter {
                 from {
-                  transform: translateY(28px);
+                  transform: translateY(34px);
                   opacity: 0;
                 }
                 to {
@@ -550,8 +571,44 @@ export default function QuickSearch({
                   opacity: 1;
                 }
               }
+              @keyframes sheetExit {
+                from {
+                  transform: translateY(0);
+                  opacity: 1;
+                }
+                to {
+                  transform: translateY(34px);
+                  opacity: 0;
+                }
+              }
               .sheet-enter {
-                animation: sheetEnter 240ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+                animation: sheetEnter 320ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
+              }
+              .sheet-exit {
+                animation: sheetExit 280ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
+              }
+
+              @keyframes backdropEnter {
+                from {
+                  opacity: 0;
+                }
+                to {
+                  opacity: 1;
+                }
+              }
+              @keyframes backdropExit {
+                from {
+                  opacity: 1;
+                }
+                to {
+                  opacity: 0;
+                }
+              }
+              .backdrop-enter {
+                animation: backdropEnter 220ms ease-out both;
+              }
+              .backdrop-exit {
+                animation: backdropExit 220ms ease-in both;
               }
             `}</style>
           </div>
