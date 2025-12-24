@@ -20,7 +20,7 @@ function Star({ fillPct }: { fillPct: number }) {
   const pct = Math.max(0, Math.min(100, fillPct));
 
   return (
-    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5">
+    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" aria-hidden="true">
       <path
         d="M12 3.6l2.5 5.3 5.8.5-4.4 3.8 1.4 5.7L12 16.1 6.7 18.9l1.4-5.7-4.4-3.8 5.8-.5L12 3.6z"
         className="fill-zinc-300"
@@ -41,13 +41,19 @@ function Star({ fillPct }: { fillPct: number }) {
 
 function StarsRow({ rating }: { rating: number }) {
   const r = Math.max(0, Math.min(5, rating));
+
   return (
-    // ⭐ estrelas literalmente encostadas
-    <div className="flex items-center gap-0">
+    // ⭐ encostadas: zero gap + sobreposição leve (-ml) nas estrelas seguintes
+    <div className="flex items-center">
       {Array.from({ length: 5 }).map((_, i) => {
         const fill =
           r <= i ? 0 : r >= i + 1 ? 100 : Math.round((r - i) * 100);
-        return <Star key={i} fillPct={fill} />;
+
+        return (
+          <span key={i} className={i === 0 ? '' : '-ml-[3px]'}>
+            <Star fillPct={fill} />
+          </span>
+        );
       })}
     </div>
   );
@@ -58,15 +64,24 @@ function StarsRow({ rating }: { rating: number }) {
 ========================= */
 
 function buildMeta(item: any) {
+  const metaText = (item?.metaText ?? '').toString().trim();
+  if (metaText) return metaText;
+
   const parts: string[] = [];
   if (item?.city) parts.push(item.city);
   if (item?.category) parts.push(item.category);
   if (item?.kind) parts.push(item.kind);
-  return parts.join(' | ');
+
+  if (parts.length) return parts.join(' | ');
+
+  const subtitle = (item?.subtitle ?? '').toString().trim();
+  if (subtitle) return subtitle;
+
+  return '';
 }
 
 /* =========================
-   CORAÇÃO (novo, correto)
+   CORAÇÃO (simétrico, gordinho; vazado -> cheio)
 ========================= */
 
 function HeartIcon({
@@ -84,6 +99,7 @@ function HeartIcon({
       stroke="currentColor"
       strokeWidth={filled ? 0 : 2}
       strokeLinejoin="round"
+      aria-hidden="true"
     >
       <path d="M12 21c-.35 0-7.1-4.3-9.4-8.4C.7 9.5 2.4 6.6 5.6 6.3c1.8-.2 3.5.7 4.4 2.1 0 0 .9-1.3 1.3-1.6.8-.6 2.2-1 3.5-.8 3.2.3 4.9 3.2 3 6.3C19 16.7 12.4 21 12 21z" />
     </svg>
@@ -93,7 +109,8 @@ function HeartIcon({
 export default function SponsoredOffersRow({
   items,
   className,
-  title = 'Patrocinados',
+  title = 'Patrocinado',
+  viewAllHref,
 }: Props) {
   const shown = useMemo(() => items.slice(0, 5), [items]);
   const [favIds, setFavIds] = useState<Record<string, boolean>>({});
@@ -106,52 +123,75 @@ export default function SponsoredOffersRow({
 
   return (
     <section className={['w-full', className || ''].join(' ')}>
-      <div className="mb-2 px-4 text-[14px] font-semibold text-zinc-900">
+      {/* 1) Título menor e com menos peso */}
+      <div className="mb-1 px-4 text-[12px] font-medium text-zinc-500">
         {title}
       </div>
 
       <div className="px-3">
         {shown.map((item, idx) => {
+          const anyItem: any = item;
           const isFav = !!favIds[item.id];
 
-          const rating = 4.8;
-          const reviews = 275;
+          const meta = buildMeta(anyItem) || 'Gramado | Gastronomia | Italiana';
+
+          const range =
+            (anyItem?.economyText ?? item.priceText ?? '').toString().trim();
+          const economyLine = range ? `Economia de ${range}` : 'Economia de R$80 a R$120';
+
+          const rating = Number(anyItem?.rating ?? 4.8);
+          const reviews = Number(anyItem?.reviews ?? 275);
+
+          const displayTitle =
+            (item.title ?? '').trim() ||
+            'Churrascaria Fogo de Chão Gramado com Rodízio Premium Completo, Buffet Internacional e Sobremesas Ilimitadas Inclusas';
 
           return (
             <div key={item.id} className="relative">
               <Link href={item.href} className="block py-3">
                 <div className="flex gap-3">
                   {/* FOTO */}
-                  <div className="h-24 w-24 flex-none overflow-hidden rounded-md bg-zinc-200" />
+                  <div className="h-24 w-24 flex-none overflow-hidden rounded-md bg-zinc-200">
+                    {item.imageUrl ? (
+                      <img
+                        src={item.imageUrl}
+                        alt={displayTitle}
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                      />
+                    ) : null}
+                  </div>
 
                   <div className="min-w-0 flex-1">
-                    {/* 🔴 LINHA 1 — TÍTULO FICTÍCIO EXTENSO */}
+                    {/* LINHA 1 – título (peso 800) */}
                     <div className="pr-14 text-[11px] font-extrabold leading-snug text-zinc-900 line-clamp-2">
-                      Churrascaria Fogo de Chão Gramado com Rodízio Premium Completo,
-                      Buffet Internacional e Sobremesas Ilimitadas Inclusas
+                      {displayTitle}
                     </div>
 
-                    {/* LINHA 2 — descida em relação à linha 1 */}
-                    <div className="mt-[2px] text-[11px] text-zinc-500 line-clamp-1">
-                      Gramado | Gastronomia | Italiana
-                    </div>
+                    {/* 2) Linha 2 e 3: aproximar 2px e deslocar conjunto +4px */}
+                    <div className="mt-[4px]">
+                      <div className="text-[11px] text-zinc-500 line-clamp-1">
+                        {meta}
+                      </div>
 
-                    {/* LINHA 3 — próxima da linha 2 */}
-                    <div className="-mt-[1px] text-[11px] font-medium text-zinc-900">
-                      Economia de R$80 a R$120
+                      {/* aproxima 2px: puxa a linha 3 pra cima */}
+                      <div className="-mt-[2px] text-[11px] font-medium text-zinc-900">
+                        {economyLine}
+                      </div>
                     </div>
 
                     {/* ESTRELAS + NOTAS */}
                     <div className="mt-1.5 flex items-end justify-between">
                       <div>
+                        {/* 3) estrelas encostadas */}
                         <StarsRow rating={rating} />
                         <div className="-mt-0.5 text-[11px] text-zinc-500">
                           <span className="font-semibold text-zinc-700">
-                            {rating.toFixed(1)}
+                            {Number.isFinite(rating) ? rating.toFixed(1) : '0.0'}
                           </span>{' '}
                           de{' '}
                           <span className="font-semibold text-zinc-700">
-                            {reviews}
+                            {Number.isFinite(reviews) ? reviews : 0}
                           </span>{' '}
                           avaliações
                         </div>
@@ -164,10 +204,10 @@ export default function SponsoredOffersRow({
                   </div>
                 </div>
 
-                {/* CORAÇÃO */}
+                {/* CORAÇÃO (clicável e independente) */}
                 <button
                   type="button"
-                  aria-label="Favoritar"
+                  aria-label={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -194,6 +234,15 @@ export default function SponsoredOffersRow({
           );
         })}
       </div>
+
+      {/* opcional: link "Ver todos" (se você passar viewAllHref depois) */}
+      {viewAllHref ? (
+        <div className="px-4 pt-1">
+          <Link href={viewAllHref} className="text-[13px] font-semibold text-zinc-900 underline underline-offset-4">
+            Ver todos
+          </Link>
+        </div>
+      ) : null}
     </section>
   );
 }
