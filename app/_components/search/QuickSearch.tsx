@@ -15,6 +15,9 @@ type Props = {
   maxCategories?: number;
 };
 
+const QS_STORAGE_KEY = 'plugdesconto_quicksearch_v1';
+const QS_TTL_MS = 60 * 60 * 1000; // 1 hora
+
 function useDebouncedValue<T>(value: T, delayMs: number) {
   const [v, setV] = useState(value);
   useEffect(() => {
@@ -243,6 +246,44 @@ function CategoryIcon({ id, className }: { id: string; className?: string }) {
   }
 }
 
+function safeReadStoredQuery(): string | null {
+  try {
+    const raw = localStorage.getItem(QS_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { q?: string; t?: number };
+    const q = typeof parsed.q === 'string' ? parsed.q : '';
+    const t = typeof parsed.t === 'number' ? parsed.t : 0;
+
+    if (!q || !t) return null;
+
+    const age = Date.now() - t;
+    if (age >= QS_TTL_MS) {
+      localStorage.removeItem(QS_STORAGE_KEY);
+      return null;
+    }
+
+    return q;
+  } catch {
+    return null;
+  }
+}
+
+function safeStoreQuery(q: string) {
+  try {
+    localStorage.setItem(QS_STORAGE_KEY, JSON.stringify({ q, t: Date.now() }));
+  } catch {
+    // ignore
+  }
+}
+
+function safeClearStoredQuery() {
+  try {
+    localStorage.removeItem(QS_STORAGE_KEY);
+  } catch {
+    // ignore
+  }
+}
+
 export default function QuickSearch({
   offers,
   categories,
@@ -252,6 +293,7 @@ export default function QuickSearch({
   maxCategories = 24,
 }: Props) {
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const clearTimerRef = useRef<number | null>(null);
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const [closing, setClosing] = useState(false);
@@ -284,13 +326,47 @@ export default function QuickSearch({
     return () => window.clearTimeout(t);
   }, [sheetOpen]);
 
+  useEffect(() => {
+    return () => {
+      if (clearTimerRef.current) window.clearTimeout(clearTimerRef.current);
+    };
+  }, []);
+
+  function scheduleAutoClear() {
+    if (clearTimerRef.current) window.clearTimeout(clearTimerRef.current);
+    clearTimerRef.current = window.setTimeout(() => {
+      safeClearStoredQuery();
+    }, QS_TTL_MS);
+  }
+
   function openSheet() {
+    // ao abrir: restaura se ainda estiver dentro de 1 hora
+    const saved = safeReadStoredQuery();
+    if (saved) {
+      setValue(saved);
+      setActive(0);
+    } else {
+      setValue('');
+      setActive(0);
+    }
+
     setClosing(false);
     setSheetOpen(true);
   }
 
   function closeSheet() {
     if (closing) return;
+
+    // ao fechar: guarda a busca e inicia contagem de 1 hora
+    if (hasQuery) {
+      safeStoreQuery(value.trim());
+      scheduleAutoClear();
+    } else {
+      safeClearStoredQuery();
+      if (clearTimerRef.current) window.clearTimeout(clearTimerRef.current);
+      clearTimerRef.current = null;
+    }
+
     setClosing(true);
     window.setTimeout(() => {
       setSheetOpen(false);
@@ -405,8 +481,16 @@ export default function QuickSearch({
                         ref={inputRef}
                         value={value}
                         onChange={(e) => {
-                          setValue(e.target.value);
+                          const next = e.target.value;
+                          setValue(next);
                           setActive(0);
+
+                          // opcional: se ele apagar tudo, já limpa o "lembrar"
+                          if (next.trim().length === 0) {
+                            safeClearStoredQuery();
+                            if (clearTimerRef.current) window.clearTimeout(clearTimerRef.current);
+                            clearTimerRef.current = null;
+                          }
                         }}
                         onKeyDown={onKeyDown}
                         placeholder={placeholder}
@@ -422,6 +506,9 @@ export default function QuickSearch({
                           onClick={() => {
                             setValue('');
                             setActive(0);
+                            safeClearStoredQuery();
+                            if (clearTimerRef.current) window.clearTimeout(clearTimerRef.current);
+                            clearTimerRef.current = null;
                             inputRef.current?.focus();
                           }}
                           aria-label="Limpar pesquisa"
@@ -542,8 +629,6 @@ export default function QuickSearch({
                         ))}
                       </div>
                     </div>
-
-                    {/* ✅ DICA REMOVIDA AQUI */}
                   </div>
                 </div>
               </div>
