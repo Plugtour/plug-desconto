@@ -10,6 +10,7 @@ type Props = { className?: string };
 const DURATION_MS = 6500;
 const SWIPE_THRESHOLD = 45;
 const TRANSITION_MS = 420;
+const LOCK_DIR_PX = 8; // trava direção do swipe após esse deslocamento
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -117,9 +118,14 @@ export default function HomeBanner({ className }: Props) {
   const [toIndex, setToIndex] = useState<number | null>(null);
   const [direction, setDirection] = useState<'next' | 'prev'>('next');
 
-  // swipe “ao vivo”
-  const [dragX, setDragX] = useState(0); // px (negativo = p/ esquerda)
+  // swipe ao vivo
+  const [dragX, setDragX] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+
+  // trava da direção do swipe (para não piscar)
+  const lockedDirRef = useRef<'next' | 'prev' | null>(null);
+  const [lockedDir, setLockedDir] = useState<'next' | 'prev' | null>(null);
+  const [lockedToIndex, setLockedToIndex] = useState<number | null>(null);
 
   // autoplay/progress
   const [progress, setProgress] = useState(0);
@@ -140,7 +146,6 @@ export default function HomeBanner({ className }: Props) {
   const widthRef = useRef<number>(1);
 
   const current = items[active];
-  const nextItem = toIndex !== null ? items[toIndex] : null;
 
   const autoplayPaused = userPaused || isAnimating || isDragging;
 
@@ -278,12 +283,25 @@ export default function HomeBanner({ className }: Props) {
     return !!el.closest('button, a, input, textarea, select, [role="button"]');
   }
 
+  function getToIndexForDir(dir: 'next' | 'prev') {
+    return dir === 'next'
+      ? (active + 1) % items.length
+      : active === 0
+        ? items.length - 1
+        : active - 1;
+  }
+
   function onPointerDown(e: React.PointerEvent) {
     if (shouldIgnoreGesture(e.target)) return;
 
     startXRef.current = e.clientX;
     startYRef.current = e.clientY;
     draggingRef.current = true;
+
+    lockedDirRef.current = null;
+    setLockedDir(null);
+    setLockedToIndex(null);
+
     setIsDragging(true);
     setDragX(0);
 
@@ -300,32 +318,43 @@ export default function HomeBanner({ className }: Props) {
     const dx = e.clientX - startXRef.current;
     const dy = e.clientY - startYRef.current;
 
-    // vertical domina -> solta o gesto (permite rolagem da página)
+    // vertical domina -> solta e deixa rolar a página
     if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 8) {
       draggingRef.current = false;
       setIsDragging(false);
       setDragX(0);
+      lockedDirRef.current = null;
+      setLockedDir(null);
+      setLockedToIndex(null);
       return;
     }
 
-    // horizontal -> acompanha ao vivo
+    // horizontal -> acompanha
     e.preventDefault();
+
+    // trava a direção após um pequeno deslocamento, evitando piscar
+    if (!lockedDirRef.current && Math.abs(dx) >= LOCK_DIR_PX) {
+      const dir: 'next' | 'prev' = dx < 0 ? 'next' : 'prev';
+      lockedDirRef.current = dir;
+      setLockedDir(dir);
+      setLockedToIndex(getToIndexForDir(dir));
+    }
+
     setDragX(clamp(dx, -widthRef.current, widthRef.current));
   }
 
   function endDrag(commit: boolean, dir: 'next' | 'prev') {
     const width = widthRef.current || 1;
+    const targetIndex = getToIndexForDir(dir);
 
     if (!commit) {
-      // volta pro lugar com animação suave
       setIsDragging(false);
       setDragX(0);
+      lockedDirRef.current = null;
+      setLockedDir(null);
+      setLockedToIndex(null);
       return;
     }
-
-    // “soltou” passando do limiar: anima o restante e troca
-    const targetIndex =
-      dir === 'next' ? (active + 1) % items.length : active === 0 ? items.length - 1 : active - 1;
 
     if (animTimerRef.current) window.clearTimeout(animTimerRef.current);
 
@@ -334,7 +363,7 @@ export default function HomeBanner({ className }: Props) {
     setToIndex(targetIndex);
     setIsAnimating(true);
 
-    // empurra até sair totalmente
+    // completa o movimento
     setIsDragging(false);
     setDragX(dir === 'next' ? -width : width);
 
@@ -344,7 +373,11 @@ export default function HomeBanner({ className }: Props) {
       setIsAnimating(false);
       setProgress(0);
       lastRef.current = performance.now();
+
       setDragX(0);
+      lockedDirRef.current = null;
+      setLockedDir(null);
+      setLockedToIndex(null);
     }, TRANSITION_MS);
   }
 
@@ -360,48 +393,44 @@ export default function HomeBanner({ className }: Props) {
     startYRef.current = null;
 
     const absDx = Math.abs(dx);
-    const commit = absDx >= SWIPE_THRESHOLD;
-    const dir: 'next' | 'prev' = dx < 0 ? 'next' : 'prev';
 
+    // se direção já foi travada, use ela; senão, usa o sinal do dx
+    const dir: 'next' | 'prev' = (lockedDirRef.current ?? (dx < 0 ? 'next' : 'prev'));
+
+    const commit = absDx >= SWIPE_THRESHOLD;
     endDrag(commit, dir);
   }
 
-  // ===== slides/topo =====
-  const topItem = (isAnimating || isDragging) && (nextItem ?? current) ? (nextItem ?? current) : current;
-
-  const topAlign = alignClasses(topItem.align);
-
-  const progressForActive = isAnimating ? 100 : clamp(progress, 0, 100);
-
-  // ✅ só o texto central sobe 15px
-  const centerLiftClass = topItem.align === 'center' ? '-translate-y-[15px]' : '';
-
-  // ===== cálculo de posições durante drag =====
-  const width = widthRef.current || 1;
-  const dragDir: 'next' | 'prev' = dragX < 0 ? 'next' : 'prev';
-
-  // durante drag, garantimos qual é o “nextItem”
+  // ===== qual slide entra (para swipe ao vivo e para animação) =====
+  const liveDir: 'next' | 'prev' | null = lockedDir ?? (isAnimating ? direction : null);
   const liveToIndex =
-    isDragging || isAnimating
-      ? dragDir === 'next'
-        ? (active + 1) % items.length
-        : active === 0
-          ? items.length - 1
-          : active - 1
-      : null;
+    lockedToIndex ??
+    (isAnimating ? toIndex : null);
 
   const liveNextItem = liveToIndex !== null ? items[liveToIndex] : null;
 
-  // offsets:
-  // - current: acompanha o dedo (dragX)
-  // - next: entra da direita (next) ou esquerda (prev), acompanhando o dedo
-  const currentOffset = dragX;
-  const nextOffset =
-    dragDir === 'next'
-      ? width + dragX // começa em +width e vem para 0
-      : -width + dragX; // começa em -width e vem para 0
+  // offsets
+  const width = widthRef.current || 1;
 
-  const isLiveSliding = isDragging || isAnimating;
+  // durante swipe sem direção travada ainda, não mostra o vizinho (evita “troca”)
+  const canShowNeighbor = !!liveDir && !!liveNextItem;
+
+  const currentOffset = dragX;
+
+  const nextOffset =
+    !canShowNeighbor
+      ? (liveDir === 'prev' ? -width : width)
+      : liveDir === 'next'
+        ? width + dragX
+        : -width + dragX;
+
+  // texto do topo
+  const topItem = (isAnimating && liveNextItem) ? liveNextItem : current;
+
+  const topAlign = alignClasses(topItem.align);
+  const centerLiftClass = topItem.align === 'center' ? '-translate-y-[15px]' : '';
+
+  const progressForActive = isAnimating ? 100 : clamp(progress, 0, 100);
 
   return (
     <section className={className}>
@@ -414,34 +443,34 @@ export default function HomeBanner({ className }: Props) {
           onPointerCancel={onPointerUp}
           style={{ touchAction: 'pan-y' }}
         >
-          {/* ===== SLIDES: 2 camadas com translateX controlado ===== */}
           {/* CURRENT */}
           <div
             className={[
               'absolute inset-0',
-              isLiveSliding ? 'will-change-transform' : '',
+              'will-change-transform',
               !isDragging && isAnimating ? `transition-transform duration-[${TRANSITION_MS}ms]` : '',
             ].join(' ')}
             style={{
               transform: `translate3d(${currentOffset}px, 0, 0)`,
               transitionTimingFunction: 'cubic-bezier(0.22, 0.8, 0.2, 1)',
+              backfaceVisibility: 'hidden',
             }}
           >
             <picture>
               <source srcSet={withWebp(current.imageUrl)} type="image/webp" />
-              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={current.imageUrl}
                 alt={current.title}
                 className="absolute inset-0 h-full w-full object-cover"
                 loading="lazy"
                 draggable={false}
+                decoding="async"
               />
             </picture>
           </div>
 
-          {/* NEXT (pré-carregado para swipe ao vivo e também usado na transição) */}
-          {liveNextItem ? (
+          {/* NEXT/PREV (vizinho travado, sem piscar) */}
+          {canShowNeighbor && liveNextItem ? (
             <div
               className={[
                 'absolute inset-0',
@@ -451,17 +480,18 @@ export default function HomeBanner({ className }: Props) {
               style={{
                 transform: `translate3d(${nextOffset}px, 0, 0)`,
                 transitionTimingFunction: 'cubic-bezier(0.22, 0.8, 0.2, 1)',
+                backfaceVisibility: 'hidden',
               }}
             >
               <picture>
                 <source srcSet={withWebp(liveNextItem.imageUrl)} type="image/webp" />
-                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={liveNextItem.imageUrl}
                   alt={liveNextItem.title}
                   className="absolute inset-0 h-full w-full object-cover"
                   loading="lazy"
                   draggable={false}
+                  decoding="async"
                 />
               </picture>
             </div>
@@ -485,7 +515,7 @@ export default function HomeBanner({ className }: Props) {
             </div>
           </div>
 
-          {/* controls top-right */}
+          {/* controls */}
           <div className="absolute right-2 top-6 z-[40] flex items-center gap-3 text-white">
             <button
               type="button"
