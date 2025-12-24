@@ -254,7 +254,7 @@ export default function QuickSearch({
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [closing, setClosing] = useState(false); // ✅ novo: animação de saída
+  const [closing, setClosing] = useState(false);
   const [value, setValue] = useState('');
   const [active, setActive] = useState(0);
 
@@ -290,7 +290,6 @@ export default function QuickSearch({
   }
 
   function closeSheet() {
-    // ✅ fecha com animação (desliza para baixo)
     if (closing) return;
     setClosing(true);
     window.setTimeout(() => {
@@ -334,7 +333,7 @@ export default function QuickSearch({
         <button
           type="button"
           onClick={openSheet}
-          className="flex-1"
+          className="flex-1 touch-manipulation"
           aria-label="Abrir busca"
         >
           <div className="h-10 flex items-center rounded-md bg-white/95 shadow-sm ring-1 ring-black/10 px-3 py-0">
@@ -347,7 +346,7 @@ export default function QuickSearch({
         <button
           type="button"
           onClick={openSheet}
-          className="h-10 flex items-center justify-center rounded-md bg-emerald-600 px-3 py-0 text-[13px] font-semibold text-white shadow-sm hover:bg-emerald-700"
+          className="h-10 touch-manipulation flex items-center justify-center rounded-md bg-emerald-600 px-3 py-0 text-[13px] font-semibold text-white shadow-sm hover:bg-emerald-700"
           aria-label="Buscar"
         >
           Buscar
@@ -357,13 +356,13 @@ export default function QuickSearch({
       {/* bottom sheet */}
       {sheetOpen && (
         <div className="fixed inset-0 z-[999]">
-          {/* backdrop com blur (também anima na saída) */}
+          {/* backdrop com blur */}
           <button
             type="button"
             aria-label="Fechar"
             onClick={closeSheet}
             className={[
-              'absolute inset-0 rounded-md bg-black/35 backdrop-blur-[6px]',
+              'absolute inset-0 rounded-md bg-black/35 backdrop-blur-[6px] touch-manipulation',
               closing ? 'backdrop-exit' : 'backdrop-enter',
             ].join(' ')}
           />
@@ -372,14 +371,14 @@ export default function QuickSearch({
           <div className="absolute inset-x-0 bottom-0">
             <div
               className={[
-                'mx-auto w-full max-w-md px-[5px] pb-[5px] relative',
+                'mx-auto w-full max-w-md px-[5px] pb-[5px] relative touch-manipulation',
                 closing ? 'sheet-exit' : 'sheet-enter',
               ].join(' ')}
             >
               <button
                 type="button"
                 onClick={closeSheet}
-                className="absolute right-[5px] -top-9 rounded-md bg-white/80 ring-1 ring-black/10 px-3 py-1.5 text-[13px] font-normal text-black/75 hover:bg-white"
+                className="absolute right-[5px] -top-9 touch-manipulation rounded-md bg-white/80 ring-1 ring-black/10 px-3 py-1.5 text-[13px] font-normal text-black/75 hover:bg-white"
               >
                 Fechar
               </button>
@@ -407,6 +406,7 @@ export default function QuickSearch({
                         </svg>
                       </span>
 
+                      {/* ✅ evita “zoom” do navegador ao focar (principalmente em mobile) */}
                       <input
                         ref={inputRef}
                         value={value}
@@ -416,7 +416,7 @@ export default function QuickSearch({
                         }}
                         onKeyDown={onKeyDown}
                         placeholder={placeholder}
-                        className="w-full bg-transparent outline-none text-[15px] placeholder:text-black/45"
+                        className="w-full bg-transparent outline-none text-[16px] placeholder:text-black/45"
                         inputMode="search"
                         autoComplete="off"
                         spellCheck={false}
@@ -431,7 +431,7 @@ export default function QuickSearch({
                             inputRef.current?.focus();
                           }}
                           aria-label="Limpar pesquisa"
-                          className="shrink-0 rounded-md px-2 py-1 text-black/55 hover:text-black"
+                          className="shrink-0 touch-manipulation rounded-md px-2 py-1 text-black/55 hover:text-black"
                         >
                           <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none">
                             <path
@@ -447,7 +447,7 @@ export default function QuickSearch({
 
                     <button
                       type="button"
-                      className="rounded-md bg-emerald-600 px-3 py-2 text-[13px] font-semibold text-white shadow-sm hover:bg-emerald-700"
+                      className="touch-manipulation rounded-md bg-emerald-600 px-3 py-2 text-[13px] font-semibold text-white shadow-sm hover:bg-emerald-700"
                       aria-label="Buscar"
                       onClick={() => inputRef.current?.focus()}
                     >
@@ -456,7 +456,6 @@ export default function QuickSearch({
                   </div>
                 </div>
 
-                {/* modal com altura fixa (não encolhe) */}
                 <div className="h-[72vh] px-4 pb-5 overflow-hidden">
                   <div className="h-full overflow-auto">
                     {hasQuery && (
@@ -521,7 +520,6 @@ export default function QuickSearch({
                       </div>
                     )}
 
-                    {/* categorias */}
                     <div className={hasQuery ? 'pt-4' : 'pt-3'}>
                       <div className="text-[12px] font-semibold text-black/60">
                         Categorias
@@ -532,7 +530,7 @@ export default function QuickSearch({
                           <button
                             key={c.id}
                             type="button"
-                            className="rounded-md bg-white/90 border border-neutral-200/60 px-2 py-2 flex flex-col items-center gap-0 hover:bg-black/5 transition-colors"
+                            className="touch-manipulation rounded-md bg-white/90 border border-neutral-200/60 px-2 py-2 flex flex-col items-center gap-0 hover:bg-black/5 transition-colors"
                             onClick={() => {
                               setValue(c.title);
                               setActive(0);
@@ -559,8 +557,12 @@ export default function QuickSearch({
               </div>
             </div>
 
-            {/* ✅ animações: abrir (subir) + fechar (descer), suaves */}
             <style jsx global>{`
+              /* ✅ evita “zoom”/ajuste de texto do navegador em alguns mobiles */
+              html {
+                -webkit-text-size-adjust: 100%;
+              }
+
               @keyframes sheetEnter {
                 from {
                   transform: translateY(34px);
