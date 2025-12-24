@@ -9,7 +9,8 @@ type Props = { className?: string };
 
 const DURATION_MS = 6500;
 const SWIPE_THRESHOLD = 45;
-const TRANSITION_MS = 420;
+const SLIDE_MS = 420; // swipe
+const FADE_MS = 280; // setas + autoplay
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -110,49 +111,50 @@ function withWebp(url: string) {
 
 export default function HomeBanner({ className }: Props) {
   const items = useMemo(() => BANNERS.slice(0, 3), []);
+  const count = items.length;
+
   const [active, setActive] = useState(0);
 
-  // swipe / animação
-  const [isAnimating, setIsAnimating] = useState(false);
+  // swipe/slide
   const [isDragging, setIsDragging] = useState(false);
   const [dragX, setDragX] = useState(0);
-
-  // snap sem transição
+  const [isSlideAnimating, setIsSlideAnimating] = useState(false);
   const [snapping, setSnapping] = useState(false);
+  const slideTimerRef = useRef<number | null>(null);
 
-  const dirRef = useRef<'next' | 'prev' | null>(null);
+  // fade (setas + autoplay)
+  const [isFading, setIsFading] = useState(false);
+  const [fadeTo, setFadeTo] = useState<number | null>(null);
+  const fadeTimerRef = useRef<number | null>(null);
 
-  // progress
+  // progress/autoplay
   const [progress, setProgress] = useState(0);
   const [userPaused, setUserPaused] = useState(false);
-
   const rafRef = useRef<number | null>(null);
   const lastRef = useRef<number>(0);
-  const animTimerRef = useRef<number | null>(null);
 
   // swipe refs
   const startXRef = useRef<number | null>(null);
   const startYRef = useRef<number | null>(null);
   const draggingRef = useRef(false);
 
-  // medir largura
+  // container width
   const containerRef = useRef<HTMLDivElement | null>(null);
   const widthRef = useRef<number>(1);
 
-  // favoritos
+  // favorites
   const [favorites, setFavorites] = useState<Record<string, boolean>>({});
   const [heartPop, setHeartPop] = useState(false);
 
-  const count = items.length;
   const current = items[active];
   const prevIndex = (active - 1 + count) % count;
   const nextIndex = (active + 1) % count;
   const prevItem = items[prevIndex];
   const nextItem = items[nextIndex];
 
-  const autoplayPaused = userPaused || isAnimating || isDragging;
+  const autoplayPaused = userPaused || isDragging || isSlideAnimating || isFading;
 
-  // ===== medir largura no mount + resize =====
+  // ===== medir largura =====
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -177,12 +179,13 @@ export default function HomeBanner({ className }: Props) {
     };
   }, []);
 
-  // ===== preload prev/current/next =====
+  // ===== preload prev/current/next (+ fade target) =====
   useEffect(() => {
     const urls = [
       withWebp(prevItem?.imageUrl),
       withWebp(current?.imageUrl),
       withWebp(nextItem?.imageUrl),
+      fadeTo != null ? withWebp(items[fadeTo]?.imageUrl) : '',
     ].filter(Boolean);
 
     urls.forEach((u) => {
@@ -190,7 +193,7 @@ export default function HomeBanner({ className }: Props) {
       img.decoding = 'async' as any;
       img.src = u!;
     });
-  }, [prevItem?.imageUrl, current?.imageUrl, nextItem?.imageUrl]);
+  }, [prevItem?.imageUrl, current?.imageUrl, nextItem?.imageUrl, fadeTo, items]);
 
   // ===== favoritos localStorage =====
   useEffect(() => {
@@ -242,7 +245,8 @@ export default function HomeBanner({ className }: Props) {
         const np = p + inc;
 
         if (np >= 100) {
-          setTimeout(() => goNext(), 0);
+          // ✅ troca automática = FADE
+          setTimeout(() => goNextFade(), 0);
           return 100;
         }
         return np;
@@ -261,58 +265,78 @@ export default function HomeBanner({ className }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoplayPaused, active, count]);
 
-  function finishTransition(dir: 'next' | 'prev') {
+  // ===== helpers: finalizar slide =====
+  function finishSlideTransition(dir: 'next' | 'prev') {
     const newActive =
       dir === 'next' ? (active + 1) % count : (active - 1 + count) % count;
 
     setSnapping(true);
-
     setActive(newActive);
-    setDragX(0);
-    setIsAnimating(false);
-    dirRef.current = null;
 
+    setDragX(0);
+    setIsSlideAnimating(false);
     setProgress(0);
     lastRef.current = performance.now();
 
     requestAnimationFrame(() => setSnapping(false));
   }
 
-  // ===== navegação animada (setas/autoplay) =====
-  function animateTo(dir: 'next' | 'prev') {
-    if (isAnimating) return;
-    if (animTimerRef.current) window.clearTimeout(animTimerRef.current);
+  // ===== SLIDE (somente para swipe) =====
+  function commitSwipe(dir: 'next' | 'prev') {
+    if (isSlideAnimating || isFading) return;
+    if (slideTimerRef.current) window.clearTimeout(slideTimerRef.current);
 
-    // limpa gesto
+    setProgress(100);
+    setIsDragging(false);
+    setIsSlideAnimating(true);
+
+    const w = widthRef.current || 1;
+    setDragX(dir === 'next' ? -w : w);
+
+    slideTimerRef.current = window.setTimeout(() => {
+      finishSlideTransition(dir);
+    }, SLIDE_MS);
+  }
+
+  // ===== FADE (somente para setas + autoplay) =====
+  function startFadeTo(targetIndex: number) {
+    if (isFading || isSlideAnimating) return;
+    if (fadeTimerRef.current) window.clearTimeout(fadeTimerRef.current);
+
+    const safe = ((targetIndex % count) + count) % count;
+    if (safe === active) return;
+
+    // encerra qualquer gesto
     setIsDragging(false);
     draggingRef.current = false;
     startXRef.current = null;
     startYRef.current = null;
+    setDragX(0);
 
     setProgress(100);
-    setIsAnimating(true);
-    dirRef.current = dir;
 
-    const w = widthRef.current || 1;
+    setFadeTo(safe);
+    setIsFading(true);
 
-    setDragX(0);
-    requestAnimationFrame(() => {
-      setDragX(dir === 'next' ? -w : w);
-    });
+    fadeTimerRef.current = window.setTimeout(() => {
+      setActive(safe);
+      setFadeTo(null);
+      setIsFading(false);
 
-    animTimerRef.current = window.setTimeout(() => {
-      finishTransition(dir);
-    }, TRANSITION_MS);
+      setProgress(0);
+      lastRef.current = performance.now();
+    }, FADE_MS);
   }
 
-  function goNext() {
-    animateTo('next');
+  function goNextFade() {
+    startFadeTo((active + 1) % count);
   }
 
-  function goPrev() {
-    animateTo('prev');
+  function goPrevFade() {
+    startFadeTo((active - 1 + count) % count);
   }
 
+  // ===== Share =====
   async function onShare() {
     try {
       const url =
@@ -337,22 +361,24 @@ export default function HomeBanner({ className }: Props) {
     } catch {}
   }
 
-  // ✅ ignora swipe quando o toque/click vem de controles
+  // ✅ ignora swipe quando o toque vem de controles
   function shouldIgnoreGesture(target: EventTarget | null) {
     const el = target as HTMLElement | null;
     if (!el) return false;
-    return !!el.closest('[data-banner-control], button, a, input, textarea, select, [role="button"]');
+    return !!el.closest(
+      '[data-banner-control], button, a, input, textarea, select, [role="button"]'
+    );
   }
 
+  // ===== Swipe handlers =====
   function onPointerDown(e: React.PointerEvent) {
     if (shouldIgnoreGesture(e.target)) return;
-    if (isAnimating) return;
+    if (isSlideAnimating || isFading) return;
 
     startXRef.current = e.clientX;
     startYRef.current = e.clientY;
     draggingRef.current = true;
 
-    dirRef.current = null;
     setIsDragging(true);
     setDragX(0);
 
@@ -366,19 +392,15 @@ export default function HomeBanner({ className }: Props) {
     const dx = e.clientX - startXRef.current;
     const dy = e.clientY - startYRef.current;
 
+    // se vertical domina, libera scroll
     if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 8) {
       draggingRef.current = false;
       setIsDragging(false);
       setDragX(0);
-      dirRef.current = null;
       return;
     }
 
     e.preventDefault();
-
-    if (!dirRef.current && Math.abs(dx) > 8) {
-      dirRef.current = dx < 0 ? 'next' : 'prev';
-    }
 
     const w = widthRef.current || 1;
     setDragX(clamp(dx, -w, w));
@@ -396,34 +418,29 @@ export default function HomeBanner({ className }: Props) {
     startYRef.current = null;
 
     const commit = Math.abs(dx) >= SWIPE_THRESHOLD;
-    const dir = (dirRef.current ?? (dx < 0 ? 'next' : 'prev')) as 'next' | 'prev';
-
     if (!commit) {
       setIsDragging(false);
       setDragX(0);
-      dirRef.current = null;
       return;
     }
 
-    if (animTimerRef.current) window.clearTimeout(animTimerRef.current);
-
-    setProgress(100);
-    setIsDragging(false);
-    setIsAnimating(true);
-
-    const w = widthRef.current || 1;
-    setDragX(dir === 'next' ? -w : w);
-
-    animTimerRef.current = window.setTimeout(() => {
-      finishTransition(dir);
-    }, TRANSITION_MS);
+    // dx < 0 => next; dx > 0 => prev
+    commitSwipe(dx < 0 ? 'next' : 'prev');
   }
 
   if (!current) return null;
 
-  const progressForActive = isAnimating ? 100 : clamp(progress, 0, 100);
+  // barras
+  const progressForActive = (isSlideAnimating || isFading) ? 100 : clamp(progress, 0, 100);
+
+  // transição do swipe
   const slideTransitionClass =
-    !isDragging && !snapping ? `transition-transform duration-[${TRANSITION_MS}ms]` : '';
+    !isDragging && !snapping
+      ? `transition-transform duration-[${SLIDE_MS}ms]`
+      : '';
+
+  // ✅ helper pra botões super sensíveis
+  const stop = (e: React.SyntheticEvent) => e.stopPropagation();
 
   function SlideContent({ item }: { item: BannerItem }) {
     const contentAlign = alignClasses(item.align);
@@ -431,7 +448,9 @@ export default function HomeBanner({ className }: Props) {
 
     const titleClass = [
       'text-[25px] font-extrabold leading-[1.05] text-white',
-      item.align === 'left' || item.align === 'right' ? 'max-w-[220px] whitespace-normal' : '',
+      item.align === 'left' || item.align === 'right'
+        ? 'max-w-[220px] whitespace-normal'
+        : '',
       item.align === 'center' ? 'whitespace-nowrap' : '',
     ].join(' ');
 
@@ -479,8 +498,7 @@ export default function HomeBanner({ className }: Props) {
     );
   }
 
-  // ✅ helper pra não iniciar swipe ao tocar nos botões (melhora MUITO a sensibilidade)
-  const stop = (e: React.SyntheticEvent) => e.stopPropagation();
+  const fadeItem = fadeTo != null ? items[fadeTo] : null;
 
   return (
     <section className={className}>
@@ -494,74 +512,135 @@ export default function HomeBanner({ className }: Props) {
           onPointerCancel={onPointerUp}
           style={{ touchAction: 'pan-y' }}
         >
-          {/* PREV */}
-          <div
-            className={['absolute inset-0 will-change-transform', slideTransitionClass].join(' ')}
-            style={{
-              transform: `translate3d(${(-widthRef.current + dragX)}px, 0, 0)`,
-              transitionTimingFunction: 'cubic-bezier(0.22, 0.8, 0.2, 1)',
-              backfaceVisibility: 'hidden',
-            }}
-          >
-            <picture>
-              <source srcSet={withWebp(prevItem.imageUrl)} type="image/webp" />
-              <img
-                src={prevItem.imageUrl}
-                alt={prevItem.title}
-                className="absolute inset-0 h-full w-full object-cover"
-                loading="lazy"
-                draggable={false}
-                decoding="async"
-              />
-            </picture>
-            <SlideContent item={prevItem} />
-          </div>
+          {/* ======== AREA DE IMAGENS + TEXTO ======== */}
+          {/* ✅ Se estiver em FADE (setas/autoplay), renderiza 2 camadas com opacidade */}
+          {isFading && fadeItem ? (
+            <>
+              {/* BASE (atual) */}
+              <div className="absolute inset-0">
+                <picture>
+                  <source srcSet={withWebp(current.imageUrl)} type="image/webp" />
+                  <img
+                    src={current.imageUrl}
+                    alt={current.title}
+                    className="absolute inset-0 h-full w-full object-cover"
+                    loading="lazy"
+                    draggable={false}
+                    decoding="async"
+                  />
+                </picture>
+                <SlideContent item={current} />
+              </div>
 
-          {/* CURRENT */}
-          <div
-            className={['absolute inset-0 will-change-transform', slideTransitionClass].join(' ')}
-            style={{
-              transform: `translate3d(${dragX}px, 0, 0)`,
-              transitionTimingFunction: 'cubic-bezier(0.22, 0.8, 0.2, 1)',
-              backfaceVisibility: 'hidden',
-            }}
-          >
-            <picture>
-              <source srcSet={withWebp(current.imageUrl)} type="image/webp" />
-              <img
-                src={current.imageUrl}
-                alt={current.title}
-                className="absolute inset-0 h-full w-full object-cover"
-                loading="lazy"
-                draggable={false}
-                decoding="async"
-              />
-            </picture>
-            <SlideContent item={current} />
-          </div>
+              {/* TOP (entrando com fade) */}
+              <div
+                className={[
+                  'absolute inset-0',
+                  'transition-opacity',
+                  `duration-[${FADE_MS}ms]`,
+                  'opacity-100',
+                ].join(' ')}
+                style={{ opacity: 1 }}
+              >
+                <picture>
+                  <source srcSet={withWebp(fadeItem.imageUrl)} type="image/webp" />
+                  <img
+                    src={fadeItem.imageUrl}
+                    alt={fadeItem.title}
+                    className="absolute inset-0 h-full w-full object-cover"
+                    loading="lazy"
+                    draggable={false}
+                    decoding="async"
+                    style={{
+                      // garante que a camada existe antes e só varia opacidade (sem “piscar”)
+                      opacity: 1,
+                    }}
+                  />
+                </picture>
+                {/* ✅ texto acompanha o fade */}
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    animation: `fadeIn ${FADE_MS}ms ease-out both`,
+                  }}
+                >
+                  <SlideContent item={fadeItem} />
+                </div>
+              </div>
+            </>
+          ) : (
+            /* ✅ Modo SWIPE (emendado): 3 slides com translate */
+            <>
+              {/* PREV */}
+              <div
+                className={['absolute inset-0 will-change-transform', slideTransitionClass].join(' ')}
+                style={{
+                  transform: `translate3d(${(-widthRef.current + dragX)}px, 0, 0)`,
+                  transitionTimingFunction: 'cubic-bezier(0.22, 0.8, 0.2, 1)',
+                  backfaceVisibility: 'hidden',
+                }}
+              >
+                <picture>
+                  <source srcSet={withWebp(prevItem.imageUrl)} type="image/webp" />
+                  <img
+                    src={prevItem.imageUrl}
+                    alt={prevItem.title}
+                    className="absolute inset-0 h-full w-full object-cover"
+                    loading="lazy"
+                    draggable={false}
+                    decoding="async"
+                  />
+                </picture>
+                <SlideContent item={prevItem} />
+              </div>
 
-          {/* NEXT */}
-          <div
-            className={['absolute inset-0 will-change-transform', slideTransitionClass].join(' ')}
-            style={{
-              transform: `translate3d(${(widthRef.current + dragX)}px, 0, 0)`,
-              transitionTimingFunction: 'cubic-bezier(0.22, 0.8, 0.2, 1)',
-              backfaceVisibility: 'hidden',
-            }}
-          >
-            <picture>
-              <source srcSet={withWebp(nextItem.imageUrl)} type="image/webp" />
-              <img
-                src={nextItem.imageUrl}
-                alt={nextItem.title}
-                className="absolute inset-0 h-full w-full object-cover"
-                loading="lazy"
-                draggable={false}
-                decoding="async"
-              />
-            </picture>
-            <SlideContent item={nextItem} />
-          </div>
+              {/* CURRENT */}
+              <div
+                className={['absolute inset-0 will-change-transform', slideTransitionClass].join(' ')}
+                style={{
+                  transform: `translate3d(${dragX}px, 0, 0)`,
+                  transitionTimingFunction: 'cubic-bezier(0.22, 0.8, 0.2, 1)',
+                  backfaceVisibility: 'hidden',
+                }}
+              >
+                <picture>
+                  <source srcSet={withWebp(current.imageUrl)} type="image/webp" />
+                  <img
+                    src={current.imageUrl}
+                    alt={current.title}
+                    className="absolute inset-0 h-full w-full object-cover"
+                    loading="lazy"
+                    draggable={false}
+                    decoding="async"
+                  />
+                </picture>
+                <SlideContent item={current} />
+              </div>
+
+              {/* NEXT */}
+              <div
+                className={['absolute inset-0 will-change-transform', slideTransitionClass].join(' ')}
+                style={{
+                  transform: `translate3d(${(widthRef.current + dragX)}px, 0, 0)`,
+                  transitionTimingFunction: 'cubic-bezier(0.22, 0.8, 0.2, 1)',
+                  backfaceVisibility: 'hidden',
+                }}
+              >
+                <picture>
+                  <source srcSet={withWebp(nextItem.imageUrl)} type="image/webp" />
+                  <img
+                    src={nextItem.imageUrl}
+                    alt={nextItem.title}
+                    className="absolute inset-0 h-full w-full object-cover"
+                    loading="lazy"
+                    draggable={false}
+                    decoding="async"
+                  />
+                </picture>
+                <SlideContent item={nextItem} />
+              </div>
+            </>
+          )}
 
           {/* overlays */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/25 to-black/10" />
@@ -581,7 +660,7 @@ export default function HomeBanner({ className }: Props) {
             </div>
           </div>
 
-          {/* ✅ CONTROLS (marcado e parando propagação) */}
+          {/* controls top-right */}
           <div
             data-banner-control
             className="absolute right-2 top-6 z-[70] flex items-center gap-3 text-white"
@@ -621,17 +700,21 @@ export default function HomeBanner({ className }: Props) {
               style={{ touchAction: 'manipulation' }}
             >
               <HeartIcon
-                className={['h-8 w-8', isFav ? 'text-red-500' : 'text-white', heartPop ? 'heart-pop' : ''].join(' ')}
+                className={[
+                  'h-8 w-8',
+                  isFav ? 'text-red-500' : 'text-white',
+                  heartPop ? 'heart-pop' : '',
+                ].join(' ')}
                 active={isFav}
               />
             </button>
           </div>
 
-          {/* ✅ ARROWS (também marcadas + stopPropagation) */}
+          {/* arrows (✅ clique = FADE) */}
           <button
             type="button"
             aria-label="Banner anterior"
-            onClick={goPrev}
+            onClick={goPrevFade}
             className="absolute left-2 top-1/2 z-[70] -translate-y-1/2 text-white"
             data-banner-control
             onPointerDown={stop}
@@ -646,7 +729,7 @@ export default function HomeBanner({ className }: Props) {
           <button
             type="button"
             aria-label="Próximo banner"
-            onClick={goNext}
+            onClick={goNextFade}
             className="absolute right-2 top-1/2 z-[70] -translate-y-1/2 text-white"
             data-banner-control
             onPointerDown={stop}
@@ -674,6 +757,11 @@ export default function HomeBanner({ className }: Props) {
             100% { transform: scale(1); }
           }
           .heart-pop { animation: heartPop 320ms ease-out; }
+
+          @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+          }
         `}</style>
       </div>
     </section>
