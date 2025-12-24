@@ -117,7 +117,7 @@ export default function HomeBanner({ className }: Props) {
   const [isDragging, setIsDragging] = useState(false);
   const [dragX, setDragX] = useState(0);
 
-  // snap sem transição (remove piscada no encaixe)
+  // snap sem transição
   const [snapping, setSnapping] = useState(false);
 
   const dirRef = useRef<'next' | 'prev' | null>(null);
@@ -135,7 +135,7 @@ export default function HomeBanner({ className }: Props) {
   const startYRef = useRef<number | null>(null);
   const draggingRef = useRef(false);
 
-  // ✅ medir largura sempre (pra setas funcionarem)
+  // medir largura
   const containerRef = useRef<HTMLDivElement | null>(null);
   const widthRef = useRef<number>(1);
 
@@ -152,7 +152,7 @@ export default function HomeBanner({ className }: Props) {
 
   const autoplayPaused = userPaused || isAnimating || isDragging;
 
-  // ✅ medir largura no mount + resize
+  // ===== medir largura no mount + resize =====
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -177,7 +177,7 @@ export default function HomeBanner({ className }: Props) {
     };
   }, []);
 
-  // preload prev/current/next
+  // ===== preload prev/current/next =====
   useEffect(() => {
     const urls = [
       withWebp(prevItem?.imageUrl),
@@ -192,7 +192,7 @@ export default function HomeBanner({ className }: Props) {
     });
   }, [prevItem?.imageUrl, current?.imageUrl, nextItem?.imageUrl]);
 
-  // favoritos localStorage
+  // ===== favoritos localStorage =====
   useEffect(() => {
     try {
       const raw = localStorage.getItem('plugdesconto:favorites');
@@ -222,7 +222,7 @@ export default function HomeBanner({ className }: Props) {
     }
   }
 
-  // autoplay
+  // ===== autoplay =====
   useEffect(() => {
     if (count <= 1) return;
 
@@ -278,12 +278,12 @@ export default function HomeBanner({ className }: Props) {
     requestAnimationFrame(() => setSnapping(false));
   }
 
-  // navegação animada (setas/autoplay)
+  // ===== navegação animada (setas/autoplay) =====
   function animateTo(dir: 'next' | 'prev') {
     if (isAnimating) return;
     if (animTimerRef.current) window.clearTimeout(animTimerRef.current);
 
-    // garante estado limpo
+    // limpa gesto
     setIsDragging(false);
     draggingRef.current = false;
     startXRef.current = null;
@@ -295,7 +295,6 @@ export default function HomeBanner({ className }: Props) {
 
     const w = widthRef.current || 1;
 
-    // começa do 0 e vai pro destino (pra transição ser sempre visível)
     setDragX(0);
     requestAnimationFrame(() => {
       setDragX(dir === 'next' ? -w : w);
@@ -338,10 +337,11 @@ export default function HomeBanner({ className }: Props) {
     } catch {}
   }
 
+  // ✅ ignora swipe quando o toque/click vem de controles
   function shouldIgnoreGesture(target: EventTarget | null) {
     const el = target as HTMLElement | null;
     if (!el) return false;
-    return !!el.closest('button, a, input, textarea, select, [role="button"]');
+    return !!el.closest('[data-banner-control], button, a, input, textarea, select, [role="button"]');
   }
 
   function onPointerDown(e: React.PointerEvent) {
@@ -422,7 +422,6 @@ export default function HomeBanner({ className }: Props) {
   if (!current) return null;
 
   const progressForActive = isAnimating ? 100 : clamp(progress, 0, 100);
-
   const slideTransitionClass =
     !isDragging && !snapping ? `transition-transform duration-[${TRANSITION_MS}ms]` : '';
 
@@ -479,6 +478,9 @@ export default function HomeBanner({ className }: Props) {
       </div>
     );
   }
+
+  // ✅ helper pra não iniciar swipe ao tocar nos botões (melhora MUITO a sensibilidade)
+  const stop = (e: React.SyntheticEvent) => e.stopPropagation();
 
   return (
     <section className={className}>
@@ -579,13 +581,20 @@ export default function HomeBanner({ className }: Props) {
             </div>
           </div>
 
-          {/* controls */}
-          <div className="absolute right-2 top-6 z-[70] flex items-center gap-3 text-white">
+          {/* ✅ CONTROLS (marcado e parando propagação) */}
+          <div
+            data-banner-control
+            className="absolute right-2 top-6 z-[70] flex items-center gap-3 text-white"
+            onPointerDown={stop}
+            onPointerUp={stop}
+            onClick={stop}
+          >
             <button
               type="button"
               aria-label={userPaused ? 'Ativar banner' : 'Pausar banner'}
               onClick={() => setUserPaused((v) => !v)}
               className="p2"
+              style={{ touchAction: 'manipulation' }}
             >
               {userPaused ? (
                 <PlayIcon className="h-10 w-10 text-white" />
@@ -594,7 +603,13 @@ export default function HomeBanner({ className }: Props) {
               )}
             </button>
 
-            <button type="button" aria-label="Compartilhar" onClick={onShare} className="p2 -ml-2">
+            <button
+              type="button"
+              aria-label="Compartilhar"
+              onClick={onShare}
+              className="p2 -ml-2"
+              style={{ touchAction: 'manipulation' }}
+            >
               <PlaneIcon className="h-7 w-7 text-white rotate-[25deg]" />
             </button>
 
@@ -603,6 +618,7 @@ export default function HomeBanner({ className }: Props) {
               aria-label={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
               onClick={toggleFav}
               className="p-2"
+              style={{ touchAction: 'manipulation' }}
             >
               <HeartIcon
                 className={['h-8 w-8', isFav ? 'text-red-500' : 'text-white', heartPop ? 'heart-pop' : ''].join(' ')}
@@ -611,12 +627,16 @@ export default function HomeBanner({ className }: Props) {
             </button>
           </div>
 
-          {/* arrows */}
+          {/* ✅ ARROWS (também marcadas + stopPropagation) */}
           <button
             type="button"
             aria-label="Banner anterior"
             onClick={goPrev}
             className="absolute left-2 top-1/2 z-[70] -translate-y-1/2 text-white"
+            data-banner-control
+            onPointerDown={stop}
+            onPointerUp={stop}
+            style={{ touchAction: 'manipulation' }}
           >
             <span className="arrow-float block p-2">
               <DoubleChevronOpen dir="left" className="h-10 w-10 scale-110" />
@@ -628,6 +648,10 @@ export default function HomeBanner({ className }: Props) {
             aria-label="Próximo banner"
             onClick={goNext}
             className="absolute right-2 top-1/2 z-[70] -translate-y-1/2 text-white"
+            data-banner-control
+            onPointerDown={stop}
+            onPointerUp={stop}
+            style={{ touchAction: 'manipulation' }}
           >
             <span className="arrow-float block p-2">
               <DoubleChevronOpen dir="right" className="h-10 w-10 scale-110" />
