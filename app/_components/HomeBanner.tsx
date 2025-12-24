@@ -9,9 +9,9 @@ type Props = { className?: string };
 
 const DURATION_MS = 6500;
 const SWIPE_THRESHOLD = 45;
-const DEADZONE_PX = 10;
-const SLIDE_MS = 420;
-const FADE_MS = 280;
+const DEADZONE_PX = 10; // evita cancelar tap por micro-movimento
+const SLIDE_MS = 420; // swipe
+const FADE_MS = 280; // setas + autoplay
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -149,9 +149,9 @@ export default function HomeBanner({ className }: Props) {
   const timeoutRef = useRef<number | null>(null);
   const startedAtRef = useRef<number>(0);
   const remainingRef = useRef<number>(DURATION_MS);
-  const [barKey, setBarKey] = useState(0);
 
-  // ✅ evita “flash” da barra ao trocar banner
+  // barra
+  const [barKey, setBarKey] = useState(0);
   const [barArmed, setBarArmed] = useState(false);
 
   const current = items[active];
@@ -260,13 +260,18 @@ export default function HomeBanner({ className }: Props) {
     remainingRef.current = DURATION_MS;
     startedAtRef.current = performance.now();
 
-    // ✅ barra nova nasce zerada e só depois “arma” a animação (evita piscada)
+    // ✅ evita flash: desarma, troca key e só arma depois de 2 frames
     setBarArmed(false);
     setBarKey((k) => k + 1);
-    requestAnimationFrame(() => setBarArmed(true));
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setBarArmed(true);
+      });
+    });
   }
 
-  // controla pause/retomar sem “resetar” o tempo
+  // controla pause/retomar sem resetar o tempo
   useEffect(() => {
     if (count <= 1) return;
 
@@ -584,7 +589,10 @@ export default function HomeBanner({ className }: Props) {
                   />
                 </picture>
 
-                <div className="absolute inset-0" style={{ animation: `fadeIn ${FADE_MS}ms ease-out both` }}>
+                <div
+                  className="absolute inset-0"
+                  style={{ animation: `fadeIn ${FADE_MS}ms ease-out both` }}
+                >
                   <SlideContent item={fadeItem} />
                 </div>
               </div>
@@ -675,8 +683,9 @@ export default function HomeBanner({ className }: Props) {
                       <div className="h-full w-full bg-white" />
                     ) : isActive ? (
                       <div
-                        key={barKey}
-                        className="h-full bg-white"
+                        // ✅ chave muda com active também (não reaproveita DOM)
+                        key={`${active}-${barKey}`}
+                        className="h-full bg-white will-change-transform"
                         style={
                           !barArmed
                             ? {
@@ -694,9 +703,7 @@ export default function HomeBanner({ className }: Props) {
                                 animationTimingFunction: 'linear',
                                 animationFillMode: 'both',
                                 animationDelay: `-${elapsedMs}ms`,
-                                animationPlayState: autoplayPaused
-                                  ? ('paused' as const)
-                                  : ('running' as const),
+                                animationPlayState: autoplayPaused ? ('paused' as const) : ('running' as const),
                               }
                         }
                       />
