@@ -227,7 +227,7 @@ export default function HomeBanner({ className }: Props) {
     <section className={className}>
       <div className="relative w-full">
         {/* CARD FULL (sem espaço lateral) */}
-        <div className="relative h-[220px] w-full overflow-hidden">
+        <div className="relative h-[250px] w-full overflow-hidden">
           {/* imagem */}
           <img
             src={current.imageUrl}
