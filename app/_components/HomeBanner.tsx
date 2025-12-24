@@ -7,6 +7,8 @@ import { BANNERS, type BannerItem } from '@/_data/banners';
 type Props = { className?: string };
 
 const DURATION_MS = 6500; // tempo de cada banner
+const SWIPE_THRESHOLD = 45; // px para considerar swipe
+const TRANSITION_MS = 420; // duração do deslize
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -98,91 +100,49 @@ function alignClasses(align?: BannerItem['align']) {
   return 'items-start text-left';
 }
 
+function withWebp(url: string) {
+  if (!url) return url;
+  if (url.toLowerCase().endsWith('.webp')) return url;
+
+  const sep = url.includes('?') ? '&' : '?';
+  return `${url}${sep}fm=webp`;
+}
+
 export default function HomeBanner({ className }: Props) {
   const items = useMemo(() => BANNERS.slice(0, 3), []);
   const [active, setActive] = useState(0);
+
+  // transição suave
+  const [isAnimating, setIsAnimating] = useState(false);
+  const [toIndex, setToIndex] = useState<number | null>(null);
+  const [direction, setDirection] = useState<'next' | 'prev'>('next');
+
+  // progress/autoplay
   const [progress, setProgress] = useState(0); // 0..100
-  const [paused, setPaused] = useState(false);
+
+  // pausa do usuário (controla o ícone)
+  const [userPaused, setUserPaused] = useState(false);
 
   const rafRef = useRef<number | null>(null);
   const lastRef = useRef<number>(0);
-
-  const current = items[active];
+  const animTimerRef = useRef<number | null>(null);
 
   // favoritos
   const [favorites, setFavorites] = useState<Record<string, boolean>>({});
-  const isFav = !!favorites[current?.id ?? ''];
+  const [heartPop, setHeartPop] = useState(false);
 
-  // animação do slide (para visualizar o deslize)
-  const [slideDir, setSlideDir] = useState<'next' | 'prev'>('next');
-  const [slideKey, setSlideKey] = useState(0);
+  // swipe refs
+  const startXRef = useRef<number | null>(null);
+  const startYRef = useRef<number | null>(null);
+  const draggingRef = useRef(false);
 
-  // ===== SWIPE (touch) =====
-  const touchStartX = useRef<number | null>(null);
-  const touchStartY = useRef<number | null>(null);
-  const isSwiping = useRef(false);
+  const current = items[active];
+  const nextItem = toIndex !== null ? items[toIndex] : null;
 
-  const SWIPE_THRESHOLD_PX = 48;
-  const VERTICAL_TOLERANCE_PX = 70;
+  // pausa efetiva do autoplay (usuário OU animação)
+  const autoplayPaused = userPaused || isAnimating;
 
-  function onTouchStart(e: React.TouchEvent) {
-    const t = e.touches[0];
-    touchStartX.current = t.clientX;
-    touchStartY.current = t.clientY;
-    isSwiping.current = true;
-    setPaused(true);
-  }
-
-  function onTouchMove(e: React.TouchEvent) {
-    if (!isSwiping.current) return;
-    if (touchStartX.current === null || touchStartY.current === null) return;
-
-    const t = e.touches[0];
-    const dx = t.clientX - touchStartX.current;
-    const dy = t.clientY - touchStartY.current;
-
-    // se for muito vertical, libera scroll da página
-    if (Math.abs(dy) > VERTICAL_TOLERANCE_PX && Math.abs(dy) > Math.abs(dx)) {
-      isSwiping.current = false;
-      return;
-    }
-
-    // horizontal claro -> evita "briga" com scroll
-    if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) {
-      e.preventDefault();
-    }
-  }
-
-  function onTouchEnd(e: React.TouchEvent) {
-    if (!isSwiping.current) {
-      setPaused(false);
-      return;
-    }
-    isSwiping.current = false;
-
-    const endX = e.changedTouches[0]?.clientX ?? null;
-    const startX = touchStartX.current;
-
-    touchStartX.current = null;
-    touchStartY.current = null;
-
-    if (startX === null || endX === null) {
-      setPaused(false);
-      return;
-    }
-
-    const dx = endX - startX;
-
-    if (dx <= -SWIPE_THRESHOLD_PX) {
-      next();
-    } else if (dx >= SWIPE_THRESHOLD_PX) {
-      prev();
-    }
-
-    setTimeout(() => setPaused(false), 150);
-  }
-
-  // carrega favoritos do localStorage
+  // ===== favoritos localStorage =====
   useEffect(() => {
     try {
       const raw = localStorage.getItem('plugdesconto:favorites');
@@ -192,7 +152,6 @@ export default function HomeBanner({ className }: Props) {
     }
   }, []);
 
-  // salva favoritos no localStorage
   useEffect(() => {
     try {
       localStorage.setItem('plugdesconto:favorites', JSON.stringify(favorites));
@@ -201,47 +160,65 @@ export default function HomeBanner({ className }: Props) {
     }
   }, [favorites]);
 
+  const isFav = !!favorites[current?.id ?? ''];
+
   function toggleFav() {
     const id = current?.id;
     if (!id) return;
 
-    setFavorites((prev) => {
-      const nextFav = !prev[id];
+    const willBeFav = !favorites[id];
+    setFavorites((prev) => ({ ...prev, [id]: !prev[id] }));
 
-      // animação só ao ATIVAR
-      if (nextFav) {
-        setHeartPulseKey((k) => k + 1);
-      }
-
-      return { ...prev, [id]: nextFav };
-    });
+    if (willBeFav) {
+      setHeartPop(false);
+      requestAnimationFrame(() => setHeartPop(true));
+      window.setTimeout(() => setHeartPop(false), 380);
+    }
   }
 
-  const [heartPulseKey, setHeartPulseKey] = useState(0);
+  // ===== transição controlada =====
+  function startTransition(targetIndex: number, dir: 'next' | 'prev') {
+    if (!items.length) return;
 
-  function goTo(index: number, dir: 'next' | 'prev') {
-    const nextIndex = clamp(index, 0, items.length - 1);
-    setSlideDir(dir);
-    setSlideKey((k) => k + 1);
-    setActive(nextIndex);
-    setProgress(0);
-    lastRef.current = performance.now();
+    const safe = clamp(targetIndex, 0, items.length - 1);
+    if (safe === active) return;
+
+    if (animTimerRef.current) window.clearTimeout(animTimerRef.current);
+
+    // ✅ IMPORTANTE: antes de trocar, "fecha" a barra atual em 100%
+    setProgress(100);
+
+    setDirection(dir);
+    setToIndex(safe);
+    setIsAnimating(true);
+
+    animTimerRef.current = window.setTimeout(() => {
+      setActive(safe);
+      setToIndex(null);
+      setIsAnimating(false);
+
+      // ✅ agora sim, começa a próxima barra do zero
+      setProgress(0);
+      lastRef.current = performance.now();
+    }, TRANSITION_MS);
   }
 
   function next() {
-    goTo((active + 1) % items.length, 'next');
+    const idx = (active + 1) % items.length;
+    startTransition(idx, 'next');
   }
 
   function prev() {
-    goTo(active === 0 ? items.length - 1 : active - 1, 'prev');
+    const idx = active === 0 ? items.length - 1 : active - 1;
+    startTransition(idx, 'prev');
   }
 
-  // autoplay com progress estilo stories
+  // ===== autoplay com progress estilo stories =====
   useEffect(() => {
     if (items.length <= 1) return;
 
     function tick(now: number) {
-      if (paused) {
+      if (autoplayPaused) {
         lastRef.current = now;
         rafRef.current = requestAnimationFrame(tick);
         return;
@@ -254,10 +231,13 @@ export default function HomeBanner({ className }: Props) {
       setProgress((p) => {
         const inc = (delta / DURATION_MS) * 100;
         const np = p + inc;
+
         if (np >= 100) {
+          // ✅ garante que a barra "fecha" em 100% e só depois troca
           setTimeout(() => next(), 0);
-          return 0;
+          return 100;
         }
+
         return np;
       });
 
@@ -272,15 +252,15 @@ export default function HomeBanner({ className }: Props) {
       rafRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paused, active, items.length]);
+  }, [autoplayPaused, active, items.length]);
 
   async function onShare() {
     try {
       const url =
         typeof window !== 'undefined'
-          ? (current?.href
-              ? new URL(current.href, window.location.origin).toString()
-              : window.location.href)
+          ? current?.href
+            ? new URL(current.href, window.location.origin).toString()
+            : window.location.href
           : '';
 
       if (navigator.share) {
@@ -300,101 +280,130 @@ export default function HomeBanner({ className }: Props) {
     }
   }
 
-  if (!items.length) return null;
+  if (!items.length || !current) return null;
 
-  const contentAlign = alignClasses(current?.align);
+  // ===== swipe handlers =====
+  function shouldIgnoreGesture(target: EventTarget | null) {
+    const el = target as HTMLElement | null;
+    if (!el) return false;
+    return !!el.closest('button, a, input, textarea, select, [role="button"]');
+  }
+
+  function onPointerDown(e: React.PointerEvent) {
+    if (shouldIgnoreGesture(e.target)) return;
+
+    startXRef.current = e.clientX;
+    startYRef.current = e.clientY;
+    draggingRef.current = true;
+
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+  }
+
+  function onPointerMove(e: React.PointerEvent) {
+    if (!draggingRef.current) return;
+    if (startXRef.current == null || startYRef.current == null) return;
+
+    const dx = e.clientX - startXRef.current;
+    const dy = e.clientY - startYRef.current;
+
+    if (Math.abs(dy) > Math.abs(dx)) return;
+    e.preventDefault();
+  }
+
+  function onPointerUp(e: React.PointerEvent) {
+    if (!draggingRef.current) return;
+    draggingRef.current = false;
+
+    if (startXRef.current == null || startYRef.current == null) return;
+
+    const dx = e.clientX - startXRef.current;
+    startXRef.current = null;
+    startYRef.current = null;
+
+    if (Math.abs(dx) < SWIPE_THRESHOLD) return;
+
+    if (dx < 0) next();
+    else prev();
+  }
+
+  // slide “topo” durante a animação
+  const topItem = isAnimating && nextItem ? nextItem : current;
+  const topAlign = alignClasses(topItem.align);
+
+  // ✅ barras: durante animação, mantém a barra do "active" como 100%
+  const progressForActive = isAnimating ? 100 : clamp(progress, 0, 100);
 
   return (
     <section className={className}>
       <div className="relative w-full">
-        {/* CARD FULL */}
         <div
           className="relative h-[250px] w-full overflow-hidden"
-          onTouchStart={onTouchStart}
-          onTouchMove={onTouchMove}
-          onTouchEnd={onTouchEnd}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
           style={{ touchAction: 'pan-y' }}
         >
-          {/* SLIDE WRAPPER (para visualizar o deslize) */}
-          <div
-            key={slideKey}
-            className={[
-              'absolute inset-0',
-              slideDir === 'next' ? 'banner-slide-in-next' : 'banner-slide-in-prev',
-            ].join(' ')}
-          >
-            {/* imagem */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={current.imageUrl}
-              alt={current.title}
-              className="absolute inset-0 h-full w-full object-cover"
-              loading="lazy"
-            />
-
-            {/* overlay */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/25 to-black/10" />
-            <div className="absolute inset-0 bg-black/10" />
-
-            {/* conteúdo */}
-            <div className="absolute inset-0 z-[35] px-14 pb-4 pt-6 -translate-y-[0px]">
-              <div className={`flex h-full w-full flex-col justify-end gap-1 ${contentAlign}`}>
-                <div
-                  className="text-[11px] font-semibold tracking-wide"
-                  style={{
-                    color: '#7CFFB2',
-                    textShadow: '0 2px 16px rgba(0,0,0,0.55)',
-                  }}
-                >
-                  {current.tag}
-                </div>
-
-                <div
-                  className="text-[25px] font-extrabold leading-[1.05] text-white"
-                  style={{ textShadow: '0 2px 18px rgba(0,0,0,0.65)' }}
-                >
-                  {current.title}
-                </div>
-
-                <div
-                  className="text-[16px] font-medium text-white/90"
-                  style={{ textShadow: '0 2px 14px rgba(0,0,0,0.55)' }}
-                >
-                  {current.subtitle}
-                </div>
-
-                <div
-                  className="text-[15px] font-semibold -mt-[8px]"
-                  style={{
-                    color: '#7CCBFF',
-                    textShadow: '0 2px 14px rgba(0,0,0,0.55)',
-                  }}
-                >
-                  {current.highlight}
-                </div>
-
-                {current.href ? (
-                  <div className="mt-2">
-                    <Link
-                      href={current.href}
-                      className="inline-flex text-[15px] font-semibold text-white -translate-y-[10px]"
-                      style={{ textShadow: '0 2px 14px rgba(0,0,0,0.55)' }}
-                    >
-                      Ver ofertas →
-                    </Link>
-                  </div>
-                ) : null}
-              </div>
-            </div>
+          {/* BASE */}
+          <div className="absolute inset-0">
+            <picture>
+              <source srcSet={withWebp(current.imageUrl)} type="image/webp" />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={current.imageUrl}
+                alt={current.title}
+                className="absolute inset-0 h-full w-full object-cover"
+                loading="lazy"
+              />
+            </picture>
           </div>
 
-          {/* barras de progresso */}
+          {/* TOP (entrando) */}
+          {nextItem ? (
+            <div
+              className={[
+                'absolute inset-0',
+                'transition-transform transition-opacity',
+                `duration-[${TRANSITION_MS}ms]`,
+                'will-change-transform will-change-opacity',
+                isAnimating ? 'opacity-100 translate-x-0' : 'opacity-0',
+                !isAnimating
+                  ? direction === 'next'
+                    ? 'translate-x-full'
+                    : '-translate-x-full'
+                  : '',
+              ].join(' ')}
+              style={{ transitionTimingFunction: 'cubic-bezier(0.22, 0.8, 0.2, 1)' }}
+            >
+              <picture>
+                <source srcSet={withWebp(nextItem.imageUrl)} type="image/webp" />
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={nextItem.imageUrl}
+                  alt={nextItem.title}
+                  className="absolute inset-0 h-full w-full object-cover"
+                  loading="lazy"
+                />
+              </picture>
+            </div>
+          ) : null}
+
+          {/* overlays */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/25 to-black/10" />
+          <div className="absolute inset-0 bg-black/10" />
+
+          {/* progress bars */}
           <div className="absolute left-0 right-0 top-0 z-[30] px-3 pt-2">
             <div className="flex gap-1.5">
               {items.map((_, i) => {
-                const filled = i < active ? 100 : i === active ? clamp(progress, 0, 100) : 0;
+                const filled =
+                  i < active ? 100 : i === active ? progressForActive : 0;
+
                 return (
-                  <div key={i} className="h-[3px] flex-1 overflow-hidden rounded-full bg-white/35">
+                  <div
+                    key={i}
+                    className="h-[3px] flex-1 overflow-hidden rounded-full bg-white/35"
+                  >
                     <div className="h-full bg-white" style={{ width: `${filled}%` }} />
                   </div>
                 );
@@ -402,23 +411,22 @@ export default function HomeBanner({ className }: Props) {
             </div>
           </div>
 
-          {/* controles top-right */}
+          {/* controls top-right */}
           <div className="absolute right-2 top-6 z-[40] flex items-center gap-3 text-white">
             <button
               type="button"
-              aria-label={paused ? 'Ativar banner' : 'Pausar banner'}
-              onClick={() => setPaused((v) => !v)}
+              aria-label={userPaused ? 'Ativar banner' : 'Pausar banner'}
+              onClick={() => setUserPaused((v) => !v)}
               className="p2"
             >
-              {paused ? <PlayIcon className="h-10 w-10 text-white" /> : <PauseIcon className="h-10 w-10 text-white" />}
+              {userPaused ? (
+                <PlayIcon className="h-10 w-10 text-white" />
+              ) : (
+                <PauseIcon className="h-10 w-10 text-white" />
+              )}
             </button>
 
-            <button
-              type="button"
-              aria-label="Compartilhar"
-              onClick={onShare}
-              className="p2 -ml-2"
-            >
+            <button type="button" aria-label="Compartilhar" onClick={onShare} className="p2 -ml-2">
               <PlaneIcon className="h-7 w-7 text-white rotate-[25deg]" />
             </button>
 
@@ -429,17 +437,17 @@ export default function HomeBanner({ className }: Props) {
               className="p-2"
             >
               <HeartIcon
-                key={`${current.id}-${heartPulseKey}`}
                 className={[
                   'h-8 w-8',
-                  isFav ? 'text-red-500 heart-pop' : 'text-white',
+                  isFav ? 'text-red-500' : 'text-white',
+                  heartPop ? 'heart-pop' : '',
                 ].join(' ')}
                 active={isFav}
               />
             </button>
           </div>
 
-          {/* setas */}
+          {/* arrows */}
           <button
             type="button"
             aria-label="Banner anterior"
@@ -461,6 +469,51 @@ export default function HomeBanner({ className }: Props) {
               <DoubleChevronOpen dir="right" className="h-10 w-10 scale-110" />
             </span>
           </button>
+
+          {/* content */}
+          <div className="absolute inset-0 z-[35] px-14 pb-4 pt-6 -translate-y-[0px]">
+            <div className={`flex h-full w-full flex-col justify-end gap-1 ${topAlign}`}>
+              <div
+                className="text-[11px] font-semibold tracking-wide"
+                style={{ color: '#7CFFB2', textShadow: '0 2px 16px rgba(0,0,0,0.55)' }}
+              >
+                {topItem.tag}
+              </div>
+
+              <div
+                className="text-[25px] font-extrabold leading-[1.05] text-white"
+                style={{ textShadow: '0 2px 18px rgba(0,0,0,0.65)' }}
+              >
+                {topItem.title}
+              </div>
+
+              <div
+                className="text-[16px] font-medium text-white/90"
+                style={{ textShadow: '0 2px 14px rgba(0,0,0,0.55)' }}
+              >
+                {topItem.subtitle}
+              </div>
+
+              <div
+                className="text-[15px] font-semibold -mt-[8px]"
+                style={{ color: '#7CCBFF', textShadow: '0 2px 14px rgba(0,0,0,0.55)' }}
+              >
+                {topItem.highlight}
+              </div>
+
+              {topItem.href ? (
+                <div className="mt-2">
+                  <Link
+                    href={topItem.href}
+                    className="inline-flex text-[15px] font-semibold text-white -translate-y-[10px]"
+                    style={{ textShadow: '0 2px 14px rgba(0,0,0,0.55)' }}
+                  >
+                    Ver ofertas →
+                  </Link>
+                </div>
+              ) : null}
+            </div>
+          </div>
         </div>
 
         <style jsx global>{`
@@ -473,7 +526,6 @@ export default function HomeBanner({ className }: Props) {
             animation: floatArrow 1.8s ease-in-out infinite;
           }
 
-          /* pulsar somente ao ATIVAR */
           @keyframes heartPop {
             0% { transform: scale(1); }
             30% { transform: scale(1.25); }
@@ -482,22 +534,6 @@ export default function HomeBanner({ className }: Props) {
           }
           .heart-pop {
             animation: heartPop 320ms ease-out;
-          }
-
-          /* deslize visível e suave */
-          @keyframes slideInNext {
-            0% { transform: translateX(18px); opacity: 0.65; }
-            100% { transform: translateX(0); opacity: 1; }
-          }
-          @keyframes slideInPrev {
-            0% { transform: translateX(-18px); opacity: 0.65; }
-            100% { transform: translateX(0); opacity: 1; }
-          }
-          .banner-slide-in-next {
-            animation: slideInNext 420ms cubic-bezier(.22,.9,.22,1);
-          }
-          .banner-slide-in-prev {
-            animation: slideInPrev 420ms cubic-bezier(.22,.9,.22,1);
           }
         `}</style>
       </div>
