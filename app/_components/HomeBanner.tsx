@@ -7,9 +7,9 @@ import { BANNERS, type BannerItem } from '@/_data/banners';
 
 type Props = { className?: string };
 
-const DURATION_MS = 6500; // tempo de cada banner
-const SWIPE_THRESHOLD = 45; // px para considerar swipe
-const TRANSITION_MS = 420; // duração do deslize
+const DURATION_MS = 6500;
+const SWIPE_THRESHOLD = 45;
+const TRANSITION_MS = 420;
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -104,7 +104,6 @@ function alignClasses(align?: BannerItem['align']) {
 function withWebp(url: string) {
   if (!url) return url;
   if (url.toLowerCase().endsWith('.webp')) return url;
-
   const sep = url.includes('?') ? '&' : '?';
   return `${url}${sep}fm=webp`;
 }
@@ -113,15 +112,17 @@ export default function HomeBanner({ className }: Props) {
   const items = useMemo(() => BANNERS.slice(0, 3), []);
   const [active, setActive] = useState(0);
 
-  // transição suave
+  // transição suave (programática)
   const [isAnimating, setIsAnimating] = useState(false);
   const [toIndex, setToIndex] = useState<number | null>(null);
   const [direction, setDirection] = useState<'next' | 'prev'>('next');
 
-  // progress/autoplay
-  const [progress, setProgress] = useState(0); // 0..100
+  // swipe “ao vivo”
+  const [dragX, setDragX] = useState(0); // px (negativo = p/ esquerda)
+  const [isDragging, setIsDragging] = useState(false);
 
-  // pausa do usuário (controla o ícone)
+  // autoplay/progress
+  const [progress, setProgress] = useState(0);
   const [userPaused, setUserPaused] = useState(false);
 
   const rafRef = useRef<number | null>(null);
@@ -136,29 +137,25 @@ export default function HomeBanner({ className }: Props) {
   const startXRef = useRef<number | null>(null);
   const startYRef = useRef<number | null>(null);
   const draggingRef = useRef(false);
+  const widthRef = useRef<number>(1);
 
   const current = items[active];
   const nextItem = toIndex !== null ? items[toIndex] : null;
 
-  // pausa efetiva do autoplay (usuário OU animação)
-  const autoplayPaused = userPaused || isAnimating;
+  const autoplayPaused = userPaused || isAnimating || isDragging;
 
   // ===== favoritos localStorage =====
   useEffect(() => {
     try {
       const raw = localStorage.getItem('plugdesconto:favorites');
       if (raw) setFavorites(JSON.parse(raw));
-    } catch {
-      // silencioso
-    }
+    } catch {}
   }, []);
 
   useEffect(() => {
     try {
       localStorage.setItem('plugdesconto:favorites', JSON.stringify(favorites));
-    } catch {
-      // silencioso
-    }
+    } catch {}
   }, [favorites]);
 
   const isFav = !!favorites[current?.id ?? ''];
@@ -177,18 +174,15 @@ export default function HomeBanner({ className }: Props) {
     }
   }
 
-  // ===== transição controlada =====
+  // ===== transição controlada (setas/autoplay) =====
   function startTransition(targetIndex: number, dir: 'next' | 'prev') {
     if (!items.length) return;
-
     const safe = clamp(targetIndex, 0, items.length - 1);
     if (safe === active) return;
 
     if (animTimerRef.current) window.clearTimeout(animTimerRef.current);
 
-    // fecha a barra atual em 100%
     setProgress(100);
-
     setDirection(dir);
     setToIndex(safe);
     setIsAnimating(true);
@@ -197,8 +191,6 @@ export default function HomeBanner({ className }: Props) {
       setActive(safe);
       setToIndex(null);
       setIsAnimating(false);
-
-      // começa a próxima barra do zero
       setProgress(0);
       lastRef.current = performance.now();
     }, TRANSITION_MS);
@@ -214,7 +206,7 @@ export default function HomeBanner({ className }: Props) {
     startTransition(idx, 'prev');
   }
 
-  // ===== autoplay com progress estilo stories =====
+  // ===== autoplay com progress =====
   useEffect(() => {
     if (items.length <= 1) return;
 
@@ -274,9 +266,7 @@ export default function HomeBanner({ className }: Props) {
       if (navigator.clipboard && url) {
         await navigator.clipboard.writeText(url);
       }
-    } catch {
-      // silencioso
-    }
+    } catch {}
   }
 
   if (!items.length || !current) return null;
@@ -294,6 +284,11 @@ export default function HomeBanner({ className }: Props) {
     startXRef.current = e.clientX;
     startYRef.current = e.clientY;
     draggingRef.current = true;
+    setIsDragging(true);
+    setDragX(0);
+
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    widthRef.current = Math.max(1, rect.width);
 
     (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
   }
@@ -305,8 +300,52 @@ export default function HomeBanner({ className }: Props) {
     const dx = e.clientX - startXRef.current;
     const dy = e.clientY - startYRef.current;
 
-    if (Math.abs(dy) > Math.abs(dx)) return;
+    // vertical domina -> solta o gesto (permite rolagem da página)
+    if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 8) {
+      draggingRef.current = false;
+      setIsDragging(false);
+      setDragX(0);
+      return;
+    }
+
+    // horizontal -> acompanha ao vivo
     e.preventDefault();
+    setDragX(clamp(dx, -widthRef.current, widthRef.current));
+  }
+
+  function endDrag(commit: boolean, dir: 'next' | 'prev') {
+    const width = widthRef.current || 1;
+
+    if (!commit) {
+      // volta pro lugar com animação suave
+      setIsDragging(false);
+      setDragX(0);
+      return;
+    }
+
+    // “soltou” passando do limiar: anima o restante e troca
+    const targetIndex =
+      dir === 'next' ? (active + 1) % items.length : active === 0 ? items.length - 1 : active - 1;
+
+    if (animTimerRef.current) window.clearTimeout(animTimerRef.current);
+
+    setProgress(100);
+    setDirection(dir);
+    setToIndex(targetIndex);
+    setIsAnimating(true);
+
+    // empurra até sair totalmente
+    setIsDragging(false);
+    setDragX(dir === 'next' ? -width : width);
+
+    animTimerRef.current = window.setTimeout(() => {
+      setActive(targetIndex);
+      setToIndex(null);
+      setIsAnimating(false);
+      setProgress(0);
+      lastRef.current = performance.now();
+      setDragX(0);
+    }, TRANSITION_MS);
   }
 
   function onPointerUp(e: React.PointerEvent) {
@@ -316,24 +355,53 @@ export default function HomeBanner({ className }: Props) {
     if (startXRef.current == null || startYRef.current == null) return;
 
     const dx = e.clientX - startXRef.current;
+
     startXRef.current = null;
     startYRef.current = null;
 
-    if (Math.abs(dx) < SWIPE_THRESHOLD) return;
+    const absDx = Math.abs(dx);
+    const commit = absDx >= SWIPE_THRESHOLD;
+    const dir: 'next' | 'prev' = dx < 0 ? 'next' : 'prev';
 
-    if (dx < 0) next();
-    else prev();
+    endDrag(commit, dir);
   }
 
-  // slide “topo” durante a animação
-  const topItem = isAnimating && nextItem ? nextItem : current;
+  // ===== slides/topo =====
+  const topItem = (isAnimating || isDragging) && (nextItem ?? current) ? (nextItem ?? current) : current;
+
   const topAlign = alignClasses(topItem.align);
 
-  // barras: durante animação, mantém a barra do "active" como 100%
   const progressForActive = isAnimating ? 100 : clamp(progress, 0, 100);
 
-  // ✅ AJUSTE: só o texto central sobe 15px
+  // ✅ só o texto central sobe 15px
   const centerLiftClass = topItem.align === 'center' ? '-translate-y-[15px]' : '';
+
+  // ===== cálculo de posições durante drag =====
+  const width = widthRef.current || 1;
+  const dragDir: 'next' | 'prev' = dragX < 0 ? 'next' : 'prev';
+
+  // durante drag, garantimos qual é o “nextItem”
+  const liveToIndex =
+    isDragging || isAnimating
+      ? dragDir === 'next'
+        ? (active + 1) % items.length
+        : active === 0
+          ? items.length - 1
+          : active - 1
+      : null;
+
+  const liveNextItem = liveToIndex !== null ? items[liveToIndex] : null;
+
+  // offsets:
+  // - current: acompanha o dedo (dragX)
+  // - next: entra da direita (next) ou esquerda (prev), acompanhando o dedo
+  const currentOffset = dragX;
+  const nextOffset =
+    dragDir === 'next'
+      ? width + dragX // começa em +width e vem para 0
+      : -width + dragX; // começa em -width e vem para 0
+
+  const isLiveSliding = isDragging || isAnimating;
 
   return (
     <section className={className}>
@@ -346,8 +414,19 @@ export default function HomeBanner({ className }: Props) {
           onPointerCancel={onPointerUp}
           style={{ touchAction: 'pan-y' }}
         >
-          {/* BASE */}
-          <div className="absolute inset-0">
+          {/* ===== SLIDES: 2 camadas com translateX controlado ===== */}
+          {/* CURRENT */}
+          <div
+            className={[
+              'absolute inset-0',
+              isLiveSliding ? 'will-change-transform' : '',
+              !isDragging && isAnimating ? `transition-transform duration-[${TRANSITION_MS}ms]` : '',
+            ].join(' ')}
+            style={{
+              transform: `translate3d(${currentOffset}px, 0, 0)`,
+              transitionTimingFunction: 'cubic-bezier(0.22, 0.8, 0.2, 1)',
+            }}
+          >
             <picture>
               <source srcSet={withWebp(current.imageUrl)} type="image/webp" />
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -356,35 +435,33 @@ export default function HomeBanner({ className }: Props) {
                 alt={current.title}
                 className="absolute inset-0 h-full w-full object-cover"
                 loading="lazy"
+                draggable={false}
               />
             </picture>
           </div>
 
-          {/* TOP (entrando) */}
-          {nextItem ? (
+          {/* NEXT (pré-carregado para swipe ao vivo e também usado na transição) */}
+          {liveNextItem ? (
             <div
               className={[
                 'absolute inset-0',
-                'transition-transform transition-opacity',
-                `duration-[${TRANSITION_MS}ms]`,
-                'will-change-transform will-change-opacity',
-                isAnimating ? 'opacity-100 translate-x-0' : 'opacity-0',
-                !isAnimating
-                  ? direction === 'next'
-                    ? 'translate-x-full'
-                    : '-translate-x-full'
-                  : '',
+                'will-change-transform',
+                !isDragging && isAnimating ? `transition-transform duration-[${TRANSITION_MS}ms]` : '',
               ].join(' ')}
-              style={{ transitionTimingFunction: 'cubic-bezier(0.22, 0.8, 0.2, 1)' }}
+              style={{
+                transform: `translate3d(${nextOffset}px, 0, 0)`,
+                transitionTimingFunction: 'cubic-bezier(0.22, 0.8, 0.2, 1)',
+              }}
             >
               <picture>
-                <source srcSet={withWebp(nextItem.imageUrl)} type="image/webp" />
+                <source srcSet={withWebp(liveNextItem.imageUrl)} type="image/webp" />
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={nextItem.imageUrl}
-                  alt={nextItem.title}
+                  src={liveNextItem.imageUrl}
+                  alt={liveNextItem.title}
                   className="absolute inset-0 h-full w-full object-cover"
                   loading="lazy"
+                  draggable={false}
                 />
               </picture>
             </div>
@@ -399,12 +476,8 @@ export default function HomeBanner({ className }: Props) {
             <div className="flex gap-1.5">
               {items.map((_, i) => {
                 const filled = i < active ? 100 : i === active ? progressForActive : 0;
-
                 return (
-                  <div
-                    key={i}
-                    className="h-[3px] flex-1 overflow-hidden rounded-full bg-white/35"
-                  >
+                  <div key={i} className="h-[3px] flex-1 overflow-hidden rounded-full bg-white/35">
                     <div className="h-full bg-white" style={{ width: `${filled}%` }} />
                   </div>
                 );
@@ -427,12 +500,7 @@ export default function HomeBanner({ className }: Props) {
               )}
             </button>
 
-            <button
-              type="button"
-              aria-label="Compartilhar"
-              onClick={onShare}
-              className="p2 -ml-2"
-            >
+            <button type="button" aria-label="Compartilhar" onClick={onShare} className="p2 -ml-2">
               <PlaneIcon className="h-7 w-7 text-white rotate-[25deg]" />
             </button>
 
@@ -478,12 +546,7 @@ export default function HomeBanner({ className }: Props) {
 
           {/* content */}
           <div className="absolute inset-0 z-[35] px-14 pb-4 pt-6 -translate-y-[0px]">
-            <div
-              className={[
-                `flex h-full w-full flex-col justify-end gap-1 ${topAlign}`,
-                centerLiftClass, // ✅ só quando center
-              ].join(' ')}
-            >
+            <div className={[`flex h-full w-full flex-col justify-end gap-1 ${topAlign}`, centerLiftClass].join(' ')}>
               <div
                 className="text-[11px] font-semibold tracking-wide"
                 style={{ color: '#7CFFB2', textShadow: '0 2px 16px rgba(0,0,0,0.55)' }}
@@ -539,9 +602,7 @@ export default function HomeBanner({ className }: Props) {
             50% { transform: translateY(-3px); }
             100% { transform: translateY(0); }
           }
-          .arrow-float {
-            animation: floatArrow 1.8s ease-in-out infinite;
-          }
+          .arrow-float { animation: floatArrow 1.8s ease-in-out infinite; }
 
           @keyframes heartPop {
             0% { transform: scale(1); }
@@ -549,9 +610,7 @@ export default function HomeBanner({ className }: Props) {
             60% { transform: scale(0.95); }
             100% { transform: scale(1); }
           }
-          .heart-pop {
-            animation: heartPop 320ms ease-out;
-          }
+          .heart-pop { animation: heartPop 320ms ease-out; }
         `}</style>
       </div>
     </section>
