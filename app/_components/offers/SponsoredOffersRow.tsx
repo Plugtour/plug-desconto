@@ -20,7 +20,7 @@ function Star({ fillPct }: { fillPct: number }) {
   const pct = Math.max(0, Math.min(100, fillPct));
 
   return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
+    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" aria-hidden="true">
       <path
         d="M12 3.6l2.5 5.3 5.8.5-4.4 3.8 1.4 5.7L12 16.1 6.7 18.9l1.4-5.7-4.4-3.8 5.8-.5L12 3.6z"
         className="fill-zinc-300"
@@ -56,7 +56,6 @@ function StarsRow({ rating }: { rating: number }) {
 ========================= */
 
 function buildMeta(item: any) {
-  // prioridade: metaText -> city|category|kind -> subtitle
   const metaText = (item?.metaText ?? '').toString().trim();
   if (metaText) return metaText;
 
@@ -88,7 +87,6 @@ function HeartIcon({
   filled: boolean;
   className?: string;
 }) {
-  // "gordinho": stroke mais forte quando vazado
   const strokeWidth = filled ? 0 : 2.2;
 
   return (
@@ -126,7 +124,7 @@ export default function SponsoredOffersRow({
   return (
     <section className={['w-full', className || ''].join(' ')}>
       <div className="mb-2 flex items-center justify-between px-4">
-        <h2 className="text-[15px] font-semibold text-zinc-900">{title}</h2>
+        <h2 className="text-[14px] font-semibold text-zinc-900">{title}</h2>
 
         {viewAllHref ? (
           <Link
@@ -138,22 +136,14 @@ export default function SponsoredOffersRow({
         ) : null}
       </div>
 
-      {/* LISTAGEM – sem fundo branco */}
       <div className="px-3">
         {shown.map((item, idx) => {
           const anyItem: any = item;
           const isFav = !!favIds[item.id];
 
-          // Linha 2
           const meta = buildMeta(anyItem);
-
-          // Linha 3 (bold)
-          // Aceita:
-          // - economyText: "R$80 a R$120" ou "R$80 - R$120"
-          // - priceText: "R$80 a R$120"
           const range =
             (anyItem?.economyText ?? item.priceText ?? '').toString().trim();
-
           const economyLine = range ? `Economia de ${range}` : '';
 
           const rating = Number(anyItem?.rating ?? 4.8);
@@ -163,7 +153,7 @@ export default function SponsoredOffersRow({
             <div key={item.id} className="relative">
               <Link href={item.href} className="block py-3 active:scale-[0.995]">
                 <div className="flex gap-3">
-                  {/* FOTO – +20% (80 -> 96), canto md */}
+                  {/* FOTO */}
                   <div className="h-24 w-24 flex-none overflow-hidden rounded-md bg-zinc-200">
                     <img
                       src={item.imageUrl}
@@ -174,40 +164,40 @@ export default function SponsoredOffersRow({
                   </div>
 
                   <div className="min-w-0 flex-1">
-                    {/* TÍTULO (2 linhas max, com espaço pro coração) */}
-                    <div className="pr-14 text-[14px] font-semibold leading-snug text-zinc-900 line-clamp-2">
+                    {/* TÍTULO */}
+                    <div className="pr-14 text-[13px] font-semibold leading-snug text-zinc-900 line-clamp-2">
                       {item.title}
                     </div>
 
-                    {/* Linha 2: meta */}
-                    <div className="mt-0 text-[12px] text-zinc-500 line-clamp-1">
+                    {/* LINHA 2 */}
+                    <div className="mt-0 text-[11px] text-zinc-500 line-clamp-1">
                       {meta || ' '}
                     </div>
 
-                    {/* Linha 3: economia (bold) — aproximar da linha 2 */}
+                    {/* LINHA 3 */}
                     {economyLine ? (
-                      <div className="-mt-0.5 text-[13px] font-semibold text-zinc-900">
+                      <div className="-mt-0.5 text-[12px] font-semibold text-zinc-900">
                         {economyLine}
                       </div>
                     ) : null}
 
-                    {/* Avaliação + Ver mais */}
+                    {/* AVALIAÇÃO + VER MAIS */}
                     <div className="mt-1.5 flex items-end justify-between">
                       <div>
                         <StarsRow rating={rating} />
-                        <div className="-mt-0.5 text-[12px] text-zinc-500">
+                        <div className="-mt-0.5 text-[11px] text-zinc-500">
                           <span className="font-semibold text-zinc-700">
-                            {Number.isFinite(rating) ? rating.toFixed(1) : '0.0'}
+                            {rating.toFixed(1)}
                           </span>{' '}
                           de{' '}
                           <span className="font-semibold text-zinc-700">
-                            {Number.isFinite(reviews) ? reviews : 0}
+                            {reviews}
                           </span>{' '}
                           avaliações
                         </div>
                       </div>
 
-                      {/* Ver mais +1px */}
+                      {/* VER MAIS (mantido) */}
                       <span className="text-[14px] font-semibold text-green-600">
                         Ver mais
                       </span>
@@ -215,10 +205,10 @@ export default function SponsoredOffersRow({
                   </div>
                 </div>
 
-                {/* CORAÇÃO – +25% (maior), vazado -> cheio vermelho */}
+                {/* CORAÇÃO */}
                 <button
                   type="button"
-                  aria-label={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+                  aria-label="Favoritar"
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -238,7 +228,6 @@ export default function SponsoredOffersRow({
                 </button>
               </Link>
 
-              {/* DIVISÓRIA */}
               {idx < shown.length - 1 ? (
                 <div className="mx-2 border-b border-dotted border-zinc-300" />
               ) : null}
