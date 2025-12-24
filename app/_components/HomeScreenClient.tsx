@@ -1,7 +1,11 @@
+// app/_components/HomeScreenClient.tsx
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import HomeBanner from './HomeBanner';
+
+import QuickSearch from './search/QuickSearch';
+import type { SearchCategory, SearchOffer } from './search/types';
 
 /* =========================
    TIPOS
@@ -226,7 +230,6 @@ export default function HomeScreenClient({
 }) {
   const categories: CategoryItem[] = useMemo(
     () => [
-      // 16 (2 telas de 8)
       { id: 'passeios', title: 'Passeios', count: 23, iconKey: 'pin' },
       { id: 'ingressos', title: 'Ingressos', count: 31, iconKey: 'ticket' },
       { id: 'servicos', title: 'Serviços', count: 12, iconKey: 'spark' },
@@ -247,6 +250,47 @@ export default function HomeScreenClient({
     ],
     []
   );
+
+  // 🔌 categorias para a busca (recurso separado)
+  const searchCategories: SearchCategory[] = useMemo(() => {
+    return categories.map((c) => ({ id: c.id, title: c.title, count: c.count }));
+  }, [categories]);
+
+  // 🔌 ofertas para a busca (recurso separado)
+  const searchData: SearchOffer[] = useMemo(() => {
+    const list = Array.isArray(offers) ? offers : [];
+    return list
+      .map((o: any): SearchOffer | null => {
+        const id = String(o?.id ?? o?._id ?? '').trim();
+        const slug = (o?.slug ?? o?.seoSlug ?? o?.slugId ?? null) as string | null;
+
+        const title = String(o?.title ?? o?.name ?? o?.nome ?? o?.titulo ?? '').trim();
+        if (!id || !title) return null;
+
+        const subtitle =
+          (o?.subtitle ?? o?.subTitle ?? o?.descricaoCurta ?? o?.shortDescription ?? null) as
+            | string
+            | null;
+
+        const categoryId =
+          (o?.categoryId ?? o?.category ?? o?.categoriaId ?? null) as string | null;
+
+        const city = (o?.city ?? o?.cidade ?? o?.locationCity ?? null) as string | null;
+
+        const priceText =
+          (o?.priceText ?? o?.precoTexto ?? o?.price_label ?? o?.priceLabel ?? null) as
+            | string
+            | null;
+
+        const imageUrl =
+          (o?.imageUrl ?? o?.image ?? o?.cover ?? o?.coverImage ?? o?.banner ?? null) as
+            | string
+            | null;
+
+        return { id, slug, title, subtitle, categoryId, city, priceText, imageUrl };
+      })
+      .filter(Boolean) as SearchOffer[];
+  }, [offers]);
 
   const scrollerRef = useRef<HTMLDivElement | null>(null);
 
@@ -374,7 +418,6 @@ export default function HomeScreenClient({
       </div>
 
       <section className="relative px-4 pt-4">
-        {/* Esfumaçado */}
         <div className="pointer-events-none absolute inset-0 z-[1]">
           <div className="absolute left-0 top-0 h-full w-10 bg-gradient-to-r from-zinc-100 to-transparent" />
           <div className="absolute right-0 top-0 h-full w-10 bg-gradient-to-l from-zinc-100 to-transparent" />
@@ -418,7 +461,6 @@ export default function HomeScreenClient({
             </button>
           )}
 
-          {/* ✅ wrapper que OCULTA a barra sem mexer no scroll */}
           <div className="overflow-hidden">
             <div
               ref={scrollerRef}
@@ -521,10 +563,14 @@ export default function HomeScreenClient({
         `}</style>
       </section>
 
-      {/* ✅ BANNER SEPARADO DO MENU (editar só em HomeBanner.tsx) */}
       <HomeBanner className="mt-4" />
 
-      {/* Aqui você pode colocar o resto da Home depois (lista de ofertas etc.) */}
+      {/* BUSCA RÁPIDA (modal + resultados + categorias) */}
+      <div className="px-4 mt-3 pb-2">
+        <QuickSearch offers={searchData} categories={searchCategories} />
+      </div>
+
+      {/* resto da Home depois */}
     </div>
   );
 }
