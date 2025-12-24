@@ -108,22 +108,29 @@ export default function HomeBanner({ className }: Props) {
   const lastRef = useRef<number>(0);
 
   const current = items[active];
+
+  // favoritos
   const [favorites, setFavorites] = useState<Record<string, boolean>>({});
+  const isFav = !!favorites[current?.id ?? ''];
+
+  // animação do slide (para visualizar o deslize)
+  const [slideDir, setSlideDir] = useState<'next' | 'prev'>('next');
+  const [slideKey, setSlideKey] = useState(0);
 
   // ===== SWIPE (touch) =====
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
   const isSwiping = useRef(false);
 
-  const SWIPE_THRESHOLD_PX = 42; // sensibilidade
-  const VERTICAL_TOLERANCE_PX = 60;
+  const SWIPE_THRESHOLD_PX = 48;
+  const VERTICAL_TOLERANCE_PX = 70;
 
   function onTouchStart(e: React.TouchEvent) {
     const t = e.touches[0];
     touchStartX.current = t.clientX;
     touchStartY.current = t.clientY;
     isSwiping.current = true;
-    setPaused(true); // pausa enquanto arrasta
+    setPaused(true);
   }
 
   function onTouchMove(e: React.TouchEvent) {
@@ -134,13 +141,13 @@ export default function HomeBanner({ className }: Props) {
     const dx = t.clientX - touchStartX.current;
     const dy = t.clientY - touchStartY.current;
 
-    // se for muito vertical, deixa rolar a página normalmente
+    // se for muito vertical, libera scroll da página
     if (Math.abs(dy) > VERTICAL_TOLERANCE_PX && Math.abs(dy) > Math.abs(dx)) {
       isSwiping.current = false;
       return;
     }
 
-    // se está claramente horizontal, impede scroll vertical “brigando”
+    // horizontal claro -> evita "briga" com scroll
     if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) {
       e.preventDefault();
     }
@@ -167,15 +174,12 @@ export default function HomeBanner({ className }: Props) {
     const dx = endX - startX;
 
     if (dx <= -SWIPE_THRESHOLD_PX) {
-      // deslizou pra esquerda -> próximo
       next();
     } else if (dx >= SWIPE_THRESHOLD_PX) {
-      // deslizou pra direita -> anterior
       prev();
     }
 
-    // volta autoplay depois do gesto
-    setTimeout(() => setPaused(false), 120);
+    setTimeout(() => setPaused(false), 150);
   }
 
   // carrega favoritos do localStorage
@@ -197,27 +201,39 @@ export default function HomeBanner({ className }: Props) {
     }
   }, [favorites]);
 
-  const isFav = !!favorites[current?.id ?? ''];
-
   function toggleFav() {
     const id = current?.id;
     if (!id) return;
-    setFavorites((prev) => ({ ...prev, [id]: !prev[id] }));
+
+    setFavorites((prev) => {
+      const nextFav = !prev[id];
+
+      // animação só ao ATIVAR
+      if (nextFav) {
+        setHeartPulseKey((k) => k + 1);
+      }
+
+      return { ...prev, [id]: nextFav };
+    });
   }
 
-  function goTo(index: number) {
+  const [heartPulseKey, setHeartPulseKey] = useState(0);
+
+  function goTo(index: number, dir: 'next' | 'prev') {
     const nextIndex = clamp(index, 0, items.length - 1);
+    setSlideDir(dir);
+    setSlideKey((k) => k + 1);
     setActive(nextIndex);
     setProgress(0);
     lastRef.current = performance.now();
   }
 
   function next() {
-    goTo((active + 1) % items.length);
+    goTo((active + 1) % items.length, 'next');
   }
 
   function prev() {
-    goTo(active === 0 ? items.length - 1 : active - 1);
+    goTo(active === 0 ? items.length - 1 : active - 1, 'prev');
   }
 
   // autoplay com progress estilo stories
@@ -291,37 +307,94 @@ export default function HomeBanner({ className }: Props) {
   return (
     <section className={className}>
       <div className="relative w-full">
-        {/* CARD FULL (sem espaço lateral) */}
+        {/* CARD FULL */}
         <div
           className="relative h-[250px] w-full overflow-hidden"
           onTouchStart={onTouchStart}
           onTouchMove={onTouchMove}
           onTouchEnd={onTouchEnd}
-          style={{ touchAction: 'pan-y' }} // permite scroll vertical; horizontal controlamos no move
+          style={{ touchAction: 'pan-y' }}
         >
-          {/* imagem */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={current.imageUrl}
-            alt={current.title}
-            className="absolute inset-0 h-full w-full object-cover"
-            loading="lazy"
-          />
+          {/* SLIDE WRAPPER (para visualizar o deslize) */}
+          <div
+            key={slideKey}
+            className={[
+              'absolute inset-0',
+              slideDir === 'next' ? 'banner-slide-in-next' : 'banner-slide-in-prev',
+            ].join(' ')}
+          >
+            {/* imagem */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={current.imageUrl}
+              alt={current.title}
+              className="absolute inset-0 h-full w-full object-cover"
+              loading="lazy"
+            />
 
-          {/* overlay para leitura */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/25 to-black/10" />
-          <div className="absolute inset-0 bg-black/10" />
+            {/* overlay */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/25 to-black/10" />
+            <div className="absolute inset-0 bg-black/10" />
 
-          {/* barras de progresso (Instagram) */}
+            {/* conteúdo */}
+            <div className="absolute inset-0 z-[35] px-14 pb-4 pt-6 -translate-y-[0px]">
+              <div className={`flex h-full w-full flex-col justify-end gap-1 ${contentAlign}`}>
+                <div
+                  className="text-[11px] font-semibold tracking-wide"
+                  style={{
+                    color: '#7CFFB2',
+                    textShadow: '0 2px 16px rgba(0,0,0,0.55)',
+                  }}
+                >
+                  {current.tag}
+                </div>
+
+                <div
+                  className="text-[25px] font-extrabold leading-[1.05] text-white"
+                  style={{ textShadow: '0 2px 18px rgba(0,0,0,0.65)' }}
+                >
+                  {current.title}
+                </div>
+
+                <div
+                  className="text-[16px] font-medium text-white/90"
+                  style={{ textShadow: '0 2px 14px rgba(0,0,0,0.55)' }}
+                >
+                  {current.subtitle}
+                </div>
+
+                <div
+                  className="text-[15px] font-semibold -mt-[8px]"
+                  style={{
+                    color: '#7CCBFF',
+                    textShadow: '0 2px 14px rgba(0,0,0,0.55)',
+                  }}
+                >
+                  {current.highlight}
+                </div>
+
+                {current.href ? (
+                  <div className="mt-2">
+                    <Link
+                      href={current.href}
+                      className="inline-flex text-[15px] font-semibold text-white -translate-y-[10px]"
+                      style={{ textShadow: '0 2px 14px rgba(0,0,0,0.55)' }}
+                    >
+                      Ver ofertas →
+                    </Link>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </div>
+
+          {/* barras de progresso */}
           <div className="absolute left-0 right-0 top-0 z-[30] px-3 pt-2">
             <div className="flex gap-1.5">
               {items.map((_, i) => {
                 const filled = i < active ? 100 : i === active ? clamp(progress, 0, 100) : 0;
                 return (
-                  <div
-                    key={i}
-                    className="h-[3px] flex-1 overflow-hidden rounded-full bg-white/35"
-                  >
+                  <div key={i} className="h-[3px] flex-1 overflow-hidden rounded-full bg-white/35">
                     <div className="h-full bg-white" style={{ width: `${filled}%` }} />
                   </div>
                 );
@@ -329,7 +402,7 @@ export default function HomeBanner({ className }: Props) {
             </div>
           </div>
 
-          {/* controles top-right (brancos) */}
+          {/* controles top-right */}
           <div className="absolute right-2 top-6 z-[40] flex items-center gap-3 text-white">
             <button
               type="button"
@@ -337,11 +410,7 @@ export default function HomeBanner({ className }: Props) {
               onClick={() => setPaused((v) => !v)}
               className="p2"
             >
-              {paused ? (
-                <PlayIcon className="h-10 w-10 text-white" />
-              ) : (
-                <PauseIcon className="h-10 w-10 text-white" />
-              )}
+              {paused ? <PlayIcon className="h-10 w-10 text-white" /> : <PauseIcon className="h-10 w-10 text-white" />}
             </button>
 
             <button
@@ -360,13 +429,17 @@ export default function HomeBanner({ className }: Props) {
               className="p-2"
             >
               <HeartIcon
-                className={['h-8 w-8', isFav ? 'text-red-500 heart-pop' : 'text-white'].join(' ')}
+                key={`${current.id}-${heartPulseKey}`}
+                className={[
+                  'h-8 w-8',
+                  isFav ? 'text-red-500 heart-pop' : 'text-white',
+                ].join(' ')}
                 active={isFav}
               />
             </button>
           </div>
 
-          {/* setas laterais flutuando (fixas) */}
+          {/* setas */}
           <button
             type="button"
             aria-label="Banner anterior"
@@ -388,57 +461,6 @@ export default function HomeBanner({ className }: Props) {
               <DoubleChevronOpen dir="right" className="h-10 w-10 scale-110" />
             </span>
           </button>
-
-          {/* conteúdo */}
-          <div className="absolute inset-0 z-[35] px-14 pb-4 pt-6 -translate-y-[0px]">
-            <div className={`flex h-full w-full flex-col justify-end gap-1 ${contentAlign}`}>
-              <div
-                className="text-[11px] font-semibold tracking-wide"
-                style={{
-                  color: '#7CFFB2',
-                  textShadow: '0 2px 16px rgba(0,0,0,0.55)',
-                }}
-              >
-                {current.tag}
-              </div>
-
-              <div
-                className="text-[25px] font-extrabold leading-[1.05] text-white"
-                style={{ textShadow: '0 2px 18px rgba(0,0,0,0.65)' }}
-              >
-                {current.title}
-              </div>
-
-              <div
-                className="text-[16px] font-medium text-white/90"
-                style={{ textShadow: '0 2px 14px rgba(0,0,0,0.55)' }}
-              >
-                {current.subtitle}
-              </div>
-
-              <div
-                className="text-[15px] font-semibold -mt-[8px]"
-                style={{
-                  color: '#7CCBFF',
-                  textShadow: '0 2px 14px rgba(0,0,0,0.55)',
-                }}
-              >
-                {current.highlight}
-              </div>
-
-              {current.href ? (
-                <div className="mt-2">
-                  <Link
-                    href={current.href}
-                    className="inline-flex text-[15px] font-semibold text-white -translate-y-[10px]"
-                    style={{ textShadow: '0 2px 14px rgba(0,0,0,0.55)' }}
-                  >
-                    Ver ofertas →
-                  </Link>
-                </div>
-              ) : null}
-            </div>
-          </div>
         </div>
 
         <style jsx global>{`
@@ -451,15 +473,31 @@ export default function HomeBanner({ className }: Props) {
             animation: floatArrow 1.8s ease-in-out infinite;
           }
 
+          /* pulsar somente ao ATIVAR */
           @keyframes heartPop {
             0% { transform: scale(1); }
             30% { transform: scale(1.25); }
             60% { transform: scale(0.95); }
             100% { transform: scale(1); }
           }
-
           .heart-pop {
             animation: heartPop 320ms ease-out;
+          }
+
+          /* deslize visível e suave */
+          @keyframes slideInNext {
+            0% { transform: translateX(18px); opacity: 0.65; }
+            100% { transform: translateX(0); opacity: 1; }
+          }
+          @keyframes slideInPrev {
+            0% { transform: translateX(-18px); opacity: 0.65; }
+            100% { transform: translateX(0); opacity: 1; }
+          }
+          .banner-slide-in-next {
+            animation: slideInNext 420ms cubic-bezier(.22,.9,.22,1);
+          }
+          .banner-slide-in-prev {
+            animation: slideInPrev 420ms cubic-bezier(.22,.9,.22,1);
           }
         `}</style>
       </div>
