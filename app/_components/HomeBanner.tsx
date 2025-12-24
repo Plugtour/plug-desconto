@@ -51,7 +51,7 @@ function HeartIcon({
   return (
     <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
       <path
-        d="M12 21s-7-4.6-9.2-8.7C1.3 9.3 3.1 6.6 6.2 6.1c1.8-.3 3.4.4 4.5 1.7 1.1-1.3 2.7-2 4.5-1.7 3.1.5 4.9 3.2 3.4 6.2C19 16.4 12 21 12 21z"
+        d="M12 21C12 21 4 15.36 4 9.5C4 7.02 6.02 5 8.5 5C10.04 5 11.4 5.81 12 7C12.6 5.81 13.96 5 15.5 5C17.98 5 20 7.02 20 9.5C20 15.36 12 21 12 21Z"
         fill={active ? 'currentColor' : 'none'}
         stroke={active ? 'none' : 'currentColor'}
         strokeWidth={active ? 0 : 1.8}
