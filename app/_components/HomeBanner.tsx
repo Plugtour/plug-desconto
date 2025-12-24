@@ -325,14 +325,14 @@ export default function HomeBanner({ className }: Props) {
           </button>
 
           {/* conteúdo (com padding pra não ficar atrás das setas) */}
-            <div className="absolute inset-0 z-[35] px-14 pb-4 pt-6 -translate-y-[15px]">
+            <div className="absolute inset-0 z-[35] px-14 pb-4 pt-6 -translate-y-[0px]">
             <div className={`flex h-full w-full flex-col justify-end gap-1 ${contentAlign}`}>
               {/* tag colorida */}
               <div
                 className="text-[11px] font-semibold tracking-wide"
                 style={{
                   color: '#7CFFB2',
-                  textShadow: '0 2px 14px rgba(0,0,0,0.55)',
+                  textShadow: '0 2px 16px rgba(0,0,0,0.55)',
                 }}
               >
                 {current.tag}
@@ -340,7 +340,7 @@ export default function HomeBanner({ className }: Props) {
 
               {/* título grande */}
               <div
-                className="text-[22px] font-extrabold leading-[1.05] text-white"
+                className="text-[25px] font-extrabold leading-[1.05] text-white"
                 style={{ textShadow: '0 2px 18px rgba(0,0,0,0.65)' }}
               >
                 {current.title}
@@ -348,7 +348,7 @@ export default function HomeBanner({ className }: Props) {
 
               {/* subtítulo menor */}
               <div
-                className="text-[14px] font-medium text-white/90"
+                className="text-[16px] font-medium text-white/90"
                 style={{ textShadow: '0 2px 14px rgba(0,0,0,0.55)' }}
               >
                 {current.subtitle}
@@ -356,7 +356,7 @@ export default function HomeBanner({ className }: Props) {
 
               {/* linha menor colorida */}
             <div
-            className="text-[13px] font-semibold -mt-[8px]"
+            className="text-[15px] font-semibold -mt-[8px]"
             style={{
                 color: '#7CCBFF',
                 textShadow: '0 2px 14px rgba(0,0,0,0.55)',
@@ -370,7 +370,7 @@ export default function HomeBanner({ className }: Props) {
                 <div className="mt-2">
                   <Link
                     href={current.href}
-                    className="inline-flex text-[14px] font-semibold text-white -translate-y-[10px]"
+                    className="inline-flex text-[15px] font-semibold text-white -translate-y-[10px]"
                     style={{ textShadow: '0 2px 14px rgba(0,0,0,0.55)' }}
                   >
                     Ver ofertas →
