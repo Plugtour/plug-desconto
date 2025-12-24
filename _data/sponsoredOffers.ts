@@ -13,13 +13,13 @@ export type SponsoredOffer = {
 export const SPONSORED_OFFERS: SponsoredOffer[] = [
   {
     id: 'sp-1',
-    title: 'Skyglass Canela',
-    subtitle: 'Ingressos com economia',
+    title: 'Tour Uva e Vinho + Almoço Italiano + Trem Maria Fumaça',
+    subtitle: 'Passeio com economia',
     imageUrl:
       'https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1400&q=80',
     priceText: 'a partir de R$ 79',
     badge: 'Patrocinado',
-    href: '/oferta/skyglass-canela',
+    href: '/oferta/trem-maria-fumaca',
   },
   {
     id: 'sp-2',
