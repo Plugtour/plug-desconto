@@ -1,3 +1,4 @@
+// Caminho: app/_components/HomeBanner.tsx
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -185,7 +186,7 @@ export default function HomeBanner({ className }: Props) {
 
     if (animTimerRef.current) window.clearTimeout(animTimerRef.current);
 
-    // ✅ IMPORTANTE: antes de trocar, "fecha" a barra atual em 100%
+    // fecha a barra atual em 100%
     setProgress(100);
 
     setDirection(dir);
@@ -197,7 +198,7 @@ export default function HomeBanner({ className }: Props) {
       setToIndex(null);
       setIsAnimating(false);
 
-      // ✅ agora sim, começa a próxima barra do zero
+      // começa a próxima barra do zero
       setProgress(0);
       lastRef.current = performance.now();
     }, TRANSITION_MS);
@@ -233,11 +234,9 @@ export default function HomeBanner({ className }: Props) {
         const np = p + inc;
 
         if (np >= 100) {
-          // ✅ garante que a barra "fecha" em 100% e só depois troca
           setTimeout(() => next(), 0);
           return 100;
         }
-
         return np;
       });
 
@@ -330,8 +329,11 @@ export default function HomeBanner({ className }: Props) {
   const topItem = isAnimating && nextItem ? nextItem : current;
   const topAlign = alignClasses(topItem.align);
 
-  // ✅ barras: durante animação, mantém a barra do "active" como 100%
+  // barras: durante animação, mantém a barra do "active" como 100%
   const progressForActive = isAnimating ? 100 : clamp(progress, 0, 100);
+
+  // ✅ AJUSTE: só o texto central sobe 15px
+  const centerLiftClass = topItem.align === 'center' ? '-translate-y-[15px]' : '';
 
   return (
     <section className={className}>
@@ -396,8 +398,7 @@ export default function HomeBanner({ className }: Props) {
           <div className="absolute left-0 right-0 top-0 z-[30] px-3 pt-2">
             <div className="flex gap-1.5">
               {items.map((_, i) => {
-                const filled =
-                  i < active ? 100 : i === active ? progressForActive : 0;
+                const filled = i < active ? 100 : i === active ? progressForActive : 0;
 
                 return (
                   <div
@@ -426,7 +427,12 @@ export default function HomeBanner({ className }: Props) {
               )}
             </button>
 
-            <button type="button" aria-label="Compartilhar" onClick={onShare} className="p2 -ml-2">
+            <button
+              type="button"
+              aria-label="Compartilhar"
+              onClick={onShare}
+              className="p2 -ml-2"
+            >
               <PlaneIcon className="h-7 w-7 text-white rotate-[25deg]" />
             </button>
 
@@ -472,7 +478,12 @@ export default function HomeBanner({ className }: Props) {
 
           {/* content */}
           <div className="absolute inset-0 z-[35] px-14 pb-4 pt-6 -translate-y-[0px]">
-            <div className={`flex h-full w-full flex-col justify-end gap-1 ${topAlign}`}>
+            <div
+              className={[
+                `flex h-full w-full flex-col justify-end gap-1 ${topAlign}`,
+                centerLiftClass, // ✅ só quando center
+              ].join(' ')}
+            >
               <div
                 className="text-[11px] font-semibold tracking-wide"
                 style={{ color: '#7CFFB2', textShadow: '0 2px 16px rgba(0,0,0,0.55)' }}
@@ -481,7 +492,13 @@ export default function HomeBanner({ className }: Props) {
               </div>
 
               <div
-                className="text-[25px] font-extrabold leading-[1.05] text-white"
+                className={[
+                  'text-[25px] font-extrabold leading-[1.05] text-white',
+                  topItem.align === 'left' || topItem.align === 'right'
+                    ? 'max-w-[220px] whitespace-normal'
+                    : '',
+                  topItem.align === 'center' ? 'whitespace-nowrap' : '',
+                ].join(' ')}
                 style={{ textShadow: '0 2px 18px rgba(0,0,0,0.65)' }}
               >
                 {topItem.title}
