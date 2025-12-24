@@ -9,6 +9,7 @@ type Props = { className?: string };
 
 const DURATION_MS = 6500;
 const SWIPE_THRESHOLD = 45;
+const DEADZONE_PX = 10; // ✅ evita cancelar tap por micro-movimento
 const SLIDE_MS = 420; // swipe
 const FADE_MS = 280; // setas + autoplay
 
@@ -137,6 +138,7 @@ export default function HomeBanner({ className }: Props) {
   const startXRef = useRef<number | null>(null);
   const startYRef = useRef<number | null>(null);
   const draggingRef = useRef(false);
+  const hasMovedRef = useRef(false); // ✅ só vira swipe após deadzone
 
   // container width
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -154,7 +156,7 @@ export default function HomeBanner({ className }: Props) {
 
   const autoplayPaused = userPaused || isDragging || isSlideAnimating || isFading;
 
-  // ===== medir largura =====
+  // medir largura
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -179,7 +181,7 @@ export default function HomeBanner({ className }: Props) {
     };
   }, []);
 
-  // ===== preload prev/current/next (+ fade target) =====
+  // preload (prev/current/next + fade target)
   useEffect(() => {
     const urls = [
       withWebp(prevItem?.imageUrl),
@@ -195,7 +197,7 @@ export default function HomeBanner({ className }: Props) {
     });
   }, [prevItem?.imageUrl, current?.imageUrl, nextItem?.imageUrl, fadeTo, items]);
 
-  // ===== favoritos localStorage =====
+  // favoritos localStorage
   useEffect(() => {
     try {
       const raw = localStorage.getItem('plugdesconto:favorites');
@@ -225,7 +227,7 @@ export default function HomeBanner({ className }: Props) {
     }
   }
 
-  // ===== autoplay =====
+  // autoplay
   useEffect(() => {
     if (count <= 1) return;
 
@@ -245,7 +247,7 @@ export default function HomeBanner({ className }: Props) {
         const np = p + inc;
 
         if (np >= 100) {
-          setTimeout(() => goNextFade(), 0); // ✅ autoplay = fade
+          setTimeout(() => goNextFade(), 0);
           return 100;
         }
         return np;
@@ -264,7 +266,6 @@ export default function HomeBanner({ className }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoplayPaused, active, count]);
 
-  // ===== helpers: finalizar slide =====
   function finishSlideTransition(dir: 'next' | 'prev') {
     const newActive =
       dir === 'next' ? (active + 1) % count : (active - 1 + count) % count;
@@ -274,13 +275,13 @@ export default function HomeBanner({ className }: Props) {
 
     setDragX(0);
     setIsSlideAnimating(false);
+    setIsDragging(false);
     setProgress(0);
     lastRef.current = performance.now();
 
     requestAnimationFrame(() => setSnapping(false));
   }
 
-  // ===== SLIDE (somente swipe) =====
   function commitSwipe(dir: 'next' | 'prev') {
     if (isSlideAnimating || isFading) return;
     if (slideTimerRef.current) window.clearTimeout(slideTimerRef.current);
@@ -297,7 +298,6 @@ export default function HomeBanner({ className }: Props) {
     }, SLIDE_MS);
   }
 
-  // ===== FADE (somente setas + autoplay) =====
   function startFadeTo(targetIndex: number) {
     if (isFading || isSlideAnimating) return;
     if (fadeTimerRef.current) window.clearTimeout(fadeTimerRef.current);
@@ -305,8 +305,10 @@ export default function HomeBanner({ className }: Props) {
     const safe = ((targetIndex % count) + count) % count;
     if (safe === active) return;
 
+    // reseta swipe
     setIsDragging(false);
     draggingRef.current = false;
+    hasMovedRef.current = false;
     startXRef.current = null;
     startYRef.current = null;
     setDragX(0);
@@ -333,7 +335,6 @@ export default function HomeBanner({ className }: Props) {
     startFadeTo((active - 1 + count) % count);
   }
 
-  // ===== Share =====
   async function onShare() {
     try {
       const url =
@@ -366,7 +367,7 @@ export default function HomeBanner({ className }: Props) {
     );
   }
 
-  // ===== Swipe handlers =====
+  // ✅ Swipe handlers (com deadzone)
   function onPointerDown(e: React.PointerEvent) {
     if (shouldIgnoreGesture(e.target)) return;
     if (isSlideAnimating || isFading) return;
@@ -374,8 +375,8 @@ export default function HomeBanner({ className }: Props) {
     startXRef.current = e.clientX;
     startYRef.current = e.clientY;
     draggingRef.current = true;
+    hasMovedRef.current = false; // ✅ ainda não virou swipe
 
-    setIsDragging(true);
     setDragX(0);
 
     (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
@@ -388,13 +389,24 @@ export default function HomeBanner({ className }: Props) {
     const dx = e.clientX - startXRef.current;
     const dy = e.clientY - startYRef.current;
 
-    if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 8) {
-      draggingRef.current = false;
-      setIsDragging(false);
-      setDragX(0);
-      return;
+    // ✅ deadzone: não faz nada (não cancela tap)
+    if (!hasMovedRef.current) {
+      if (Math.abs(dx) < DEADZONE_PX && Math.abs(dy) < DEADZONE_PX) return;
+
+      // se começou mais vertical, libera scroll e cancela swipe
+      if (Math.abs(dy) > Math.abs(dx)) {
+        draggingRef.current = false;
+        setIsDragging(false);
+        setDragX(0);
+        return;
+      }
+
+      // agora sim virou swipe
+      hasMovedRef.current = true;
+      setIsDragging(true);
     }
 
+    // só aqui impede gesto do navegador
     e.preventDefault();
 
     const w = widthRef.current || 1;
@@ -411,6 +423,15 @@ export default function HomeBanner({ className }: Props) {
     const dx = e.clientX - sx;
     startXRef.current = null;
     startYRef.current = null;
+
+    // ✅ se nem virou swipe (só foi tap), não mexe em nada
+    if (!hasMovedRef.current) {
+      setIsDragging(false);
+      setDragX(0);
+      return;
+    }
+
+    hasMovedRef.current = false;
 
     const commit = Math.abs(dx) >= SWIPE_THRESHOLD;
     if (!commit) {
@@ -490,6 +511,9 @@ export default function HomeBanner({ className }: Props) {
 
   const fadeItem = fadeTo != null ? items[fadeTo] : null;
 
+  const prevForSlide = prevItem;
+  const nextForSlide = nextItem;
+
   return (
     <section className={className}>
       <div className="relative w-full">
@@ -502,10 +526,10 @@ export default function HomeBanner({ className }: Props) {
           onPointerCancel={onPointerUp}
           style={{ touchAction: 'pan-y' }}
         >
-          {/* ======== IMAGENS + TEXTO ======== */}
+          {/* IMAGENS + TEXTO */}
           {isFading && fadeItem ? (
             <>
-              {/* BASE (atual): ✅ SOMENTE IMAGEM (sem texto) */}
+              {/* BASE: só imagem */}
               <div className="absolute inset-0">
                 <picture>
                   <source srcSet={withWebp(current.imageUrl)} type="image/webp" />
@@ -520,7 +544,7 @@ export default function HomeBanner({ className }: Props) {
                 </picture>
               </div>
 
-              {/* TOP (entrando): ✅ IMAGEM + TEXTO */}
+              {/* TOP: imagem + texto */}
               <div
                 className={[
                   'absolute inset-0',
@@ -542,10 +566,7 @@ export default function HomeBanner({ className }: Props) {
                   />
                 </picture>
 
-                <div
-                  className="absolute inset-0"
-                  style={{ animation: `fadeIn ${FADE_MS}ms ease-out both` }}
-                >
+                <div className="absolute inset-0" style={{ animation: `fadeIn ${FADE_MS}ms ease-out both` }}>
                   <SlideContent item={fadeItem} />
                 </div>
               </div>
@@ -562,17 +583,17 @@ export default function HomeBanner({ className }: Props) {
                 }}
               >
                 <picture>
-                  <source srcSet={withWebp(prevItem.imageUrl)} type="image/webp" />
+                  <source srcSet={withWebp(prevForSlide.imageUrl)} type="image/webp" />
                   <img
-                    src={prevItem.imageUrl}
-                    alt={prevItem.title}
+                    src={prevForSlide.imageUrl}
+                    alt={prevForSlide.title}
                     className="absolute inset-0 h-full w-full object-cover"
                     loading="lazy"
                     draggable={false}
                     decoding="async"
                   />
                 </picture>
-                <SlideContent item={prevItem} />
+                <SlideContent item={prevForSlide} />
               </div>
 
               {/* CURRENT */}
@@ -608,17 +629,17 @@ export default function HomeBanner({ className }: Props) {
                 }}
               >
                 <picture>
-                  <source srcSet={withWebp(nextItem.imageUrl)} type="image/webp" />
+                  <source srcSet={withWebp(nextForSlide.imageUrl)} type="image/webp" />
                   <img
-                    src={nextItem.imageUrl}
-                    alt={nextItem.title}
+                    src={nextForSlide.imageUrl}
+                    alt={nextForSlide.title}
                     className="absolute inset-0 h-full w-full object-cover"
                     loading="lazy"
                     draggable={false}
                     decoding="async"
                   />
                 </picture>
-                <SlideContent item={nextItem} />
+                <SlideContent item={nextForSlide} />
               </div>
             </>
           )}
@@ -627,7 +648,7 @@ export default function HomeBanner({ className }: Props) {
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/25 to-black/10" />
           <div className="absolute inset-0 bg-black/10" />
 
-          {/* progress bars */}
+          {/* progress */}
           <div className="absolute left-0 right-0 top-0 z-[60] px-3 pt-2">
             <div className="flex gap-1.5">
               {items.map((_, i) => {
@@ -641,7 +662,7 @@ export default function HomeBanner({ className }: Props) {
             </div>
           </div>
 
-          {/* controls top-right */}
+          {/* controls */}
           <div
             data-banner-control
             className="absolute right-2 top-6 z-[70] flex items-center gap-3 text-white"
@@ -656,11 +677,7 @@ export default function HomeBanner({ className }: Props) {
               className="p2"
               style={{ touchAction: 'manipulation' }}
             >
-              {userPaused ? (
-                <PlayIcon className="h-10 w-10 text-white" />
-              ) : (
-                <PauseIcon className="h-10 w-10 text-white" />
-              )}
+              {userPaused ? <PlayIcon className="h-10 w-10 text-white" /> : <PauseIcon className="h-10 w-10 text-white" />}
             </button>
 
             <button
@@ -681,11 +698,7 @@ export default function HomeBanner({ className }: Props) {
               style={{ touchAction: 'manipulation' }}
             >
               <HeartIcon
-                className={[
-                  'h-8 w-8',
-                  isFav ? 'text-red-500' : 'text-white',
-                  heartPop ? 'heart-pop' : '',
-                ].join(' ')}
+                className={['h-8 w-8', isFav ? 'text-red-500' : 'text-white', heartPop ? 'heart-pop' : ''].join(' ')}
                 active={isFav}
               />
             </button>
