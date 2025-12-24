@@ -151,6 +151,9 @@ export default function HomeBanner({ className }: Props) {
   const remainingRef = useRef<number>(DURATION_MS);
   const [barKey, setBarKey] = useState(0);
 
+  // ✅ evita “flash” da barra ao trocar banner
+  const [barArmed, setBarArmed] = useState(false);
+
   const current = items[active];
   const prevIndex = (active - 1 + count) % count;
   const nextIndex = (active + 1) % count;
@@ -256,10 +259,14 @@ export default function HomeBanner({ className }: Props) {
     clearAutoplayTimer();
     remainingRef.current = DURATION_MS;
     startedAtRef.current = performance.now();
+
+    // ✅ barra nova nasce zerada e só depois “arma” a animação (evita piscada)
+    setBarArmed(false);
     setBarKey((k) => k + 1);
+    requestAnimationFrame(() => setBarArmed(true));
   }
 
-  // ✅ controla pause/retomar sem “resetar” o tempo
+  // controla pause/retomar sem “resetar” o tempo
   useEffect(() => {
     if (count <= 1) return;
 
@@ -273,7 +280,7 @@ export default function HomeBanner({ className }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoplayPaused, count]);
 
-  // ✅ quando muda o banner, reinicia o relógio E já agenda o próximo (se não estiver pausado)
+  // quando muda o banner, reinicia o relógio e agenda o próximo se não estiver pausado
   useEffect(() => {
     if (count <= 1) return;
 
@@ -462,7 +469,6 @@ export default function HomeBanner({ className }: Props) {
 
   const stop = (e: React.SyntheticEvent) => e.stopPropagation();
 
-  // legibilidade
   const SHADOW_STRONG = '0 3px 22px rgba(0,0,0,0.92)';
   const SHADOW_MED = '0 3px 18px rgba(0,0,0,0.88)';
   const SHADOW_SOFT = '0 2px 16px rgba(0,0,0,0.82)';
@@ -498,10 +504,7 @@ export default function HomeBanner({ className }: Props) {
             {item.title}
           </div>
 
-          <div
-            className="text-[16px] font-semibold text-white"
-            style={{ textShadow: SHADOW_MED }}
-          >
+          <div className="text-[16px] font-semibold text-white" style={{ textShadow: SHADOW_MED }}>
             {item.subtitle}
           </div>
 
@@ -659,6 +662,7 @@ export default function HomeBanner({ className }: Props) {
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/25 to-black/10" />
           <div className="absolute inset-0 bg-black/10" />
 
+          {/* progress */}
           <div className="absolute left-0 right-0 top-0 z-[60] px-3 pt-2">
             <div className="flex gap-1.5">
               {items.map((_, i) => {
@@ -673,17 +677,28 @@ export default function HomeBanner({ className }: Props) {
                       <div
                         key={barKey}
                         className="h-full bg-white"
-                        style={{
-                          width: '100%',
-                          transformOrigin: 'left',
-                          transform: 'scaleX(0)',
-                          animationName: 'storyFill',
-                          animationDuration: `${DURATION_MS}ms`,
-                          animationTimingFunction: 'linear',
-                          animationFillMode: 'both',
-                          animationDelay: `-${elapsedMs}ms`,
-                          animationPlayState: autoplayPaused ? ('paused' as const) : ('running' as const),
-                        }}
+                        style={
+                          !barArmed
+                            ? {
+                                width: '100%',
+                                transformOrigin: 'left',
+                                transform: 'scaleX(0)',
+                                animationName: 'none',
+                              }
+                            : {
+                                width: '100%',
+                                transformOrigin: 'left',
+                                transform: 'scaleX(0)',
+                                animationName: 'storyFill',
+                                animationDuration: `${DURATION_MS}ms`,
+                                animationTimingFunction: 'linear',
+                                animationFillMode: 'both',
+                                animationDelay: `-${elapsedMs}ms`,
+                                animationPlayState: autoplayPaused
+                                  ? ('paused' as const)
+                                  : ('running' as const),
+                              }
+                        }
                       />
                     ) : (
                       <div className="h-full bg-white" style={{ width: '0%' }} />
@@ -694,6 +709,7 @@ export default function HomeBanner({ className }: Props) {
             </div>
           </div>
 
+          {/* controls */}
           <div
             data-banner-control
             className="absolute right-2 top-6 z-[70] flex items-center gap-3 text-white"
@@ -735,6 +751,7 @@ export default function HomeBanner({ className }: Props) {
             </button>
           </div>
 
+          {/* arrows */}
           <button
             type="button"
             aria-label="Banner anterior"
