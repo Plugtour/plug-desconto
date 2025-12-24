@@ -259,6 +259,7 @@ export default function HomeBanner({ className }: Props) {
     setBarKey((k) => k + 1);
   }
 
+  // ✅ controla pause/retomar sem “resetar” o tempo
   useEffect(() => {
     if (count <= 1) return;
 
@@ -268,14 +269,22 @@ export default function HomeBanner({ className }: Props) {
     }
 
     resumeAutoplayClock();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoplayPaused, active, count]);
 
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoplayPaused, count]);
+
+  // ✅ quando muda o banner, reinicia o relógio E já agenda o próximo (se não estiver pausado)
   useEffect(() => {
     if (count <= 1) return;
+
     resetAutoplayClock();
+
+    if (!autoplayPaused) {
+      resumeAutoplayClock();
+    }
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active]);
+  }, [active, count]);
 
   function finishSlideTransition(dir: 'next' | 'prev') {
     const newActive =
@@ -453,7 +462,7 @@ export default function HomeBanner({ className }: Props) {
 
   const stop = (e: React.SyntheticEvent) => e.stopPropagation();
 
-  // ✅ Sombras mais fortes + subtítulo branco sem opacidade
+  // legibilidade
   const SHADOW_STRONG = '0 3px 22px rgba(0,0,0,0.92)';
   const SHADOW_MED = '0 3px 18px rgba(0,0,0,0.88)';
   const SHADOW_SOFT = '0 2px 16px rgba(0,0,0,0.82)';
@@ -490,7 +499,7 @@ export default function HomeBanner({ className }: Props) {
           </div>
 
           <div
-            className="text-[16px] font-semibold text-white" // ✅ era white/90
+            className="text-[16px] font-semibold text-white"
             style={{ textShadow: SHADOW_MED }}
           >
             {item.subtitle}
@@ -647,11 +656,9 @@ export default function HomeBanner({ className }: Props) {
             </>
           )}
 
-          {/* overlays (mantidos) */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/25 to-black/10" />
           <div className="absolute inset-0 bg-black/10" />
 
-          {/* progress */}
           <div className="absolute left-0 right-0 top-0 z-[60] px-3 pt-2">
             <div className="flex gap-1.5">
               {items.map((_, i) => {
@@ -687,7 +694,6 @@ export default function HomeBanner({ className }: Props) {
             </div>
           </div>
 
-          {/* controls */}
           <div
             data-banner-control
             className="absolute right-2 top-6 z-[70] flex items-center gap-3 text-white"
@@ -729,7 +735,6 @@ export default function HomeBanner({ className }: Props) {
             </button>
           </div>
 
-          {/* arrows (fade) */}
           <button
             type="button"
             aria-label="Banner anterior"
