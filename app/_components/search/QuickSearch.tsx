@@ -328,7 +328,6 @@ export default function QuickSearch({
 
   return (
     <div className={className}>
-      {/* campo compacto (home) */}
       <div className="flex items-stretch gap-2">
         <button
           type="button"
@@ -353,10 +352,8 @@ export default function QuickSearch({
         </button>
       </div>
 
-      {/* bottom sheet */}
       {sheetOpen && (
         <div className="fixed inset-0 z-[999]">
-          {/* backdrop com blur */}
           <button
             type="button"
             aria-label="Fechar"
@@ -367,7 +364,6 @@ export default function QuickSearch({
             ].join(' ')}
           />
 
-          {/* painel */}
           <div className="absolute inset-x-0 bottom-0">
             <div
               className={[
@@ -384,7 +380,6 @@ export default function QuickSearch({
               </button>
 
               <div className="rounded-t-md bg-zinc-100/92 shadow-2xl ring-1 ring-black/10 overflow-hidden">
-                {/* topo */}
                 <div className="px-4 pt-3 pb-2">
                   <div className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-black/15" />
 
@@ -406,7 +401,6 @@ export default function QuickSearch({
                         </svg>
                       </span>
 
-                      {/* ✅ evita “zoom” do navegador ao focar (principalmente em mobile) */}
                       <input
                         ref={inputRef}
                         value={value}
@@ -549,16 +543,13 @@ export default function QuickSearch({
                       </div>
                     </div>
 
-                    <div className="pt-4 text-[12px] text-black/45">
-                      Dica: use ↑ ↓ e Enter para escolher um resultado.
-                    </div>
+                    {/* ✅ DICA REMOVIDA AQUI */}
                   </div>
                 </div>
               </div>
             </div>
 
             <style jsx global>{`
-              /* ✅ evita “zoom”/ajuste de texto do navegador em alguns mobiles */
               html {
                 -webkit-text-size-adjust: 100%;
               }
