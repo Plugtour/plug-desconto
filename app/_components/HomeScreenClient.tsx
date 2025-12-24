@@ -522,7 +522,7 @@ export default function HomeScreenClient({
       </section>
 
       {/* ✅ BANNER SEPARADO DO MENU (editar só em HomeBanner.tsx) */}
-      <HomeBanner className="mt-4 px-4" />
+      <HomeBanner className="mt-4" />
 
       {/* Aqui você pode colocar o resto da Home depois (lista de ofertas etc.) */}
     </div>
