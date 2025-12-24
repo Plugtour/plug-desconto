@@ -7,6 +7,11 @@ import HomeBanner from './HomeBanner';
 import QuickSearch from './search/QuickSearch';
 import type { SearchCategory, SearchOffer } from './search/types';
 
+// ✅ trocar alias @ por imports relativos (sem depender de tsconfig paths)
+import SponsoredOffersRow from './offers/SponsoredOffersRow';
+// ✅ como sua pasta _data está na raiz, subimos 2 níveis: app/_components -> app -> raiz
+import { SPONSORED_OFFERS } from '../../_data/sponsoredOffers';
+
 /* =========================
    TIPOS
 ========================= */
@@ -251,12 +256,10 @@ export default function HomeScreenClient({
     []
   );
 
-  // 🔌 categorias para a busca (recurso separado)
   const searchCategories: SearchCategory[] = useMemo(() => {
     return categories.map((c) => ({ id: c.id, title: c.title, count: c.count }));
   }, [categories]);
 
-  // 🔌 ofertas para a busca (recurso separado)
   const searchData: SearchOffer[] = useMemo(() => {
     const list = Array.isArray(offers) ? offers : [];
     return list
@@ -569,6 +572,9 @@ export default function HomeScreenClient({
       <div className="px-4 mt-3 pb-2">
         <QuickSearch offers={searchData} categories={searchCategories} />
       </div>
+
+      {/* PATROCINADOS */}
+      <SponsoredOffersRow items={SPONSORED_OFFERS} className="mt-4" />
 
       {/* resto da Home depois */}
     </div>
