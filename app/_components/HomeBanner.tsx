@@ -13,9 +13,6 @@ const DEADZONE_PX = 10; // evita cancelar tap por micro-movimento
 const SLIDE_MS = 420; // swipe
 const FADE_MS = 280; // setas + autoplay
 
-// ✅ reduz re-renders enquanto autoplay roda (melhora MUITO o toque no mobile)
-const PROGRESS_UI_THROTTLE_MS = 80;
-
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
@@ -131,16 +128,10 @@ export default function HomeBanner({ className }: Props) {
   const [fadeTo, setFadeTo] = useState<number | null>(null);
   const fadeTimerRef = useRef<number | null>(null);
 
-  // progress/autoplay
-  const [progress, setProgress] = useState(0); // ✅ UI (throttled)
-  const progressRef = useRef(0); // ✅ real progress (sem re-render)
-  const lastUiRef = useRef(0);
-
+  // pausa do usuário (ícone)
   const [userPaused, setUserPaused] = useState(false);
-  const rafRef = useRef<number | null>(null);
-  const lastRef = useRef<number>(0);
 
-  // swipe refs
+  // swipe refs (deadzone)
   const startXRef = useRef<number | null>(null);
   const startYRef = useRef<number | null>(null);
   const draggingRef = useRef(false);
@@ -153,6 +144,12 @@ export default function HomeBanner({ className }: Props) {
   // favorites
   const [favorites, setFavorites] = useState<Record<string, boolean>>({});
   const [heartPop, setHeartPop] = useState(false);
+
+  // ===== Autoplay “sem React” (timeout + tempo restante) =====
+  const timeoutRef = useRef<number | null>(null);
+  const startedAtRef = useRef<number>(0);
+  const remainingRef = useRef<number>(DURATION_MS);
+  const [barKey, setBarKey] = useState(0); // força reiniciar animação CSS quando necessário
 
   const current = items[active];
   const prevIndex = (active - 1 + count) % count;
@@ -233,63 +230,60 @@ export default function HomeBanner({ className }: Props) {
     }
   }
 
-  function setProgressBoth(value: number) {
-    const v = clamp(value, 0, 100);
-    progressRef.current = v;
-    setProgress(v);
+  function clearAutoplayTimer() {
+    if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
+    timeoutRef.current = null;
   }
 
-  // autoplay (✅ sem re-render por frame)
+  function pauseAutoplayClock() {
+    clearAutoplayTimer();
+    const now = performance.now();
+    const elapsed = Math.max(0, now - startedAtRef.current);
+    remainingRef.current = Math.max(0, remainingRef.current - elapsed);
+    startedAtRef.current = now;
+  }
+
+  function resumeAutoplayClock() {
+    clearAutoplayTimer();
+    startedAtRef.current = performance.now();
+
+    timeoutRef.current = window.setTimeout(() => {
+      goNextFade();
+    }, Math.max(0, remainingRef.current));
+  }
+
+  // quando troca o banner (ou conclui transição), reseta relógio + barra
+  function resetAutoplayClock() {
+    clearAutoplayTimer();
+    remainingRef.current = DURATION_MS;
+    startedAtRef.current = performance.now();
+    setBarKey((k) => k + 1);
+  }
+
+  // controla start/pause do autoplay sem re-render contínuo
   useEffect(() => {
     if (count <= 1) return;
 
-    function tick(now: number) {
-      if (autoplayPaused) {
-        lastRef.current = now;
-        rafRef.current = requestAnimationFrame(tick);
-        return;
-      }
-
-      const last = lastRef.current || now;
-      const delta = now - last;
-      lastRef.current = now;
-
-      const inc = (delta / DURATION_MS) * 100;
-      let np = progressRef.current + inc;
-
-      if (np >= 100) {
-        np = 100;
-        progressRef.current = 100;
-
-        // ✅ atualiza UI no fim, e só depois troca
-        setProgress(100);
-        setTimeout(() => goNextFade(), 0);
-
-        rafRef.current = requestAnimationFrame(tick);
-        return;
-      }
-
-      progressRef.current = np;
-
-      // ✅ atualiza UI só a cada X ms (melhora clique/tap no mobile)
-      if (now - lastUiRef.current >= PROGRESS_UI_THROTTLE_MS) {
-        lastUiRef.current = now;
-        setProgress(np);
-      }
-
-      rafRef.current = requestAnimationFrame(tick);
+    if (autoplayPaused) {
+      pauseAutoplayClock();
+      return;
     }
 
-    lastRef.current = performance.now();
-    lastUiRef.current = 0;
-    rafRef.current = requestAnimationFrame(tick);
+    // se voltar a rodar, retoma com tempo restante
+    resumeAutoplayClock();
 
     return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
+      // não limpa sempre aqui pra não “matar” o timer em mudanças de render irrelevantes
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoplayPaused, active, count]);
+
+  // ao montar / quando active muda por transições, reinicia
+  useEffect(() => {
+    if (count <= 1) return;
+    resetAutoplayClock();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active]);
 
   function finishSlideTransition(dir: 'next' | 'prev') {
     const newActive =
@@ -302,9 +296,6 @@ export default function HomeBanner({ className }: Props) {
     setIsSlideAnimating(false);
     setIsDragging(false);
 
-    setProgressBoth(0);
-    lastRef.current = performance.now();
-
     requestAnimationFrame(() => setSnapping(false));
   }
 
@@ -312,7 +303,9 @@ export default function HomeBanner({ className }: Props) {
     if (isSlideAnimating || isFading) return;
     if (slideTimerRef.current) window.clearTimeout(slideTimerRef.current);
 
-    setProgressBoth(100);
+    // “fecha” barra atual visualmente (CSS: vira 100% no pause automático via autoplayPaused)
+    pauseAutoplayClock();
+    remainingRef.current = 0;
 
     setIsDragging(false);
     setIsSlideAnimating(true);
@@ -340,7 +333,8 @@ export default function HomeBanner({ className }: Props) {
     startYRef.current = null;
     setDragX(0);
 
-    setProgressBoth(100);
+    pauseAutoplayClock();
+    remainingRef.current = 0;
 
     setFadeTo(safe);
     setIsFading(true);
@@ -349,10 +343,6 @@ export default function HomeBanner({ className }: Props) {
       setActive(safe);
       setFadeTo(null);
       setIsFading(false);
-
-      setProgressBoth(0);
-      lastRef.current = performance.now();
-      lastUiRef.current = 0;
     }, FADE_MS);
   }
 
@@ -396,6 +386,7 @@ export default function HomeBanner({ className }: Props) {
     );
   }
 
+  // Swipe handlers (deadzone)
   function onPointerDown(e: React.PointerEvent) {
     if (shouldIgnoreGesture(e.target)) return;
     if (isSlideAnimating || isFading) return;
@@ -468,9 +459,6 @@ export default function HomeBanner({ className }: Props) {
 
   if (!current) return null;
 
-  const progressForActive =
-    isSlideAnimating || isFading ? 100 : clamp(progress, 0, 100);
-
   const slideTransitionClass =
     !isDragging && !snapping ? `transition-transform duration-[${SLIDE_MS}ms]` : '';
 
@@ -538,6 +526,9 @@ export default function HomeBanner({ className }: Props) {
   }
 
   const fadeItem = fadeTo != null ? items[fadeTo] : null;
+
+  // ===== Barra ativa via CSS: delay negativo simula progresso já decorrido =====
+  const elapsedMs = clamp(DURATION_MS - remainingRef.current, 0, DURATION_MS);
 
   return (
     <section className={className}>
@@ -673,14 +664,37 @@ export default function HomeBanner({ className }: Props) {
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/25 to-black/10" />
           <div className="absolute inset-0 bg-black/10" />
 
-          {/* progress */}
+          {/* progress (CSS animation) */}
           <div className="absolute left-0 right-0 top-0 z-[60] px-3 pt-2">
             <div className="flex gap-1.5">
               {items.map((_, i) => {
-                const filled = i < active ? 100 : i === active ? progressForActive : 0;
+                const isActive = i === active;
+                const isPast = i < active;
+
                 return (
                   <div key={i} className="h-[3px] flex-1 overflow-hidden rounded-full bg-white/35">
-                    <div className="h-full bg-white" style={{ width: `${filled}%` }} />
+                    {/* fundo preenchido */}
+                    {isPast ? (
+                      <div className="h-full w-full bg-white" />
+                    ) : isActive ? (
+                      <div
+                        key={barKey} // ✅ reinicia animação quando troca/retoma
+                        className="h-full bg-white"
+                        style={{
+                          width: '100%',
+                          transformOrigin: 'left',
+                          transform: 'scaleX(0)',
+                          animationName: 'storyFill',
+                          animationDuration: `${DURATION_MS}ms`,
+                          animationTimingFunction: 'linear',
+                          animationFillMode: 'both',
+                          animationDelay: `-${elapsedMs}ms`,
+                          animationPlayState: autoplayPaused ? ('paused' as const) : ('running' as const),
+                        }}
+                      />
+                    ) : (
+                      <div className="h-full bg-white" style={{ width: '0%' }} />
+                    )}
                   </div>
                 );
               })}
@@ -780,6 +794,11 @@ export default function HomeBanner({ className }: Props) {
           @keyframes fadeIn {
             from { opacity: 0; }
             to { opacity: 1; }
+          }
+
+          @keyframes storyFill {
+            from { transform: scaleX(0); }
+            to { transform: scaleX(1); }
           }
         `}</style>
       </div>
