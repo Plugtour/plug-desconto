@@ -11,7 +11,10 @@ export type SponsoredOffer = {
   tags: [string, string, string];
 
   imageUrl: string;
-  priceText?: string; // ex: "a partir de R$ 79"
+
+  // intervalo de economia (o texto "Economia de" é montado no componente)
+  priceText?: string; // ex: "R$50 a R$190"
+
   badge?: string; // ex: "Patrocinado"
   href: string;
 
@@ -28,7 +31,7 @@ export const SPONSORED_OFFERS: SponsoredOffer[] = [
     tags: ['Bento Gonçalves', 'Passeios', 'Enoturismo'],
     imageUrl:
       'https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1400&q=80',
-    priceText: 'a partir de R$ 79',
+    priceText: 'R$50 a R$190',
     badge: 'Patrocinado',
     href: '/oferta/trem-maria-fumaca',
     rating: 4.8,
@@ -41,7 +44,7 @@ export const SPONSORED_OFFERS: SponsoredOffer[] = [
     tags: ['Bento Gonçalves', 'Gastronomia', 'Cultura'],
     imageUrl:
       'https://images.unsplash.com/photo-1523906834658-6e24ef2386f9?auto=format&fit=crop&w=1400&q=80',
-    priceText: 'a partir de R$ 129',
+    priceText: 'R$40 a R$120',
     badge: 'Patrocinado',
     href: '/oferta/tour-linha-bella',
     rating: 4.7,
@@ -54,7 +57,7 @@ export const SPONSORED_OFFERS: SponsoredOffer[] = [
     tags: ['Gramado', 'Transfers', 'Aeroporto'],
     imageUrl:
       'https://images.unsplash.com/photo-1525609004556-c46c7d6cf023?auto=format&fit=crop&w=1400&q=80',
-    priceText: 'a partir de R$ 149',
+    priceText: 'R$60 a R$150',
     badge: 'Patrocinado',
     href: '/oferta/transfer-aeroporto-gramado',
     rating: 4.9,
@@ -67,7 +70,7 @@ export const SPONSORED_OFFERS: SponsoredOffer[] = [
     tags: ['Gramado', 'Shows', 'Jantar típico'],
     imageUrl:
       'https://images.unsplash.com/photo-1529692236671-f1f6cf9683ba?auto=format&fit=crop&w=1400&q=80',
-    priceText: 'a partir de R$ 189',
+    priceText: 'R$70 a R$200',
     badge: 'Patrocinado',
     href: '/oferta/noite-alema',
     rating: 4.6,
@@ -80,7 +83,7 @@ export const SPONSORED_OFFERS: SponsoredOffer[] = [
     tags: ['Gramado', 'Gastronomia', 'Café colonial'],
     imageUrl:
       'https://images.unsplash.com/photo-1484723091739-30a097e8f929?auto=format&fit=crop&w=1400&q=80',
-    priceText: 'a partir de R$ 69',
+    priceText: 'R$30 a R$90',
     badge: 'Patrocinado',
     href: '/oferta/cafe-colonial',
     rating: 4.8,

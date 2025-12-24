@@ -56,8 +56,7 @@ function StarsRow({ rating }: { rating: number }) {
 }
 
 /* =========================
-   TAGS (LINHA 2)
-   Sempre: Cidade | Categoria | Tipo
+   TAGS — Cidade | Categoria | Tipo
 ========================= */
 
 function buildTags(item: SponsoredOffer) {
@@ -68,7 +67,7 @@ function buildTags(item: SponsoredOffer) {
 }
 
 /* =========================
-   CORAÇÃO (simétrico, gordinho)
+   CORAÇÃO (vasado → preenchido)
 ========================= */
 
 function HeartIcon({
@@ -93,6 +92,10 @@ function HeartIcon({
   );
 }
 
+/* =========================
+   COMPONENTE PRINCIPAL
+========================= */
+
 export default function SponsoredOffersRow({
   items,
   className,
@@ -109,6 +112,7 @@ export default function SponsoredOffersRow({
 
   return (
     <section className={['w-full', className || ''].join(' ')}>
+      {/* título pequeno */}
       <div className="mb-1 px-4 text-[12px] font-medium text-zinc-500">
         {title}
       </div>
@@ -124,6 +128,7 @@ export default function SponsoredOffersRow({
             <div key={item.id} className="relative">
               <Link href={item.href} className="block py-3">
                 <div className="flex gap-3">
+                  {/* FOTO */}
                   <div className="h-24 w-24 flex-none overflow-hidden rounded-md bg-zinc-200">
                     <img
                       src={item.imageUrl}
@@ -133,16 +138,20 @@ export default function SponsoredOffersRow({
                     />
                   </div>
 
+                  {/* TEXTO */}
                   <div className="min-w-0 flex-1">
+                    {/* LINHA 1 — TÍTULO */}
                     <div className="pr-14 text-[11px] font-extrabold leading-snug text-zinc-900 line-clamp-2">
                       {item.title}
                     </div>
 
+                    {/* LINHA 2 + 3 */}
                     <div className="mt-[4px]">
                       <div className="text-[11px] text-zinc-500 line-clamp-1">
                         {tagsLine}
                       </div>
 
+                      {/* LINHA 3 — ECONOMIA (texto correto) */}
                       {item.priceText ? (
                         <div className="-mt-[2px] text-[11px] font-medium text-zinc-900">
                           Economia de {item.priceText}
@@ -150,6 +159,7 @@ export default function SponsoredOffersRow({
                       ) : null}
                     </div>
 
+                    {/* ESTRELAS + VER MAIS */}
                     <div className="mt-1.5 flex items-end justify-between">
                       <div>
                         <StarsRow rating={rating} />
@@ -172,9 +182,14 @@ export default function SponsoredOffersRow({
                   </div>
                 </div>
 
+                {/* CORAÇÃO */}
                 <button
                   type="button"
-                  aria-label={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+                  aria-label={
+                    isFav
+                      ? 'Remover dos favoritos'
+                      : 'Adicionar aos favoritos'
+                  }
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -194,6 +209,7 @@ export default function SponsoredOffersRow({
                 </button>
               </Link>
 
+              {/* DIVISÓRIA */}
               {idx < shown.length - 1 ? (
                 <div className="mx-2 border-b border-dotted border-zinc-300" />
               ) : null}
