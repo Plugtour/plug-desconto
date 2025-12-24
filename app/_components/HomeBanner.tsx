@@ -117,7 +117,7 @@ export default function HomeBanner({ className }: Props) {
   const [isDragging, setIsDragging] = useState(false);
   const [dragX, setDragX] = useState(0);
 
-  // ✅ snap sem transição (remove a “piscada” no encaixe)
+  // snap sem transição (remove piscada no encaixe)
   const [snapping, setSnapping] = useState(false);
 
   const dirRef = useRef<'next' | 'prev' | null>(null);
@@ -149,9 +149,14 @@ export default function HomeBanner({ className }: Props) {
 
   const autoplayPaused = userPaused || isAnimating || isDragging;
 
-  // ===== preload dos 3 (ajuda contra “flash” ao inverter) =====
+  // preload prev/current/next
   useEffect(() => {
-    const urls = [withWebp(prevItem?.imageUrl), withWebp(current?.imageUrl), withWebp(nextItem?.imageUrl)].filter(Boolean);
+    const urls = [
+      withWebp(prevItem?.imageUrl),
+      withWebp(current?.imageUrl),
+      withWebp(nextItem?.imageUrl),
+    ].filter(Boolean);
+
     urls.forEach((u) => {
       const img = new Image();
       img.decoding = 'async' as any;
@@ -159,7 +164,7 @@ export default function HomeBanner({ className }: Props) {
     });
   }, [prevItem?.imageUrl, current?.imageUrl, nextItem?.imageUrl]);
 
-  // ===== favoritos localStorage =====
+  // favoritos localStorage
   useEffect(() => {
     try {
       const raw = localStorage.getItem('plugdesconto:favorites');
@@ -189,7 +194,7 @@ export default function HomeBanner({ className }: Props) {
     }
   }
 
-  // ===== autoplay =====
+  // autoplay
   useEffect(() => {
     if (count <= 1) return;
 
@@ -228,29 +233,25 @@ export default function HomeBanner({ className }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoplayPaused, active, count]);
 
-  // ===== FINALIZAÇÃO SEM “REBOTE” (snap) =====
+  // finalização sem “rebote” (snap)
   function finishTransition(dir: 'next' | 'prev') {
     const newActive =
       dir === 'next' ? (active + 1) % count : (active - 1 + count) % count;
 
-    // 1) desliga transição por 1 frame
     setSnapping(true);
 
-    // 2) troca “centro” e zera dragX imediatamente (sem transição)
     setActive(newActive);
     setDragX(0);
     setIsAnimating(false);
     dirRef.current = null;
 
-    // 3) reseta barra e relógio
     setProgress(0);
     lastRef.current = performance.now();
 
-    // 4) reativa transição no próximo frame
     requestAnimationFrame(() => setSnapping(false));
   }
 
-  // ===== navegação animada (setas/autoplay) =====
+  // navegação animada (setas/autoplay)
   function animateTo(dir: 'next' | 'prev') {
     if (isAnimating) return;
     if (animTimerRef.current) window.clearTimeout(animTimerRef.current);
@@ -299,7 +300,7 @@ export default function HomeBanner({ className }: Props) {
     } catch {}
   }
 
-  // ===== swipe =====
+  // swipe
   function shouldIgnoreGesture(target: EventTarget | null) {
     const el = target as HTMLElement | null;
     if (!el) return false;
@@ -389,13 +390,64 @@ export default function HomeBanner({ className }: Props) {
   // barras
   const progressForActive = isAnimating ? 100 : clamp(progress, 0, 100);
 
-  // texto: sempre do banner atual
-  const contentAlign = alignClasses(current.align);
-  const centerLiftClass = current.align === 'center' ? '-translate-y-[15px]' : '';
-
-  // transição só quando não está arrastando e não está “snapping”
+  // transição só quando não está arrastando e não está snapping
   const slideTransitionClass =
     !isDragging && !snapping ? `transition-transform duration-[${TRANSITION_MS}ms]` : '';
+
+  // ✅ conteúdo por slide (texto viaja junto com a imagem)
+  function SlideContent({ item }: { item: BannerItem }) {
+    const contentAlign = alignClasses(item.align);
+    const centerLiftClass = item.align === 'center' ? '-translate-y-[15px]' : '';
+
+    const titleClass = [
+      'text-[25px] font-extrabold leading-[1.05] text-white',
+      item.align === 'left' || item.align === 'right' ? 'max-w-[220px] whitespace-normal' : '',
+      item.align === 'center' ? 'whitespace-nowrap' : '',
+    ].join(' ');
+
+    return (
+      <div className="absolute inset-0 z-[35] px-14 pb-4 pt-6 -translate-y-[0px]">
+        <div className={[`flex h-full w-full flex-col justify-end gap-1 ${contentAlign}`, centerLiftClass].join(' ')}>
+          <div
+            className="text-[11px] font-semibold tracking-wide"
+            style={{ color: '#7CFFB2', textShadow: '0 2px 16px rgba(0,0,0,0.55)' }}
+          >
+            {item.tag}
+          </div>
+
+          <div className={titleClass} style={{ textShadow: '0 2px 18px rgba(0,0,0,0.65)' }}>
+            {item.title}
+          </div>
+
+          <div
+            className="text-[16px] font-medium text-white/90"
+            style={{ textShadow: '0 2px 14px rgba(0,0,0,0.55)' }}
+          >
+            {item.subtitle}
+          </div>
+
+          <div
+            className="text-[15px] font-semibold -mt-[8px]"
+            style={{ color: '#7CCBFF', textShadow: '0 2px 14px rgba(0,0,0,0.55)' }}
+          >
+            {item.highlight}
+          </div>
+
+          {item.href ? (
+            <div className="mt-2">
+              <Link
+                href={item.href}
+                className="inline-flex text-[15px] font-semibold text-white -translate-y-[10px]"
+                style={{ textShadow: '0 2px 14px rgba(0,0,0,0.55)' }}
+              >
+                Ver ofertas →
+              </Link>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <section className={className}>
@@ -428,6 +480,7 @@ export default function HomeBanner({ className }: Props) {
                 decoding="async"
               />
             </picture>
+            <SlideContent item={prevItem} />
           </div>
 
           {/* CURRENT */}
@@ -450,6 +503,7 @@ export default function HomeBanner({ className }: Props) {
                 decoding="async"
               />
             </picture>
+            <SlideContent item={current} />
           </div>
 
           {/* NEXT */}
@@ -472,14 +526,15 @@ export default function HomeBanner({ className }: Props) {
                 decoding="async"
               />
             </picture>
+            <SlideContent item={nextItem} />
           </div>
 
-          {/* overlays */}
+          {/* overlays (por cima das imagens, por baixo do texto) */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/25 to-black/10" />
           <div className="absolute inset-0 bg-black/10" />
 
           {/* progress bars */}
-          <div className="absolute left-0 right-0 top-0 z-[30] px-3 pt-2">
+          <div className="absolute left-0 right-0 top-0 z-[60] px-3 pt-2">
             <div className="flex gap-1.5">
               {items.map((_, i) => {
                 const filled = i < active ? 100 : i === active ? progressForActive : 0;
@@ -493,7 +548,7 @@ export default function HomeBanner({ className }: Props) {
           </div>
 
           {/* controls */}
-          <div className="absolute right-2 top-6 z-[40] flex items-center gap-3 text-white">
+          <div className="absolute right-2 top-6 z-[70] flex items-center gap-3 text-white">
             <button
               type="button"
               aria-label={userPaused ? 'Ativar banner' : 'Pausar banner'}
@@ -529,7 +584,7 @@ export default function HomeBanner({ className }: Props) {
             type="button"
             aria-label="Banner anterior"
             onClick={goPrev}
-            className="absolute left-2 top-1/2 z-[45] -translate-y-1/2 text-white"
+            className="absolute left-2 top-1/2 z-[70] -translate-y-1/2 text-white"
           >
             <span className="arrow-float block p-2">
               <DoubleChevronOpen dir="left" className="h-10 w-10 scale-110" />
@@ -540,61 +595,12 @@ export default function HomeBanner({ className }: Props) {
             type="button"
             aria-label="Próximo banner"
             onClick={goNext}
-            className="absolute right-2 top-1/2 z-[45] -translate-y-1/2 text-white"
+            className="absolute right-2 top-1/2 z-[70] -translate-y-1/2 text-white"
           >
             <span className="arrow-float block p-2">
               <DoubleChevronOpen dir="right" className="h-10 w-10 scale-110" />
             </span>
           </button>
-
-          {/* content */}
-          <div className="absolute inset-0 z-[35] px-14 pb-4 pt-6 -translate-y-[0px]">
-            <div className={[`flex h-full w-full flex-col justify-end gap-1 ${contentAlign}`, centerLiftClass].join(' ')}>
-              <div
-                className="text-[11px] font-semibold tracking-wide"
-                style={{ color: '#7CFFB2', textShadow: '0 2px 16px rgba(0,0,0,0.55)' }}
-              >
-                {current.tag}
-              </div>
-
-              <div
-                className={[
-                  'text-[25px] font-extrabold leading-[1.05] text-white',
-                  current.align === 'left' || current.align === 'right' ? 'max-w-[220px] whitespace-normal' : '',
-                  current.align === 'center' ? 'whitespace-nowrap' : '',
-                ].join(' ')}
-                style={{ textShadow: '0 2px 18px rgba(0,0,0,0.65)' }}
-              >
-                {current.title}
-              </div>
-
-              <div
-                className="text-[16px] font-medium text-white/90"
-                style={{ textShadow: '0 2px 14px rgba(0,0,0,0.55)' }}
-              >
-                {current.subtitle}
-              </div>
-
-              <div
-                className="text-[15px] font-semibold -mt-[8px]"
-                style={{ color: '#7CCBFF', textShadow: '0 2px 14px rgba(0,0,0,0.55)' }}
-              >
-                {current.highlight}
-              </div>
-
-              {current.href ? (
-                <div className="mt-2">
-                  <Link
-                    href={current.href}
-                    className="inline-flex text-[15px] font-semibold text-white -translate-y-[10px]"
-                    style={{ textShadow: '0 2px 14px rgba(0,0,0,0.55)' }}
-                  >
-                    Ver ofertas →
-                  </Link>
-                </div>
-              ) : null}
-            </div>
-          </div>
         </div>
 
         <style jsx global>{`
