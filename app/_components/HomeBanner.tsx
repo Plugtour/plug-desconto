@@ -10,7 +10,6 @@ type Props = { className?: string };
 const DURATION_MS = 6500;
 const SWIPE_THRESHOLD = 45;
 const TRANSITION_MS = 420;
-const LOCK_DIR_PX = 8; // trava direção do swipe após esse deslocamento
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -113,21 +112,13 @@ export default function HomeBanner({ className }: Props) {
   const items = useMemo(() => BANNERS.slice(0, 3), []);
   const [active, setActive] = useState(0);
 
-  // transição suave (programática)
+  // animação / swipe
   const [isAnimating, setIsAnimating] = useState(false);
-  const [toIndex, setToIndex] = useState<number | null>(null);
-  const [direction, setDirection] = useState<'next' | 'prev'>('next');
-
-  // swipe ao vivo
-  const [dragX, setDragX] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const [dragX, setDragX] = useState(0);
+  const dirRef = useRef<'next' | 'prev' | null>(null);
 
-  // trava da direção do swipe (para não piscar)
-  const lockedDirRef = useRef<'next' | 'prev' | null>(null);
-  const [lockedDir, setLockedDir] = useState<'next' | 'prev' | null>(null);
-  const [lockedToIndex, setLockedToIndex] = useState<number | null>(null);
-
-  // autoplay/progress
+  // progress
   const [progress, setProgress] = useState(0);
   const [userPaused, setUserPaused] = useState(false);
 
@@ -135,19 +126,34 @@ export default function HomeBanner({ className }: Props) {
   const lastRef = useRef<number>(0);
   const animTimerRef = useRef<number | null>(null);
 
-  // favoritos
-  const [favorites, setFavorites] = useState<Record<string, boolean>>({});
-  const [heartPop, setHeartPop] = useState(false);
-
   // swipe refs
   const startXRef = useRef<number | null>(null);
   const startYRef = useRef<number | null>(null);
   const draggingRef = useRef(false);
   const widthRef = useRef<number>(1);
 
+  // favoritos
+  const [favorites, setFavorites] = useState<Record<string, boolean>>({});
+  const [heartPop, setHeartPop] = useState(false);
+
+  const count = items.length;
   const current = items[active];
+  const prevIndex = (active - 1 + count) % count;
+  const nextIndex = (active + 1) % count;
+  const prevItem = items[prevIndex];
+  const nextItem = items[nextIndex];
 
   const autoplayPaused = userPaused || isAnimating || isDragging;
+
+  // ===== preload dos 3 (evita piscar ao inverter direção) =====
+  useEffect(() => {
+    const urls = [withWebp(prevItem?.imageUrl), withWebp(current?.imageUrl), withWebp(nextItem?.imageUrl)].filter(Boolean);
+    urls.forEach((u) => {
+      const img = new Image();
+      img.decoding = 'async' as any;
+      img.src = u;
+    });
+  }, [prevItem?.imageUrl, current?.imageUrl, nextItem?.imageUrl]);
 
   // ===== favoritos localStorage =====
   useEffect(() => {
@@ -179,41 +185,9 @@ export default function HomeBanner({ className }: Props) {
     }
   }
 
-  // ===== transição controlada (setas/autoplay) =====
-  function startTransition(targetIndex: number, dir: 'next' | 'prev') {
-    if (!items.length) return;
-    const safe = clamp(targetIndex, 0, items.length - 1);
-    if (safe === active) return;
-
-    if (animTimerRef.current) window.clearTimeout(animTimerRef.current);
-
-    setProgress(100);
-    setDirection(dir);
-    setToIndex(safe);
-    setIsAnimating(true);
-
-    animTimerRef.current = window.setTimeout(() => {
-      setActive(safe);
-      setToIndex(null);
-      setIsAnimating(false);
-      setProgress(0);
-      lastRef.current = performance.now();
-    }, TRANSITION_MS);
-  }
-
-  function next() {
-    const idx = (active + 1) % items.length;
-    startTransition(idx, 'next');
-  }
-
-  function prev() {
-    const idx = active === 0 ? items.length - 1 : active - 1;
-    startTransition(idx, 'prev');
-  }
-
-  // ===== autoplay com progress =====
+  // ===== autoplay =====
   useEffect(() => {
-    if (items.length <= 1) return;
+    if (count <= 1) return;
 
     function tick(now: number) {
       if (autoplayPaused) {
@@ -231,7 +205,7 @@ export default function HomeBanner({ className }: Props) {
         const np = p + inc;
 
         if (np >= 100) {
-          setTimeout(() => next(), 0);
+          setTimeout(() => goNext(), 0);
           return 100;
         }
         return np;
@@ -248,7 +222,39 @@ export default function HomeBanner({ className }: Props) {
       rafRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoplayPaused, active, items.length]);
+  }, [autoplayPaused, active, count]);
+
+  // ===== navegação animada (setas/autoplay) =====
+  function animateTo(dir: 'next' | 'prev') {
+    if (isAnimating) return;
+
+    if (animTimerRef.current) window.clearTimeout(animTimerRef.current);
+
+    setProgress(100);
+    setIsAnimating(true);
+    dirRef.current = dir;
+
+    const w = widthRef.current || 1;
+    setDragX(dir === 'next' ? -w : w);
+
+    animTimerRef.current = window.setTimeout(() => {
+      setActive((a) => (dir === 'next' ? (a + 1) % count : (a - 1 + count) % count));
+      setIsAnimating(false);
+      setDragX(0);
+      dirRef.current = null;
+
+      setProgress(0);
+      lastRef.current = performance.now();
+    }, TRANSITION_MS);
+  }
+
+  function goNext() {
+    animateTo('next');
+  }
+
+  function goPrev() {
+    animateTo('prev');
+  }
 
   async function onShare() {
     try {
@@ -274,34 +280,22 @@ export default function HomeBanner({ className }: Props) {
     } catch {}
   }
 
-  if (!items.length || !current) return null;
-
-  // ===== swipe handlers =====
+  // ===== swipe =====
   function shouldIgnoreGesture(target: EventTarget | null) {
     const el = target as HTMLElement | null;
     if (!el) return false;
     return !!el.closest('button, a, input, textarea, select, [role="button"]');
   }
 
-  function getToIndexForDir(dir: 'next' | 'prev') {
-    return dir === 'next'
-      ? (active + 1) % items.length
-      : active === 0
-        ? items.length - 1
-        : active - 1;
-  }
-
   function onPointerDown(e: React.PointerEvent) {
     if (shouldIgnoreGesture(e.target)) return;
+    if (isAnimating) return;
 
     startXRef.current = e.clientX;
     startYRef.current = e.clientY;
     draggingRef.current = true;
 
-    lockedDirRef.current = null;
-    setLockedDir(null);
-    setLockedToIndex(null);
-
+    dirRef.current = null;
     setIsDragging(true);
     setDragX(0);
 
@@ -318,140 +312,127 @@ export default function HomeBanner({ className }: Props) {
     const dx = e.clientX - startXRef.current;
     const dy = e.clientY - startYRef.current;
 
-    // vertical domina -> solta e deixa rolar a página
+    // deixa scroll vertical ganhar
     if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 8) {
       draggingRef.current = false;
       setIsDragging(false);
       setDragX(0);
-      lockedDirRef.current = null;
-      setLockedDir(null);
-      setLockedToIndex(null);
+      dirRef.current = null;
       return;
     }
 
-    // horizontal -> acompanha
     e.preventDefault();
 
-    // trava a direção após um pequeno deslocamento, evitando piscar
-    if (!lockedDirRef.current && Math.abs(dx) >= LOCK_DIR_PX) {
-      const dir: 'next' | 'prev' = dx < 0 ? 'next' : 'prev';
-      lockedDirRef.current = dir;
-      setLockedDir(dir);
-      setLockedToIndex(getToIndexForDir(dir));
+    // só define direção (pra commit), mas NÃO muda o slide renderizado (já temos os 3 fixos)
+    if (!dirRef.current && Math.abs(dx) > 8) {
+      dirRef.current = dx < 0 ? 'next' : 'prev';
     }
 
-    setDragX(clamp(dx, -widthRef.current, widthRef.current));
-  }
-
-  function endDrag(commit: boolean, dir: 'next' | 'prev') {
-    const width = widthRef.current || 1;
-    const targetIndex = getToIndexForDir(dir);
-
-    if (!commit) {
-      setIsDragging(false);
-      setDragX(0);
-      lockedDirRef.current = null;
-      setLockedDir(null);
-      setLockedToIndex(null);
-      return;
-    }
-
-    if (animTimerRef.current) window.clearTimeout(animTimerRef.current);
-
-    setProgress(100);
-    setDirection(dir);
-    setToIndex(targetIndex);
-    setIsAnimating(true);
-
-    // completa o movimento
-    setIsDragging(false);
-    setDragX(dir === 'next' ? -width : width);
-
-    animTimerRef.current = window.setTimeout(() => {
-      setActive(targetIndex);
-      setToIndex(null);
-      setIsAnimating(false);
-      setProgress(0);
-      lastRef.current = performance.now();
-
-      setDragX(0);
-      lockedDirRef.current = null;
-      setLockedDir(null);
-      setLockedToIndex(null);
-    }, TRANSITION_MS);
+    const w = widthRef.current || 1;
+    setDragX(clamp(dx, -w, w));
   }
 
   function onPointerUp(e: React.PointerEvent) {
     if (!draggingRef.current) return;
     draggingRef.current = false;
 
-    if (startXRef.current == null || startYRef.current == null) return;
+    const sx = startXRef.current;
+    if (sx == null) return;
 
-    const dx = e.clientX - startXRef.current;
+    const dx = e.clientX - sx;
 
     startXRef.current = null;
     startYRef.current = null;
 
-    const absDx = Math.abs(dx);
+    const commit = Math.abs(dx) >= SWIPE_THRESHOLD;
+    const dir = (dirRef.current ?? (dx < 0 ? 'next' : 'prev')) as 'next' | 'prev';
 
-    // se direção já foi travada, use ela; senão, usa o sinal do dx
-    const dir: 'next' | 'prev' = (lockedDirRef.current ?? (dx < 0 ? 'next' : 'prev'));
+    if (!commit) {
+      // volta suave pro centro
+      setIsDragging(false);
+      setDragX(0);
+      dirRef.current = null;
+      return;
+    }
 
-    const commit = absDx >= SWIPE_THRESHOLD;
-    endDrag(commit, dir);
+    // commit: completa o deslize e troca
+    if (animTimerRef.current) window.clearTimeout(animTimerRef.current);
+
+    setProgress(100);
+    setIsDragging(false);
+    setIsAnimating(true);
+
+    const w = widthRef.current || 1;
+    setDragX(dir === 'next' ? -w : w);
+
+    animTimerRef.current = window.setTimeout(() => {
+      setActive((a) => (dir === 'next' ? (a + 1) % count : (a - 1 + count) % count));
+      setIsAnimating(false);
+      setDragX(0);
+      dirRef.current = null;
+
+      setProgress(0);
+      lastRef.current = performance.now();
+    }, TRANSITION_MS);
   }
 
-  // ===== qual slide entra (para swipe ao vivo e para animação) =====
-  const liveDir: 'next' | 'prev' | null = lockedDir ?? (isAnimating ? direction : null);
-  const liveToIndex =
-    lockedToIndex ??
-    (isAnimating ? toIndex : null);
+  if (!current) return null;
 
-  const liveNextItem = liveToIndex !== null ? items[liveToIndex] : null;
-
-  // offsets
-  const width = widthRef.current || 1;
-
-  // durante swipe sem direção travada ainda, não mostra o vizinho (evita “troca”)
-  const canShowNeighbor = !!liveDir && !!liveNextItem;
-
-  const currentOffset = dragX;
-
-  const nextOffset =
-    !canShowNeighbor
-      ? (liveDir === 'prev' ? -width : width)
-      : liveDir === 'next'
-        ? width + dragX
-        : -width + dragX;
-
-  // texto do topo
-  const topItem = (isAnimating && liveNextItem) ? liveNextItem : current;
-
-  const topAlign = alignClasses(topItem.align);
-  const centerLiftClass = topItem.align === 'center' ? '-translate-y-[15px]' : '';
-
+  // ===== barras =====
   const progressForActive = isAnimating ? 100 : clamp(progress, 0, 100);
+
+  // ===== texto: SEMPRE do banner atual (não muda antes da imagem) =====
+  const contentAlign = alignClasses(current.align);
+  const centerLiftClass = current.align === 'center' ? '-translate-y-[15px]' : '';
 
   return (
     <section className={className}>
       <div className="relative w-full">
         <div
-          className="relative h-[250px] w-full overflow-hidden"
+          className={[
+            'relative h-[250px] w-full overflow-hidden',
+            (!isDragging && (isAnimating || dragX === 0)) ? `transition-transform duration-[${TRANSITION_MS}ms]` : '',
+          ].join(' ')}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
           style={{ touchAction: 'pan-y' }}
         >
+          {/* 3 SLIDES SEMPRE MONTADOS (prev / current / next) */}
+          {/* PREV */}
+          <div
+            className={[
+              'absolute inset-0 will-change-transform',
+              !isDragging ? `transition-transform duration-[${TRANSITION_MS}ms]` : '',
+            ].join(' ')}
+            style={{
+              transform: `translate3d(${(-widthRef.current + dragX)}px, 0, 0)`,
+              transitionTimingFunction: 'cubic-bezier(0.22, 0.8, 0.2, 1)',
+              backfaceVisibility: 'hidden',
+            }}
+          >
+            <picture>
+              <source srcSet={withWebp(prevItem.imageUrl)} type="image/webp" />
+              <img
+                src={prevItem.imageUrl}
+                alt={prevItem.title}
+                className="absolute inset-0 h-full w-full object-cover"
+                loading="lazy"
+                draggable={false}
+                decoding="async"
+              />
+            </picture>
+          </div>
+
           {/* CURRENT */}
           <div
             className={[
-              'absolute inset-0',
-              'will-change-transform',
-              !isDragging && isAnimating ? `transition-transform duration-[${TRANSITION_MS}ms]` : '',
+              'absolute inset-0 will-change-transform',
+              !isDragging ? `transition-transform duration-[${TRANSITION_MS}ms]` : '',
             ].join(' ')}
             style={{
-              transform: `translate3d(${currentOffset}px, 0, 0)`,
+              transform: `translate3d(${dragX}px, 0, 0)`,
               transitionTimingFunction: 'cubic-bezier(0.22, 0.8, 0.2, 1)',
               backfaceVisibility: 'hidden',
             }}
@@ -469,33 +450,30 @@ export default function HomeBanner({ className }: Props) {
             </picture>
           </div>
 
-          {/* NEXT/PREV (vizinho travado, sem piscar) */}
-          {canShowNeighbor && liveNextItem ? (
-            <div
-              className={[
-                'absolute inset-0',
-                'will-change-transform',
-                !isDragging && isAnimating ? `transition-transform duration-[${TRANSITION_MS}ms]` : '',
-              ].join(' ')}
-              style={{
-                transform: `translate3d(${nextOffset}px, 0, 0)`,
-                transitionTimingFunction: 'cubic-bezier(0.22, 0.8, 0.2, 1)',
-                backfaceVisibility: 'hidden',
-              }}
-            >
-              <picture>
-                <source srcSet={withWebp(liveNextItem.imageUrl)} type="image/webp" />
-                <img
-                  src={liveNextItem.imageUrl}
-                  alt={liveNextItem.title}
-                  className="absolute inset-0 h-full w-full object-cover"
-                  loading="lazy"
-                  draggable={false}
-                  decoding="async"
-                />
-              </picture>
-            </div>
-          ) : null}
+          {/* NEXT */}
+          <div
+            className={[
+              'absolute inset-0 will-change-transform',
+              !isDragging ? `transition-transform duration-[${TRANSITION_MS}ms]` : '',
+            ].join(' ')}
+            style={{
+              transform: `translate3d(${(widthRef.current + dragX)}px, 0, 0)`,
+              transitionTimingFunction: 'cubic-bezier(0.22, 0.8, 0.2, 1)',
+              backfaceVisibility: 'hidden',
+            }}
+          >
+            <picture>
+              <source srcSet={withWebp(nextItem.imageUrl)} type="image/webp" />
+              <img
+                src={nextItem.imageUrl}
+                alt={nextItem.title}
+                className="absolute inset-0 h-full w-full object-cover"
+                loading="lazy"
+                draggable={false}
+                decoding="async"
+              />
+            </picture>
+          </div>
 
           {/* overlays */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/25 to-black/10" />
@@ -555,7 +533,7 @@ export default function HomeBanner({ className }: Props) {
           <button
             type="button"
             aria-label="Banner anterior"
-            onClick={prev}
+            onClick={goPrev}
             className="absolute left-2 top-1/2 z-[45] -translate-y-1/2 text-white"
           >
             <span className="arrow-float block p-2">
@@ -566,7 +544,7 @@ export default function HomeBanner({ className }: Props) {
           <button
             type="button"
             aria-label="Próximo banner"
-            onClick={next}
+            onClick={goNext}
             className="absolute right-2 top-1/2 z-[45] -translate-y-1/2 text-white"
           >
             <span className="arrow-float block p-2">
@@ -574,47 +552,47 @@ export default function HomeBanner({ className }: Props) {
             </span>
           </button>
 
-          {/* content */}
+          {/* content (sempre do CURRENT, troca só quando a imagem troca) */}
           <div className="absolute inset-0 z-[35] px-14 pb-4 pt-6 -translate-y-[0px]">
-            <div className={[`flex h-full w-full flex-col justify-end gap-1 ${topAlign}`, centerLiftClass].join(' ')}>
+            <div className={[`flex h-full w-full flex-col justify-end gap-1 ${contentAlign}`, centerLiftClass].join(' ')}>
               <div
                 className="text-[11px] font-semibold tracking-wide"
                 style={{ color: '#7CFFB2', textShadow: '0 2px 16px rgba(0,0,0,0.55)' }}
               >
-                {topItem.tag}
+                {current.tag}
               </div>
 
               <div
                 className={[
                   'text-[25px] font-extrabold leading-[1.05] text-white',
-                  topItem.align === 'left' || topItem.align === 'right'
+                  current.align === 'left' || current.align === 'right'
                     ? 'max-w-[220px] whitespace-normal'
                     : '',
-                  topItem.align === 'center' ? 'whitespace-nowrap' : '',
+                  current.align === 'center' ? 'whitespace-nowrap' : '',
                 ].join(' ')}
                 style={{ textShadow: '0 2px 18px rgba(0,0,0,0.65)' }}
               >
-                {topItem.title}
+                {current.title}
               </div>
 
               <div
                 className="text-[16px] font-medium text-white/90"
                 style={{ textShadow: '0 2px 14px rgba(0,0,0,0.55)' }}
               >
-                {topItem.subtitle}
+                {current.subtitle}
               </div>
 
               <div
                 className="text-[15px] font-semibold -mt-[8px]"
                 style={{ color: '#7CCBFF', textShadow: '0 2px 14px rgba(0,0,0,0.55)' }}
               >
-                {topItem.highlight}
+                {current.highlight}
               </div>
 
-              {topItem.href ? (
+              {current.href ? (
                 <div className="mt-2">
                   <Link
-                    href={topItem.href}
+                    href={current.href}
                     className="inline-flex text-[15px] font-semibold text-white -translate-y-[10px]"
                     style={{ textShadow: '0 2px 14px rgba(0,0,0,0.55)' }}
                   >
