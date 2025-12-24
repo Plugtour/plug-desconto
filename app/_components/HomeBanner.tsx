@@ -112,10 +112,14 @@ export default function HomeBanner({ className }: Props) {
   const items = useMemo(() => BANNERS.slice(0, 3), []);
   const [active, setActive] = useState(0);
 
-  // animação / swipe
+  // swipe / animação
   const [isAnimating, setIsAnimating] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [dragX, setDragX] = useState(0);
+
+  // ✅ snap sem transição (remove a “piscada” no encaixe)
+  const [snapping, setSnapping] = useState(false);
+
   const dirRef = useRef<'next' | 'prev' | null>(null);
 
   // progress
@@ -145,7 +149,7 @@ export default function HomeBanner({ className }: Props) {
 
   const autoplayPaused = userPaused || isAnimating || isDragging;
 
-  // ===== preload dos 3 (evita piscar ao inverter direção) =====
+  // ===== preload dos 3 (ajuda contra “flash” ao inverter) =====
   useEffect(() => {
     const urls = [withWebp(prevItem?.imageUrl), withWebp(current?.imageUrl), withWebp(nextItem?.imageUrl)].filter(Boolean);
     urls.forEach((u) => {
@@ -224,10 +228,31 @@ export default function HomeBanner({ className }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoplayPaused, active, count]);
 
+  // ===== FINALIZAÇÃO SEM “REBOTE” (snap) =====
+  function finishTransition(dir: 'next' | 'prev') {
+    const newActive =
+      dir === 'next' ? (active + 1) % count : (active - 1 + count) % count;
+
+    // 1) desliga transição por 1 frame
+    setSnapping(true);
+
+    // 2) troca “centro” e zera dragX imediatamente (sem transição)
+    setActive(newActive);
+    setDragX(0);
+    setIsAnimating(false);
+    dirRef.current = null;
+
+    // 3) reseta barra e relógio
+    setProgress(0);
+    lastRef.current = performance.now();
+
+    // 4) reativa transição no próximo frame
+    requestAnimationFrame(() => setSnapping(false));
+  }
+
   // ===== navegação animada (setas/autoplay) =====
   function animateTo(dir: 'next' | 'prev') {
     if (isAnimating) return;
-
     if (animTimerRef.current) window.clearTimeout(animTimerRef.current);
 
     setProgress(100);
@@ -238,13 +263,7 @@ export default function HomeBanner({ className }: Props) {
     setDragX(dir === 'next' ? -w : w);
 
     animTimerRef.current = window.setTimeout(() => {
-      setActive((a) => (dir === 'next' ? (a + 1) % count : (a - 1 + count) % count));
-      setIsAnimating(false);
-      setDragX(0);
-      dirRef.current = null;
-
-      setProgress(0);
-      lastRef.current = performance.now();
+      finishTransition(dir);
     }, TRANSITION_MS);
   }
 
@@ -312,7 +331,6 @@ export default function HomeBanner({ className }: Props) {
     const dx = e.clientX - startXRef.current;
     const dy = e.clientY - startYRef.current;
 
-    // deixa scroll vertical ganhar
     if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 8) {
       draggingRef.current = false;
       setIsDragging(false);
@@ -323,7 +341,6 @@ export default function HomeBanner({ className }: Props) {
 
     e.preventDefault();
 
-    // só define direção (pra commit), mas NÃO muda o slide renderizado (já temos os 3 fixos)
     if (!dirRef.current && Math.abs(dx) > 8) {
       dirRef.current = dx < 0 ? 'next' : 'prev';
     }
@@ -340,7 +357,6 @@ export default function HomeBanner({ className }: Props) {
     if (sx == null) return;
 
     const dx = e.clientX - sx;
-
     startXRef.current = null;
     startYRef.current = null;
 
@@ -348,14 +364,12 @@ export default function HomeBanner({ className }: Props) {
     const dir = (dirRef.current ?? (dx < 0 ? 'next' : 'prev')) as 'next' | 'prev';
 
     if (!commit) {
-      // volta suave pro centro
       setIsDragging(false);
       setDragX(0);
       dirRef.current = null;
       return;
     }
 
-    // commit: completa o deslize e troca
     if (animTimerRef.current) window.clearTimeout(animTimerRef.current);
 
     setProgress(100);
@@ -366,46 +380,37 @@ export default function HomeBanner({ className }: Props) {
     setDragX(dir === 'next' ? -w : w);
 
     animTimerRef.current = window.setTimeout(() => {
-      setActive((a) => (dir === 'next' ? (a + 1) % count : (a - 1 + count) % count));
-      setIsAnimating(false);
-      setDragX(0);
-      dirRef.current = null;
-
-      setProgress(0);
-      lastRef.current = performance.now();
+      finishTransition(dir);
     }, TRANSITION_MS);
   }
 
   if (!current) return null;
 
-  // ===== barras =====
+  // barras
   const progressForActive = isAnimating ? 100 : clamp(progress, 0, 100);
 
-  // ===== texto: SEMPRE do banner atual (não muda antes da imagem) =====
+  // texto: sempre do banner atual
   const contentAlign = alignClasses(current.align);
   const centerLiftClass = current.align === 'center' ? '-translate-y-[15px]' : '';
+
+  // transição só quando não está arrastando e não está “snapping”
+  const slideTransitionClass =
+    !isDragging && !snapping ? `transition-transform duration-[${TRANSITION_MS}ms]` : '';
 
   return (
     <section className={className}>
       <div className="relative w-full">
         <div
-          className={[
-            'relative h-[250px] w-full overflow-hidden',
-            (!isDragging && (isAnimating || dragX === 0)) ? `transition-transform duration-[${TRANSITION_MS}ms]` : '',
-          ].join(' ')}
+          className="relative h-[250px] w-full overflow-hidden"
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
           style={{ touchAction: 'pan-y' }}
         >
-          {/* 3 SLIDES SEMPRE MONTADOS (prev / current / next) */}
           {/* PREV */}
           <div
-            className={[
-              'absolute inset-0 will-change-transform',
-              !isDragging ? `transition-transform duration-[${TRANSITION_MS}ms]` : '',
-            ].join(' ')}
+            className={['absolute inset-0 will-change-transform', slideTransitionClass].join(' ')}
             style={{
               transform: `translate3d(${(-widthRef.current + dragX)}px, 0, 0)`,
               transitionTimingFunction: 'cubic-bezier(0.22, 0.8, 0.2, 1)',
@@ -427,10 +432,7 @@ export default function HomeBanner({ className }: Props) {
 
           {/* CURRENT */}
           <div
-            className={[
-              'absolute inset-0 will-change-transform',
-              !isDragging ? `transition-transform duration-[${TRANSITION_MS}ms]` : '',
-            ].join(' ')}
+            className={['absolute inset-0 will-change-transform', slideTransitionClass].join(' ')}
             style={{
               transform: `translate3d(${dragX}px, 0, 0)`,
               transitionTimingFunction: 'cubic-bezier(0.22, 0.8, 0.2, 1)',
@@ -452,10 +454,7 @@ export default function HomeBanner({ className }: Props) {
 
           {/* NEXT */}
           <div
-            className={[
-              'absolute inset-0 will-change-transform',
-              !isDragging ? `transition-transform duration-[${TRANSITION_MS}ms]` : '',
-            ].join(' ')}
+            className={['absolute inset-0 will-change-transform', slideTransitionClass].join(' ')}
             style={{
               transform: `translate3d(${(widthRef.current + dragX)}px, 0, 0)`,
               transitionTimingFunction: 'cubic-bezier(0.22, 0.8, 0.2, 1)',
@@ -519,11 +518,7 @@ export default function HomeBanner({ className }: Props) {
               className="p-2"
             >
               <HeartIcon
-                className={[
-                  'h-8 w-8',
-                  isFav ? 'text-red-500' : 'text-white',
-                  heartPop ? 'heart-pop' : '',
-                ].join(' ')}
+                className={['h-8 w-8', isFav ? 'text-red-500' : 'text-white', heartPop ? 'heart-pop' : ''].join(' ')}
                 active={isFav}
               />
             </button>
@@ -552,7 +547,7 @@ export default function HomeBanner({ className }: Props) {
             </span>
           </button>
 
-          {/* content (sempre do CURRENT, troca só quando a imagem troca) */}
+          {/* content */}
           <div className="absolute inset-0 z-[35] px-14 pb-4 pt-6 -translate-y-[0px]">
             <div className={[`flex h-full w-full flex-col justify-end gap-1 ${contentAlign}`, centerLiftClass].join(' ')}>
               <div
@@ -565,9 +560,7 @@ export default function HomeBanner({ className }: Props) {
               <div
                 className={[
                   'text-[25px] font-extrabold leading-[1.05] text-white',
-                  current.align === 'left' || current.align === 'right'
-                    ? 'max-w-[220px] whitespace-normal'
-                    : '',
+                  current.align === 'left' || current.align === 'right' ? 'max-w-[220px] whitespace-normal' : '',
                   current.align === 'center' ? 'whitespace-nowrap' : '',
                 ].join(' ')}
                 style={{ textShadow: '0 2px 18px rgba(0,0,0,0.65)' }}
