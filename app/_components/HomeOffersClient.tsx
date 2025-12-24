@@ -1,439 +1,335 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { BANNERS, type BannerItem } from '@/_data/banners';
 
-type Props = { className?: string };
+type OfferItem = {
+  id?: string;
+  slug?: string;
+  title?: string;
+  name?: string;
+  partner?: string;
+  city?: string;
+  categoryId?: string;
+  category?: { id?: string; name?: string };
+  benefit?: string;
+  shortDescription?: string;
+  description?: string;
+  imageUrl?: string;
+  coverImageUrl?: string;
+  rating?: number;
+  reviewsCount?: number;
+};
 
-const DURATION_MS = 6500; // tempo de cada banner
-const SWIPE_THRESHOLD = 45; // px para considerar swipe
+type OffersResponse = {
+  items: OfferItem[];
+  total: number;
+};
 
-function clamp(n: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, n));
+const CITIES = [
+  { id: '', label: 'Todas as cidades' },
+  { id: 'gramado', label: 'Gramado' },
+  { id: 'canela', label: 'Canela' },
+  { id: 'nova-petropolis', label: 'Nova Petrópolis' },
+  { id: 'bento-goncalves', label: 'Bento Gonçalves' },
+];
+
+const CATEGORIES = [
+  { id: '', label: 'Todas' },
+  { id: 'restaurante', label: 'Restaurantes' },
+  { id: 'atracao', label: 'Atrações' },
+  { id: 'passeio', label: 'Passeios' },
+  { id: 'servico', label: 'Serviços' },
+];
+
+function normalizeText(v?: string | null) {
+  return (v ?? '').toString().trim();
 }
 
-function DoubleChevronOpen({
-  dir,
-  className,
-}: {
-  dir: 'left' | 'right';
-  className?: string;
-}) {
-  const flip = dir === 'left';
+function getOfferTitle(o: OfferItem) {
   return (
-    <svg viewBox="0 0 28 28" className={className} aria-hidden="true" fill="none">
-      <g
-        transform={flip ? 'translate(28 0) scale(-1 1)' : undefined}
-        stroke="currentColor"
-        strokeWidth="2.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M9 7.5 14.5 14 9 20.5" />
-        <path d="M15 7.5 20.5 14 15 20.5" />
-      </g>
-    </svg>
+    normalizeText(o.title) ||
+    normalizeText(o.name) ||
+    normalizeText(o.partner) ||
+    'Benefício'
   );
 }
 
-function HeartIcon({
-  className,
-  active = false,
-}: {
-  className?: string;
-  active?: boolean;
-}) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
-      <path
-        d="M12 21s-7-4.6-9.2-8.7C1.3 9.3 3.1 6.6 6.2 6.1c1.8-.3 3.4.4 4.5 1.7 1.1-1.3 2.7-2 4.5-1.7 3.1.5 4.9 3.2 3.4 6.2C19 16.4 12 21 12 21z"
-        fill={active ? 'currentColor' : 'none'}
-        stroke={active ? 'none' : 'currentColor'}
-        strokeWidth={active ? 0 : 1.8}
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
+function getOfferHref(o: OfferItem) {
+  const key = normalizeText(o.slug) || normalizeText(o.id);
+  return key ? `/beneficio/${encodeURIComponent(key)}` : '#';
 }
 
-function PlaneIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} fill="none" aria-hidden="true">
-      <path
-        d="M21.8 2.2 9.1 14.9"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      />
-      <path
-        d="M21.8 2.2 14.2 21.6c-.2.6-.9.6-1.2.1l-3.7-6.6-6.6-3.7c-.5-.3-.5-1 .1-1.2L21.8 2.2z"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
+function getOfferImage(o: OfferItem) {
+  return normalizeText(o.coverImageUrl) || normalizeText(o.imageUrl) || '';
 }
 
-function PlayIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} fill="none" aria-hidden="true">
-      <path d="M9 7.5v9l8-4.5-8-4.5z" fill="currentColor" />
-    </svg>
-  );
+function getOfferCategoryId(o: OfferItem) {
+  return normalizeText(o.categoryId) || normalizeText(o.category?.id);
 }
 
-function PauseIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} fill="none" aria-hidden="true">
-      <path d="M8 7.5v9" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
-      <path d="M16 7.5v9" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
-    </svg>
-  );
+function getOfferCity(o: OfferItem) {
+  return normalizeText(o.city);
 }
 
-function alignClasses(align?: BannerItem['align']) {
-  if (align === 'center') return 'items-center text-center';
-  if (align === 'right') return 'items-end text-right';
-  return 'items-start text-left';
+function formatRating(n?: number) {
+  if (typeof n !== 'number' || Number.isNaN(n)) return null;
+  const v = Math.max(0, Math.min(5, n));
+  return v.toFixed(1).replace('.', ',');
 }
 
-export default function HomeBanner({ className }: Props) {
-  const items = useMemo(() => BANNERS.slice(0, 3), []);
-  const [active, setActive] = useState(0);
-  const [progress, setProgress] = useState(0); // 0..100
-  const [paused, setPaused] = useState(false);
+function buildOfertasHref(params: { cat?: string; city?: string }) {
+  const qs = new URLSearchParams();
+  if (params.cat) qs.set('cat', params.cat);
+  if (params.city) qs.set('city', params.city);
+  const s = qs.toString();
+  return s ? `/ofertas?${s}` : `/ofertas`;
+}
 
-  const rafRef = useRef<number | null>(null);
-  const lastRef = useRef<number>(0);
+export default function HomeOffersClient() {
+  const [city, setCity] = useState<string>('');
+  const [cat, setCat] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string>('');
+  const [data, setData] = useState<OffersResponse>({ items: [], total: 0 });
 
-  const current = items[active];
-  const [favorites, setFavorites] = useState<Record<string, boolean>>({});
+  // Continua usando a API para carregar os cards deste bloco
+  const apiUrl = useMemo(() => {
+    const params = new URLSearchParams();
+    if (city) params.set('city', city);
+    // Se a API também suportar categoryId, mantemos; se não suportar, não quebra — só ignora no backend.
+    // A página /ofertas já filtra por cat via apiGetOffers(cat).
+    if (cat) params.set('categoryId', cat);
+    const qs = params.toString();
+    return qs ? `/api/offers?${qs}` : `/api/offers`;
+  }, [city, cat]);
 
-  // ===== Swipe refs =====
-  const startXRef = useRef<number | null>(null);
-  const startYRef = useRef<number | null>(null);
-  const draggingRef = useRef(false);
+  const ofertasHref = useMemo(() => buildOfertasHref({ cat: cat || undefined, city: city || undefined }), [cat, city]);
 
-  // carrega favoritos do localStorage
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem('plugdesconto:favorites');
-      if (raw) setFavorites(JSON.parse(raw));
-    } catch {}
-  }, []);
+    let cancelled = false;
 
-  // salva favoritos no localStorage
-  useEffect(() => {
-    try {
-      localStorage.setItem('plugdesconto:favorites', JSON.stringify(favorites));
-    } catch {}
-  }, [favorites]);
+    async function load() {
+      setLoading(true);
+      setError('');
 
-  const isFav = !!favorites[current?.id ?? ''];
-
-  function toggleFav() {
-    const id = current?.id;
-    if (!id) return;
-    setFavorites((prev) => ({ ...prev, [id]: !prev[id] }));
-  }
-
-  function goTo(index: number) {
-    const next = clamp(index, 0, items.length - 1);
-    setActive(next);
-    setProgress(0);
-    lastRef.current = performance.now();
-  }
-
-  function next() {
-    goTo((active + 1) % items.length);
-  }
-
-  function prev() {
-    goTo(active === 0 ? items.length - 1 : active - 1);
-  }
-
-  // autoplay com progress estilo stories
-  useEffect(() => {
-    if (items.length <= 1) return;
-
-    function tick(now: number) {
-      if (paused) {
-        lastRef.current = now;
-        rafRef.current = requestAnimationFrame(tick);
-        return;
-      }
-
-      const last = lastRef.current || now;
-      const delta = now - last;
-      lastRef.current = now;
-
-      setProgress((p) => {
-        const inc = (delta / DURATION_MS) * 100;
-        const np = p + inc;
-        if (np >= 100) {
-          setTimeout(() => next(), 0);
-          return 0;
+      try {
+        const res = await fetch(apiUrl, { cache: 'no-store' });
+        if (!res.ok) {
+          throw new Error(`Falha ao buscar ofertas (${res.status})`);
         }
-        return np;
-      });
+        const json = (await res.json()) as OffersResponse;
 
-      rafRef.current = requestAnimationFrame(tick);
+        if (!cancelled) {
+          const items = Array.isArray(json?.items) ? json.items : [];
+          const total =
+            typeof json?.total === 'number' ? json.total : items.length;
+
+          setData({ items, total });
+        }
+      } catch (e: any) {
+        if (!cancelled) {
+          setError(e?.message || 'Erro ao buscar ofertas');
+          setData({ items: [], total: 0 });
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     }
 
-    lastRef.current = performance.now();
-    rafRef.current = requestAnimationFrame(tick);
-
+    load();
     return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
+      cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paused, active, items.length]);
+  }, [apiUrl]);
 
-  async function onShare() {
-    try {
-      const url =
-        typeof window !== 'undefined'
-          ? current?.href
-            ? new URL(current.href, window.location.origin).toString()
-            : window.location.href
-          : '';
-
-      if (navigator.share) {
-        await navigator.share({
-          title: current?.title ?? 'Plug Desconto',
-          text: current?.subtitle ?? '',
-          url,
-        });
-        return;
-      }
-
-      if (navigator.clipboard && url) {
-        await navigator.clipboard.writeText(url);
-      }
-    } catch {}
-  }
-
-  if (!items.length) return null;
-
-  const contentAlign = alignClasses(current?.align);
-
-  // ===== Swipe handlers =====
-  function shouldIgnoreGesture(target: EventTarget | null) {
-    const el = target as HTMLElement | null;
-    if (!el) return false;
-    return !!el.closest('button, a, input, textarea, select, [role="button"]');
-  }
-
-  function onPointerDown(e: React.PointerEvent) {
-    if (shouldIgnoreGesture(e.target)) return;
-
-    startXRef.current = e.clientX;
-    startYRef.current = e.clientY;
-    draggingRef.current = true;
-
-    // para não “perder” o movimento se o dedo sair do elemento
-    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
-  }
-
-  function onPointerMove(e: React.PointerEvent) {
-    if (!draggingRef.current) return;
-    if (startXRef.current == null || startYRef.current == null) return;
-
-    const dx = e.clientX - startXRef.current;
-    const dy = e.clientY - startYRef.current;
-
-    // Se o usuário está rolando verticalmente, não faz nada
-    if (Math.abs(dy) > Math.abs(dx)) return;
-
-    // evita scroll horizontal/gestos do browser
-    e.preventDefault();
-  }
-
-  function onPointerUp(e: React.PointerEvent) {
-    if (!draggingRef.current) return;
-    draggingRef.current = false;
-
-    if (startXRef.current == null || startYRef.current == null) return;
-
-    const dx = e.clientX - startXRef.current;
-    startXRef.current = null;
-    startYRef.current = null;
-
-    if (Math.abs(dx) < SWIPE_THRESHOLD) return;
-
-    // dx < 0 => arrastou para esquerda => próximo
-    if (dx < 0) next();
-    else prev();
-  }
+  const hasFilters = Boolean(city || cat);
 
   return (
-    <section className={className}>
-      <div className="relative w-full">
-        <div
-          className="relative h-[250px] w-full overflow-hidden"
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerUp}
-          style={{
-            touchAction: 'pan-y', // permite rolagem vertical, mas deixa o swipe horizontal com a gente
-          }}
-        >
-          <img
-            src={current.imageUrl}
-            alt={current.title}
-            className="absolute inset-0 h-full w-full object-cover"
-            loading="lazy"
-          />
+    <div className="w-full">
+      {/* Filtros */}
+      <div className="mb-4 rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
+        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div className="w-full md:max-w-xs">
+            <label className="mb-1 block text-xs font-medium text-zinc-400">
+              Cidade
+            </label>
+            <select
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              className="h-11 w-full rounded-xl border border-zinc-800 bg-zinc-900 px-3 text-sm text-zinc-100 outline-none focus:border-zinc-500"
+            >
+              {CITIES.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+          </div>
 
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/25 to-black/10" />
-          <div className="absolute inset-0 bg-black/10" />
-
-          <div className="absolute left-0 right-0 top-0 z-[30] px-3 pt-2">
-            <div className="flex gap-1.5">
-              {items.map((_, i) => {
-                const filled = i < active ? 100 : i === active ? clamp(progress, 0, 100) : 0;
+          <div className="w-full md:flex-1">
+            <label className="mb-1 block text-xs font-medium text-zinc-400">
+              Categorias
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {CATEGORIES.map((c) => {
+                const active = cat === c.id;
                 return (
-                  <div key={i} className="h-[3px] flex-1 overflow-hidden rounded-full bg-white/35">
-                    <div className="h-full bg-white" style={{ width: `${filled}%` }} />
-                  </div>
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setCat(c.id)}
+                    className={[
+                      'h-10 rounded-full border px-4 text-sm transition',
+                      active
+                        ? 'border-zinc-200 bg-zinc-200 text-zinc-950'
+                        : 'border-zinc-800 bg-zinc-900 text-zinc-100 hover:bg-zinc-800',
+                    ].join(' ')}
+                  >
+                    {c.label}
+                  </button>
                 );
               })}
             </div>
           </div>
 
-          <div className="absolute right-2 top-6 z-[40] flex items-center gap-3 text-white">
-            <button
-              type="button"
-              aria-label={paused ? 'Ativar banner' : 'Pausar banner'}
-              onClick={() => setPaused((v) => !v)}
-              className="p2"
+          <div className="flex flex-wrap items-center gap-2 md:pl-2">
+            {hasFilters ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setCity('');
+                  setCat('');
+                }}
+                className="h-11 rounded-xl border border-zinc-800 bg-zinc-900 px-4 text-sm font-semibold text-zinc-100 hover:bg-zinc-800"
+              >
+                Limpar
+              </button>
+            ) : null}
+
+            <Link
+              href={ofertasHref}
+              className="inline-flex h-11 items-center justify-center rounded-xl border border-zinc-700 bg-zinc-900 px-4 text-sm font-semibold text-zinc-100 hover:bg-zinc-800"
             >
-              {paused ? <PlayIcon className="h-10 w-10 text-white" /> : <PauseIcon className="h-10 w-10 text-white" />}
-            </button>
-
-            <button type="button" aria-label="Compartilhar" onClick={onShare} className="p2 -ml-2">
-              <PlaneIcon className="h-7 w-7 text-white rotate-[25deg]" />
-            </button>
-
-            <button
-              type="button"
-              aria-label={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
-              onClick={toggleFav}
-              className="p-2"
-            >
-              <HeartIcon
-                className={['h-8 w-8', isFav ? 'text-red-500 heart-pop' : 'text-white'].join(' ')}
-                active={isFav}
-              />
-            </button>
-          </div>
-
-          <button
-            type="button"
-            aria-label="Banner anterior"
-            onClick={prev}
-            className="absolute left-2 top-1/2 z-[45] -translate-y-1/2 text-white"
-          >
-            <span className="arrow-float block p-2">
-              <DoubleChevronOpen dir="left" className="h-10 w-10 scale-110" />
-            </span>
-          </button>
-
-          <button
-            type="button"
-            aria-label="Próximo banner"
-            onClick={next}
-            className="absolute right-2 top-1/2 z-[45] -translate-y-1/2 text-white"
-          >
-            <span className="arrow-float block p-2">
-              <DoubleChevronOpen dir="right" className="h-10 w-10 scale-110" />
-            </span>
-          </button>
-
-          <div className="absolute inset-0 z-[35] px-14 pb-4 pt-6 -translate-y-[0px]">
-            <div className={`flex h-full w-full flex-col justify-end gap-1 ${contentAlign}`}>
-              <div
-                className="text-[11px] font-semibold tracking-wide"
-                style={{ color: '#7CFFB2', textShadow: '0 2px 16px rgba(0,0,0,0.55)' }}
-              >
-                {current.tag}
-              </div>
-
-              <div
-                className="text-[25px] font-extrabold leading-[1.05] text-white"
-                style={{ textShadow: '0 2px 18px rgba(0,0,0,0.65)' }}
-              >
-                {current.title}
-              </div>
-
-              <div
-                className="text-[16px] font-medium text-white/90"
-                style={{ textShadow: '0 2px 14px rgba(0,0,0,0.55)' }}
-              >
-                {current.subtitle}
-              </div>
-
-              <div
-                className="text-[15px] font-semibold -mt-[8px]"
-                style={{ color: '#7CCBFF', textShadow: '0 2px 14px rgba(0,0,0,0.55)' }}
-              >
-                {current.highlight}
-              </div>
-
-              {current.href ? (
-                <div className="mt-2">
-                  <Link
-                    href={current.href}
-                    className="inline-flex text-[15px] font-semibold text-white -translate-y-[10px]"
-                    style={{ textShadow: '0 2px 14px rgba(0,0,0,0.55)' }}
-                  >
-                    Ver ofertas →
-                  </Link>
-                </div>
-              ) : null}
-            </div>
+              Ver todas em /ofertas
+            </Link>
           </div>
         </div>
 
-        <style jsx global>{`
-          @keyframes floatArrow {
-            0% {
-              transform: translateY(0);
-            }
-            50% {
-              transform: translateY(-3px);
-            }
-            100% {
-              transform: translateY(0);
-            }
-          }
-          .arrow-float {
-            animation: floatArrow 1.8s ease-in-out infinite;
-          }
-
-          @keyframes heartPop {
-            0% {
-              transform: scale(1);
-            }
-            30% {
-              transform: scale(1.25);
-            }
-            60% {
-              transform: scale(0.95);
-            }
-            100% {
-              transform: scale(1);
-            }
-          }
-          .heart-pop {
-            animation: heartPop 320ms ease-out;
-          }
-        `}</style>
+        <div className="mt-3 text-xs text-zinc-500">
+          Fonte (API): <span className="font-mono">{apiUrl}</span>
+        </div>
       </div>
-    </section>
+
+      {/* Conteúdo */}
+      <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h3 className="text-base font-semibold text-zinc-50">Benefícios</h3>
+          <div className="text-sm text-zinc-400">
+            {loading ? 'Carregando…' : `${data.total} encontrado(s)`}
+          </div>
+        </div>
+
+        {error ? (
+          <div className="rounded-xl border border-red-900/40 bg-red-950/30 p-4 text-sm text-red-200">
+            {error}
+          </div>
+        ) : loading ? (
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div
+                key={i}
+                className="h-28 animate-pulse rounded-2xl border border-zinc-800 bg-zinc-900"
+              />
+            ))}
+          </div>
+        ) : data.items.length === 0 ? (
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 text-sm text-zinc-300">
+            Nenhum benefício encontrado com os filtros atuais.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            {data.items.map((o, idx) => {
+              const title = getOfferTitle(o);
+              const href = getOfferHref(o);
+              const img = getOfferImage(o);
+              const cityName = getOfferCity(o);
+              const catId = getOfferCategoryId(o);
+              const rating = formatRating(o.rating);
+              const reviews =
+                typeof o.reviewsCount === 'number' ? o.reviewsCount : null;
+
+              return (
+                <Link
+                  key={`${o.id ?? o.slug ?? idx}`}
+                  href={href}
+                  className="group rounded-2xl border border-zinc-800 bg-zinc-950 p-3 transition hover:bg-zinc-900"
+                >
+                  <div className="flex gap-3">
+                    <div className="h-20 w-24 flex-none overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900">
+                      {img ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={img}
+                          alt={title}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : null}
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="line-clamp-2 text-sm font-semibold text-zinc-50">
+                        {title}
+                      </div>
+
+                      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-400">
+                        {cityName ? (
+                          <span>{cityName}</span>
+                        ) : (
+                          <span className="text-zinc-500">Cidade</span>
+                        )}
+                        <span className="text-zinc-700">•</span>
+                        {catId ? (
+                          <span>{catId}</span>
+                        ) : (
+                          <span className="text-zinc-500">Categoria</span>
+                        )}
+                      </div>
+
+                      <div className="mt-2 flex items-center justify-between">
+                        <div className="text-xs text-zinc-400">
+                          {rating ? (
+                            <>
+                              <span className="font-semibold text-zinc-200">
+                                {rating}
+                              </span>
+                              {reviews !== null ? (
+                                <span> ({reviews})</span>
+                              ) : null}
+                            </>
+                          ) : (
+                            <span>Sem avaliações</span>
+                          )}
+                        </div>
+
+                        <div className="text-xs font-semibold text-zinc-200 group-hover:underline">
+                          Ver detalhes
+                        </div>
+                      </div>
+
+                      {o.benefit ? (
+                        <div className="mt-2 line-clamp-1 text-xs text-zinc-300">
+                          {o.benefit}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
