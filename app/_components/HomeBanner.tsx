@@ -57,7 +57,6 @@ function HeartIcon({
 }
 
 function PlaneIcon({ className }: { className?: string }) {
-  // estilo “avião” parecido com o do Instagram (paper plane)
   return (
     <svg viewBox="0 0 24 24" className={className} fill="none" aria-hidden="true">
       <path
@@ -79,10 +78,7 @@ function PlaneIcon({ className }: { className?: string }) {
 function PlayIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" className={className} fill="none" aria-hidden="true">
-      <path
-        d="M9 7.5v9l8-4.5-8-4.5z"
-        fill="currentColor"
-      />
+      <path d="M9 7.5v9l8-4.5-8-4.5z" fill="currentColor" />
     </svg>
   );
 }
@@ -112,7 +108,75 @@ export default function HomeBanner({ className }: Props) {
   const lastRef = useRef<number>(0);
 
   const current = items[active];
-    const [favorites, setFavorites] = useState<Record<string, boolean>>({});
+  const [favorites, setFavorites] = useState<Record<string, boolean>>({});
+
+  // ===== SWIPE (touch) =====
+  const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
+  const isSwiping = useRef(false);
+
+  const SWIPE_THRESHOLD_PX = 42; // sensibilidade
+  const VERTICAL_TOLERANCE_PX = 60;
+
+  function onTouchStart(e: React.TouchEvent) {
+    const t = e.touches[0];
+    touchStartX.current = t.clientX;
+    touchStartY.current = t.clientY;
+    isSwiping.current = true;
+    setPaused(true); // pausa enquanto arrasta
+  }
+
+  function onTouchMove(e: React.TouchEvent) {
+    if (!isSwiping.current) return;
+    if (touchStartX.current === null || touchStartY.current === null) return;
+
+    const t = e.touches[0];
+    const dx = t.clientX - touchStartX.current;
+    const dy = t.clientY - touchStartY.current;
+
+    // se for muito vertical, deixa rolar a página normalmente
+    if (Math.abs(dy) > VERTICAL_TOLERANCE_PX && Math.abs(dy) > Math.abs(dx)) {
+      isSwiping.current = false;
+      return;
+    }
+
+    // se está claramente horizontal, impede scroll vertical “brigando”
+    if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) {
+      e.preventDefault();
+    }
+  }
+
+  function onTouchEnd(e: React.TouchEvent) {
+    if (!isSwiping.current) {
+      setPaused(false);
+      return;
+    }
+    isSwiping.current = false;
+
+    const endX = e.changedTouches[0]?.clientX ?? null;
+    const startX = touchStartX.current;
+
+    touchStartX.current = null;
+    touchStartY.current = null;
+
+    if (startX === null || endX === null) {
+      setPaused(false);
+      return;
+    }
+
+    const dx = endX - startX;
+
+    if (dx <= -SWIPE_THRESHOLD_PX) {
+      // deslizou pra esquerda -> próximo
+      next();
+    } else if (dx >= SWIPE_THRESHOLD_PX) {
+      // deslizou pra direita -> anterior
+      prev();
+    }
+
+    // volta autoplay depois do gesto
+    setTimeout(() => setPaused(false), 120);
+  }
 
   // carrega favoritos do localStorage
   useEffect(() => {
@@ -142,8 +206,8 @@ export default function HomeBanner({ className }: Props) {
   }
 
   function goTo(index: number) {
-    const next = clamp(index, 0, items.length - 1);
-    setActive(next);
+    const nextIndex = clamp(index, 0, items.length - 1);
+    setActive(nextIndex);
     setProgress(0);
     lastRef.current = performance.now();
   }
@@ -175,7 +239,6 @@ export default function HomeBanner({ className }: Props) {
         const inc = (delta / DURATION_MS) * 100;
         const np = p + inc;
         if (np >= 100) {
-          // troca banner
           setTimeout(() => next(), 0);
           return 0;
         }
@@ -199,7 +262,9 @@ export default function HomeBanner({ className }: Props) {
     try {
       const url =
         typeof window !== 'undefined'
-          ? (current?.href ? new URL(current.href, window.location.origin).toString() : window.location.href)
+          ? (current?.href
+              ? new URL(current.href, window.location.origin).toString()
+              : window.location.href)
           : '';
 
       if (navigator.share) {
@@ -227,8 +292,15 @@ export default function HomeBanner({ className }: Props) {
     <section className={className}>
       <div className="relative w-full">
         {/* CARD FULL (sem espaço lateral) */}
-        <div className="relative h-[250px] w-full overflow-hidden">
+        <div
+          className="relative h-[250px] w-full overflow-hidden"
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+          style={{ touchAction: 'pan-y' }} // permite scroll vertical; horizontal controlamos no move
+        >
           {/* imagem */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={current.imageUrl}
             alt={current.title}
@@ -244,17 +316,13 @@ export default function HomeBanner({ className }: Props) {
           <div className="absolute left-0 right-0 top-0 z-[30] px-3 pt-2">
             <div className="flex gap-1.5">
               {items.map((_, i) => {
-                const filled =
-                  i < active ? 100 : i === active ? clamp(progress, 0, 100) : 0;
+                const filled = i < active ? 100 : i === active ? clamp(progress, 0, 100) : 0;
                 return (
                   <div
                     key={i}
                     className="h-[3px] flex-1 overflow-hidden rounded-full bg-white/35"
                   >
-                    <div
-                      className="h-full bg-white"
-                      style={{ width: `${filled}%` }}
-                    />
+                    <div className="h-full bg-white" style={{ width: `${filled}%` }} />
                   </div>
                 );
               })}
@@ -262,7 +330,7 @@ export default function HomeBanner({ className }: Props) {
           </div>
 
           {/* controles top-right (brancos) */}
-            <div className="absolute right-2 top-6 z-[40] flex items-center gap-3 text-white">
+          <div className="absolute right-2 top-6 z-[40] flex items-center gap-3 text-white">
             <button
               type="button"
               aria-label={paused ? 'Ativar banner' : 'Pausar banner'}
@@ -286,18 +354,15 @@ export default function HomeBanner({ className }: Props) {
             </button>
 
             <button
-            type="button"
-            aria-label={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
-            onClick={toggleFav}
-            className="p-2"
+              type="button"
+              aria-label={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+              onClick={toggleFav}
+              className="p-2"
             >
-            <HeartIcon
-                className={[
-                'h-8 w-8',
-                isFav ? 'text-red-500 heart-pop' : 'text-white',
-                ].join(' ')}
+              <HeartIcon
+                className={['h-8 w-8', isFav ? 'text-red-500 heart-pop' : 'text-white'].join(' ')}
                 active={isFav}
-            />
+              />
             </button>
           </div>
 
@@ -324,10 +389,9 @@ export default function HomeBanner({ className }: Props) {
             </span>
           </button>
 
-          {/* conteúdo (com padding pra não ficar atrás das setas) */}
-            <div className="absolute inset-0 z-[35] px-14 pb-4 pt-6 -translate-y-[0px]">
+          {/* conteúdo */}
+          <div className="absolute inset-0 z-[35] px-14 pb-4 pt-6 -translate-y-[0px]">
             <div className={`flex h-full w-full flex-col justify-end gap-1 ${contentAlign}`}>
-              {/* tag colorida */}
               <div
                 className="text-[11px] font-semibold tracking-wide"
                 style={{
@@ -338,7 +402,6 @@ export default function HomeBanner({ className }: Props) {
                 {current.tag}
               </div>
 
-              {/* título grande */}
               <div
                 className="text-[25px] font-extrabold leading-[1.05] text-white"
                 style={{ textShadow: '0 2px 18px rgba(0,0,0,0.65)' }}
@@ -346,7 +409,6 @@ export default function HomeBanner({ className }: Props) {
                 {current.title}
               </div>
 
-              {/* subtítulo menor */}
               <div
                 className="text-[16px] font-medium text-white/90"
                 style={{ textShadow: '0 2px 14px rgba(0,0,0,0.55)' }}
@@ -354,18 +416,16 @@ export default function HomeBanner({ className }: Props) {
                 {current.subtitle}
               </div>
 
-              {/* linha menor colorida */}
-            <div
-            className="text-[15px] font-semibold -mt-[8px]"
-            style={{
-                color: '#7CCBFF',
-                textShadow: '0 2px 14px rgba(0,0,0,0.55)',
-            }}
-            >
-            {current.highlight}
-            </div>
+              <div
+                className="text-[15px] font-semibold -mt-[8px]"
+                style={{
+                  color: '#7CCBFF',
+                  textShadow: '0 2px 14px rgba(0,0,0,0.55)',
+                }}
+              >
+                {current.highlight}
+              </div>
 
-              {/* CTA simples */}
               {current.href ? (
                 <div className="mt-2">
                   <Link
@@ -391,25 +451,16 @@ export default function HomeBanner({ className }: Props) {
             animation: floatArrow 1.8s ease-in-out infinite;
           }
 
-        @keyframes heartPop {
-        0% {
-            transform: scale(1);
-        }
-        30% {
-            transform: scale(1.25);
-        }
-        60% {
-            transform: scale(0.95);
-        }
-        100% {
-            transform: scale(1);
-        }
-        }
+          @keyframes heartPop {
+            0% { transform: scale(1); }
+            30% { transform: scale(1.25); }
+            60% { transform: scale(0.95); }
+            100% { transform: scale(1); }
+          }
 
-        .heart-pop {
-        animation: heartPop 320ms ease-out;
-        }
-
+          .heart-pop {
+            animation: heartPop 320ms ease-out;
+          }
         `}</style>
       </div>
     </section>
