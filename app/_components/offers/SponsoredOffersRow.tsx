@@ -8,11 +8,10 @@ type Props = {
   items: SponsoredOffer[];
   className?: string;
   title?: string;
-  viewAllHref?: string;
 };
 
 /* =========================
-   ESTRELAS (preenchimento proporcional)
+   ESTRELAS (preenchimento proporcional, coladas)
 ========================= */
 
 function Star({ fillPct }: { fillPct: number }) {
@@ -41,14 +40,11 @@ function Star({ fillPct }: { fillPct: number }) {
 
 function StarsRow({ rating }: { rating: number }) {
   const r = Math.max(0, Math.min(5, rating));
-
   return (
-    // ⭐ encostadas: zero gap + sobreposição leve (-ml) nas estrelas seguintes
     <div className="flex items-center">
       {Array.from({ length: 5 }).map((_, i) => {
         const fill =
           r <= i ? 0 : r >= i + 1 ? 100 : Math.round((r - i) * 100);
-
         return (
           <span key={i} className={i === 0 ? '' : '-ml-[3px]'}>
             <Star fillPct={fill} />
@@ -60,28 +56,19 @@ function StarsRow({ rating }: { rating: number }) {
 }
 
 /* =========================
-   META (Linha 2)
+   TAGS (LINHA 2)
+   Sempre: Cidade | Categoria | Tipo
 ========================= */
 
-function buildMeta(item: any) {
-  const metaText = (item?.metaText ?? '').toString().trim();
-  if (metaText) return metaText;
-
-  const parts: string[] = [];
-  if (item?.city) parts.push(item.city);
-  if (item?.category) parts.push(item.category);
-  if (item?.kind) parts.push(item.kind);
-
-  if (parts.length) return parts.join(' | ');
-
-  const subtitle = (item?.subtitle ?? '').toString().trim();
-  if (subtitle) return subtitle;
-
+function buildTags(item: SponsoredOffer) {
+  if (Array.isArray(item.tags) && item.tags.length === 3) {
+    return item.tags.join(' | ');
+  }
   return '';
 }
 
 /* =========================
-   CORAÇÃO (simétrico, gordinho; vazado -> cheio)
+   CORAÇÃO (simétrico, gordinho)
 ========================= */
 
 function HeartIcon({
@@ -101,7 +88,7 @@ function HeartIcon({
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      <path d="M12 21c-.35 0-7.1-4.3-9.4-8.4C.7 9.5 2.4 6.6 5.6 6.3c1.8-.2 3.5.7 4.4 2.1 0 0 .9-1.3 1.3-1.6.8-.6 2.2-1 3.5-.8 3.2.3 4.9 3.2 3 6.3C19 16.7 12.4 21 12 21z" />
+      <path d="M12 21c-.35 0-7.1-4.3-9.4-8.4C.7 9.5 2.4 6.6 5.6 6.3c1.8-.2 3.5.7 4.4 2.1 1-1.4 2.7-2.3 4.4-2.1 3.2.3 4.9 3.2 3 6.3C19 16.7 12.4 21 12 21z" />
     </svg>
   );
 }
@@ -110,88 +97,69 @@ export default function SponsoredOffersRow({
   items,
   className,
   title = 'Patrocinado',
-  viewAllHref,
 }: Props) {
   const shown = useMemo(() => items.slice(0, 5), [items]);
   const [favIds, setFavIds] = useState<Record<string, boolean>>({});
 
   function toggleFav(id: string) {
-    setFavIds((p) => ({ ...p, [id]: !p[id] }));
+    setFavIds((prev) => ({ ...prev, [id]: !prev[id] }));
   }
 
   if (!shown.length) return null;
 
   return (
     <section className={['w-full', className || ''].join(' ')}>
-      {/* 1) Título menor e com menos peso */}
       <div className="mb-1 px-4 text-[12px] font-medium text-zinc-500">
         {title}
       </div>
 
       <div className="px-3">
         {shown.map((item, idx) => {
-          const anyItem: any = item;
           const isFav = !!favIds[item.id];
-
-          const meta = buildMeta(anyItem) || 'Gramado | Gastronomia | Italiana';
-
-          const range =
-            (anyItem?.economyText ?? item.priceText ?? '').toString().trim();
-          const economyLine = range ? `Economia de ${range}` : 'Economia de R$80 a R$120';
-
-          const rating = Number(anyItem?.rating ?? 4.8);
-          const reviews = Number(anyItem?.reviews ?? 275);
-
-          const displayTitle =
-            (item.title ?? '').trim() ||
-            'Churrascaria Fogo de Chão Gramado com Rodízio Premium Completo, Buffet Internacional e Sobremesas Ilimitadas Inclusas';
+          const tagsLine = buildTags(item);
+          const rating = item.rating ?? 4.8;
+          const reviews = item.reviews ?? 0;
 
           return (
             <div key={item.id} className="relative">
               <Link href={item.href} className="block py-3">
                 <div className="flex gap-3">
-                  {/* FOTO */}
                   <div className="h-24 w-24 flex-none overflow-hidden rounded-md bg-zinc-200">
-                    {item.imageUrl ? (
-                      <img
-                        src={item.imageUrl}
-                        alt={displayTitle}
-                        className="h-full w-full object-cover"
-                        loading="lazy"
-                      />
-                    ) : null}
+                    <img
+                      src={item.imageUrl}
+                      alt={item.title}
+                      className="h-full w-full object-cover"
+                      loading="lazy"
+                    />
                   </div>
 
                   <div className="min-w-0 flex-1">
-                    {/* LINHA 1 – título (peso 800) */}
                     <div className="pr-14 text-[11px] font-extrabold leading-snug text-zinc-900 line-clamp-2">
-                      {displayTitle}
+                      {item.title}
                     </div>
 
-                    {/* 2) Linha 2 e 3: aproximar 2px e deslocar conjunto +4px */}
                     <div className="mt-[4px]">
                       <div className="text-[11px] text-zinc-500 line-clamp-1">
-                        {meta}
+                        {tagsLine}
                       </div>
 
-                      {/* aproxima 2px: puxa a linha 3 pra cima */}
-                      <div className="-mt-[2px] text-[11px] font-medium text-zinc-900">
-                        {economyLine}
-                      </div>
+                      {item.priceText ? (
+                        <div className="-mt-[2px] text-[11px] font-medium text-zinc-900">
+                          Economia de {item.priceText}
+                        </div>
+                      ) : null}
                     </div>
 
-                    {/* ESTRELAS + NOTAS */}
                     <div className="mt-1.5 flex items-end justify-between">
                       <div>
-                        {/* 3) estrelas encostadas */}
                         <StarsRow rating={rating} />
                         <div className="-mt-0.5 text-[11px] text-zinc-500">
                           <span className="font-semibold text-zinc-700">
-                            {Number.isFinite(rating) ? rating.toFixed(1) : '0.0'}
+                            {rating.toFixed(1)}
                           </span>{' '}
                           de{' '}
                           <span className="font-semibold text-zinc-700">
-                            {Number.isFinite(reviews) ? reviews : 0}
+                            {reviews}
                           </span>{' '}
                           avaliações
                         </div>
@@ -204,7 +172,6 @@ export default function SponsoredOffersRow({
                   </div>
                 </div>
 
-                {/* CORAÇÃO (clicável e independente) */}
                 <button
                   type="button"
                   aria-label={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
@@ -234,15 +201,6 @@ export default function SponsoredOffersRow({
           );
         })}
       </div>
-
-      {/* opcional: link "Ver todos" (se você passar viewAllHref depois) */}
-      {viewAllHref ? (
-        <div className="px-4 pt-1">
-          <Link href={viewAllHref} className="text-[13px] font-semibold text-zinc-900 underline underline-offset-4">
-            Ver todos
-          </Link>
-        </div>
-      ) : null}
     </section>
   );
 }
