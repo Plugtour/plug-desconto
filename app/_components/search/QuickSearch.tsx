@@ -16,7 +16,7 @@ type Props = {
 };
 
 const QS_STORAGE_KEY = 'plugdesconto_quicksearch_v1';
-const QS_TTL_MS = 60 * 60 * 1000; // 1 hora
+const QS_TTL_MS = 2 * 60 * 60 * 1000; // 1 hora
 
 function useDebouncedValue<T>(value: T, delayMs: number) {
   const [v, setV] = useState(value);
