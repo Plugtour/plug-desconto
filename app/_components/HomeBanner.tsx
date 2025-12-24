@@ -134,6 +134,9 @@ export default function HomeBanner({ className }: Props) {
   const startXRef = useRef<number | null>(null);
   const startYRef = useRef<number | null>(null);
   const draggingRef = useRef(false);
+
+  // ✅ medir largura sempre (pra setas funcionarem)
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const widthRef = useRef<number>(1);
 
   // favoritos
@@ -149,6 +152,31 @@ export default function HomeBanner({ className }: Props) {
 
   const autoplayPaused = userPaused || isAnimating || isDragging;
 
+  // ✅ medir largura no mount + resize
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const measure = () => {
+      const rect = el.getBoundingClientRect();
+      widthRef.current = Math.max(1, rect.width);
+    };
+
+    measure();
+
+    let ro: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(measure);
+      ro.observe(el);
+    }
+
+    window.addEventListener('resize', measure);
+    return () => {
+      window.removeEventListener('resize', measure);
+      ro?.disconnect();
+    };
+  }, []);
+
   // preload prev/current/next
   useEffect(() => {
     const urls = [
@@ -160,7 +188,7 @@ export default function HomeBanner({ className }: Props) {
     urls.forEach((u) => {
       const img = new Image();
       img.decoding = 'async' as any;
-      img.src = u;
+      img.src = u!;
     });
   }, [prevItem?.imageUrl, current?.imageUrl, nextItem?.imageUrl]);
 
@@ -233,7 +261,6 @@ export default function HomeBanner({ className }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoplayPaused, active, count]);
 
-  // finalização sem “rebote” (snap)
   function finishTransition(dir: 'next' | 'prev') {
     const newActive =
       dir === 'next' ? (active + 1) % count : (active - 1 + count) % count;
@@ -256,12 +283,23 @@ export default function HomeBanner({ className }: Props) {
     if (isAnimating) return;
     if (animTimerRef.current) window.clearTimeout(animTimerRef.current);
 
+    // garante estado limpo
+    setIsDragging(false);
+    draggingRef.current = false;
+    startXRef.current = null;
+    startYRef.current = null;
+
     setProgress(100);
     setIsAnimating(true);
     dirRef.current = dir;
 
     const w = widthRef.current || 1;
-    setDragX(dir === 'next' ? -w : w);
+
+    // começa do 0 e vai pro destino (pra transição ser sempre visível)
+    setDragX(0);
+    requestAnimationFrame(() => {
+      setDragX(dir === 'next' ? -w : w);
+    });
 
     animTimerRef.current = window.setTimeout(() => {
       finishTransition(dir);
@@ -300,7 +338,6 @@ export default function HomeBanner({ className }: Props) {
     } catch {}
   }
 
-  // swipe
   function shouldIgnoreGesture(target: EventTarget | null) {
     const el = target as HTMLElement | null;
     if (!el) return false;
@@ -318,9 +355,6 @@ export default function HomeBanner({ className }: Props) {
     dirRef.current = null;
     setIsDragging(true);
     setDragX(0);
-
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    widthRef.current = Math.max(1, rect.width);
 
     (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
   }
@@ -387,14 +421,11 @@ export default function HomeBanner({ className }: Props) {
 
   if (!current) return null;
 
-  // barras
   const progressForActive = isAnimating ? 100 : clamp(progress, 0, 100);
 
-  // transição só quando não está arrastando e não está snapping
   const slideTransitionClass =
     !isDragging && !snapping ? `transition-transform duration-[${TRANSITION_MS}ms]` : '';
 
-  // ✅ conteúdo por slide (texto viaja junto com a imagem)
   function SlideContent({ item }: { item: BannerItem }) {
     const contentAlign = alignClasses(item.align);
     const centerLiftClass = item.align === 'center' ? '-translate-y-[15px]' : '';
@@ -453,6 +484,7 @@ export default function HomeBanner({ className }: Props) {
     <section className={className}>
       <div className="relative w-full">
         <div
+          ref={containerRef}
           className="relative h-[250px] w-full overflow-hidden"
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
@@ -529,7 +561,7 @@ export default function HomeBanner({ className }: Props) {
             <SlideContent item={nextItem} />
           </div>
 
-          {/* overlays (por cima das imagens, por baixo do texto) */}
+          {/* overlays */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/25 to-black/10" />
           <div className="absolute inset-0 bg-black/10" />
 
