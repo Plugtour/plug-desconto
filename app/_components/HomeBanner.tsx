@@ -1,7 +1,7 @@
 // Caminho: app/_components/HomeBanner.tsx
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { BANNERS, type BannerItem } from '@/_data/banners';
 
@@ -9,9 +9,9 @@ type Props = { className?: string };
 
 const DURATION_MS = 6500;
 const SWIPE_THRESHOLD = 45;
-const DEADZONE_PX = 10; // evita cancelar tap por micro-movimento
-const SLIDE_MS = 420; // swipe
-const FADE_MS = 280; // setas + autoplay
+const DEADZONE_PX = 10;
+const SLIDE_MS = 420;
+const FADE_MS = 280;
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -249,29 +249,30 @@ export default function HomeBanner({ className }: Props) {
   function resumeAutoplayClock() {
     clearAutoplayTimer();
     startedAtRef.current = performance.now();
-
     timeoutRef.current = window.setTimeout(() => {
       goNextFade();
     }, Math.max(0, remainingRef.current));
   }
 
-  function resetAutoplayClock() {
+  // ✅ (AQUI) reset da barra ANTES do paint, e arma só no frame seguinte
+  useLayoutEffect(() => {
+    if (count <= 1) return;
+
+    // zera relógio
     clearAutoplayTimer();
     remainingRef.current = DURATION_MS;
     startedAtRef.current = performance.now();
 
-    // ✅ evita flash: desarma, troca key e só arma depois de 2 frames
+    // desarma antes de pintar (evita 1 frame “cheio”)
     setBarArmed(false);
     setBarKey((k) => k + 1);
 
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        setBarArmed(true);
-      });
-    });
-  }
+    // arma depois do paint
+    requestAnimationFrame(() => setBarArmed(true));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, count]);
 
-  // controla pause/retomar sem resetar o tempo
+  // pause/retomar sem resetar o tempo
   useEffect(() => {
     if (count <= 1) return;
 
@@ -284,19 +285,6 @@ export default function HomeBanner({ className }: Props) {
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoplayPaused, count]);
-
-  // quando muda o banner, reinicia o relógio e agenda o próximo se não estiver pausado
-  useEffect(() => {
-    if (count <= 1) return;
-
-    resetAutoplayClock();
-
-    if (!autoplayPaused) {
-      resumeAutoplayClock();
-    }
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, count]);
 
   function finishSlideTransition(dir: 'next' | 'prev') {
     const newActive =
@@ -683,7 +671,6 @@ export default function HomeBanner({ className }: Props) {
                       <div className="h-full w-full bg-white" />
                     ) : isActive ? (
                       <div
-                        // ✅ chave muda com active também (não reaproveita DOM)
                         key={`${active}-${barKey}`}
                         className="h-full bg-white will-change-transform"
                         style={
