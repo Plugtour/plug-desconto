@@ -318,31 +318,31 @@ export default function QuickSearch({
   return (
     <div className={className}>
       {/* campo compacto (home) */}
-      <button
-        type="button"
-        onClick={() => setSheetOpen(true)}
-        className="w-full rounded-md"
-        aria-label="Abrir busca"
-      >
-        <div className="flex items-center gap-2 rounded-md bg-white/95 shadow-sm ring-1 ring-black/10 px-3 py-2">
-          <span className="shrink-0 opacity-60" aria-hidden="true">
-            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none">
-              <path
-                d="M10.5 18.5a8 8 0 1 1 0-16 8 8 0 0 1 0 16Z"
-                stroke="currentColor"
-                strokeWidth="1.8"
-              />
-              <path
-                d="M16.6 16.6 21 21"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-              />
-            </svg>
-          </span>
-          <div className="flex-1 text-left text-[15px] text-black/45">{placeholder}</div>
-        </div>
-      </button>
+      <div className="flex items-stretch gap-2">
+        <button
+          type="button"
+          onClick={() => setSheetOpen(true)}
+          className="flex-1"
+          aria-label="Abrir busca"
+        >
+          {/* ✅ (1) LUPA REMOVIDA + ✅ (2) MENOS ESPAÇAMENTO DO TEXTO */}
+          <div className="h-10 flex items-center rounded-md bg-white/95 shadow-sm ring-1 ring-black/10 px-3 py-0">
+            <div className="flex-1 text-left text-[14px] leading-none text-black/45">
+              {placeholder}
+            </div>
+          </div>
+        </button>
+
+        {/* mesma altura fixa do campo */}
+        <button
+          type="button"
+          onClick={() => setSheetOpen(true)}
+          className="h-10 flex items-center justify-center rounded-md bg-emerald-600 px-3 py-0 text-[13px] font-semibold text-white shadow-sm hover:bg-emerald-700"
+          aria-label="Buscar"
+        >
+          Buscar
+        </button>
+      </div>
 
       {/* bottom sheet */}
       {sheetOpen && (
@@ -357,13 +357,11 @@ export default function QuickSearch({
 
           {/* painel */}
           <div className="absolute inset-x-0 bottom-0">
-            {/* ✅ wrapper relativo pra posicionar o "Fechar" ENCOSTADO por fora do modal */}
             <div className="sheet-enter mx-auto w-full max-w-md px-[5px] pb-[5px] relative">
-              {/* ✅ Fechar: do lado de fora, colado no topo direito do modal */}
               <button
                 type="button"
                 onClick={closeSheet}
-                className="absolute right-[5px] -top-9 rounded-md bg-white/80 ring-1 ring-black/10 px-3 py-1.5 text-[13px] font-semibold text-black/75 hover:bg-white"
+                className="absolute right-[5px] -top-9 rounded-md bg-white/80 ring-1 ring-black/10 px-3 py-1.5 text-[13px] font-normal text-black/75 hover:bg-white"
               >
                 Fechar
               </button>
@@ -406,7 +404,6 @@ export default function QuickSearch({
                         spellCheck={false}
                       />
 
-                      {/* X dentro do campo para limpar */}
                       {hasQuery && (
                         <button
                           type="button"
@@ -430,7 +427,6 @@ export default function QuickSearch({
                       )}
                     </div>
 
-                    {/* Buscar verde (decorativo) */}
                     <button
                       type="button"
                       className="rounded-md bg-emerald-600 px-3 py-2 text-[13px] font-semibold text-white shadow-sm hover:bg-emerald-700"
@@ -442,10 +438,8 @@ export default function QuickSearch({
                   </div>
                 </div>
 
-                {/* modal com altura fixa (não encolhe) */}
                 <div className="h-[72vh] px-4 pb-5 overflow-hidden">
                   <div className="h-full overflow-auto">
-                    {/* só exibir resultados quando tiver texto */}
                     {hasQuery && (
                       <div className="pt-2">
                         <div className="text-[12px] font-semibold text-black/60">
@@ -461,7 +455,7 @@ export default function QuickSearch({
                           <div className="mt-2 overflow-hidden rounded-xl bg-white/90 ring-1 ring-black/10">
                             {results.map((o, idx) => {
                               const isActive = idx === active;
-                              const href = buildOfferHref(o);
+                              const href = buildOfferHref(o); // ✅ correção (era buildOfferHref(item))
 
                               return (
                                 <Link
@@ -508,7 +502,6 @@ export default function QuickSearch({
                       </div>
                     )}
 
-                    {/* categorias */}
                     <div className={hasQuery ? 'pt-4' : 'pt-3'}>
                       <div className="text-[12px] font-semibold text-black/60">
                         Categorias
