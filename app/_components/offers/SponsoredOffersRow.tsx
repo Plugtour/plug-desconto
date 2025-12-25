@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import Link from 'next/link';
 import type { SponsoredOffer } from '../../../_data/sponsoredOffers';
+import SponsoredOfferDrawer from './SponsoredOfferDrawer';
 
 type Props = {
   items: SponsoredOffer[];
@@ -67,7 +67,7 @@ function buildTags(item: SponsoredOffer) {
 }
 
 /* =========================
-   CORAÇÃO (vasado → preenchido)
+   CORAÇÃO (path aprovado)
 ========================= */
 
 function HeartIcon({
@@ -83,8 +83,9 @@ function HeartIcon({
       className={className}
       fill={filled ? 'currentColor' : 'none'}
       stroke="currentColor"
-      strokeWidth={filled ? 0 : 2}
+      strokeWidth={filled ? 0 : 1.8}
       strokeLinejoin="round"
+      strokeLinecap="round"
       aria-hidden="true"
     >
       <path d="M12 21C12 21 4 15.36 4 9.5C4 7.02 6.02 5 8.5 5C10.04 5 11.4 5.81 12 7C12.6 5.81 13.96 5 15.5 5C17.98 5 20 7.02 20 9.5C20 15.36 12 21 12 21Z" />
@@ -104,15 +105,30 @@ export default function SponsoredOffersRow({
   const shown = useMemo(() => items.slice(0, 5), [items]);
   const [favIds, setFavIds] = useState<Record<string, boolean>>({});
 
+  // Drawer
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerOffer, setDrawerOffer] = useState<SponsoredOffer | null>(null);
+
   function toggleFav(id: string) {
     setFavIds((prev) => ({ ...prev, [id]: !prev[id] }));
+  }
+
+  function openDrawer(offer: SponsoredOffer) {
+    setDrawerOffer(offer);
+    setDrawerOpen(true);
+  }
+
+  function closeDrawer() {
+    setDrawerOpen(false);
+    // limpa depois da animação (pequeno delay)
+    window.setTimeout(() => setDrawerOffer(null), 260);
   }
 
   if (!shown.length) return null;
 
   return (
     <section className={['w-full', className || ''].join(' ')}>
-      {/* título pequeno */}
+      {/* título pequeno e leve */}
       <div className="mb-1 px-4 text-[12px] font-medium text-zinc-500">
         {title}
       </div>
@@ -126,7 +142,12 @@ export default function SponsoredOffersRow({
 
           return (
             <div key={item.id} className="relative">
-              <Link href={item.href} className="block py-3">
+              {/* Card clicável (abre drawer) */}
+              <button
+                type="button"
+                onClick={() => openDrawer(item)}
+                className="block w-full text-left py-3"
+              >
                 <div className="flex gap-3">
                   {/* FOTO */}
                   <div className="h-24 w-24 flex-none overflow-hidden rounded-md bg-zinc-200">
@@ -151,7 +172,7 @@ export default function SponsoredOffersRow({
                         {tagsLine}
                       </div>
 
-                      {/* LINHA 3 — ECONOMIA (texto correto) */}
+                      {/* LINHA 3 — ECONOMIA */}
                       {item.priceText ? (
                         <div className="-mt-[2px] text-[11px] font-medium text-zinc-900">
                           Economia de {item.priceText}
@@ -181,33 +202,27 @@ export default function SponsoredOffersRow({
                     </div>
                   </div>
                 </div>
+              </button>
 
-                {/* CORAÇÃO */}
-                <button
-                  type="button"
-                  aria-label={
-                    isFav
-                      ? 'Remover dos favoritos'
-                      : 'Adicionar aos favoritos'
-                  }
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    toggleFav(item.id);
-                  }}
-                  className="absolute right-2 top-2 inline-flex h-10 w-10 items-center justify-center"
-                >
-                  <HeartIcon
-                    filled={isFav}
-                    className={[
-                      'h-9 w-9 transition',
-                      isFav
-                        ? 'text-red-500'
-                        : 'text-zinc-300 hover:text-zinc-400',
-                    ].join(' ')}
-                  />
-                </button>
-              </Link>
+              {/* CORAÇÃO (não abre drawer) */}
+              <button
+                type="button"
+                aria-label={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  toggleFav(item.id);
+                }}
+                className="absolute right-2 top-2 inline-flex h-10 w-10 items-center justify-center"
+              >
+                <HeartIcon
+                  filled={isFav}
+                  className={[
+                    'h-9 w-9 transition',
+                    isFav ? 'text-red-500' : 'text-zinc-300 hover:text-zinc-400',
+                  ].join(' ')}
+                />
+              </button>
 
               {/* DIVISÓRIA */}
               {idx < shown.length - 1 ? (
@@ -217,6 +232,9 @@ export default function SponsoredOffersRow({
           );
         })}
       </div>
+
+      {/* Drawer lateral (sem conteúdo por enquanto) */}
+      <SponsoredOfferDrawer open={drawerOpen} offer={drawerOffer} onClose={closeDrawer} />
     </section>
   );
 }
