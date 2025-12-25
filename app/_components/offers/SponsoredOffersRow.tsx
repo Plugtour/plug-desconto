@@ -241,17 +241,15 @@ export default function SponsoredOffersRow({
   const [favIds, setFavIds] = useState<Record<string, boolean>>({});
   const [expanded, setExpanded] = useState(false);
 
-  // altura compacta por card (tem que bater com o layout atual)
   const CARD_ROW_HEIGHT = 108;
-
-  // degradê mais baixo (mostra mais do 2º card)
   const GRADIENT_TOP_OFFSET = 14;
-
   const COLLAPSED_HEIGHT = Math.round(CARD_ROW_HEIGHT * 1.5) + 5;
 
   const contentRef = useRef<HTMLDivElement | null>(null);
   const animBoxRef = useRef<HTMLDivElement | null>(null);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const ctaRef = useRef<HTMLButtonElement | null>(null);
+
   const [maxH, setMaxH] = useState<number>(COLLAPSED_HEIGHT);
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -287,15 +285,31 @@ export default function SponsoredOffersRow({
       }
     };
 
-    requestAnimationFrame(() => {
-      requestAnimationFrame(step);
-    });
-
+    requestAnimationFrame(() => requestAnimationFrame(step));
     window.setTimeout(step, 220);
     window.setTimeout(step, 420);
   }
 
-  // animação mais suave: menos engasgo (principalmente iPhone)
+  // ✅ NOVO: ao recolher, garante CTA (Ver mais + seta) visível em primeiro plano
+  function smoothRevealCtaAfterCollapse() {
+    const btn = ctaRef.current;
+    if (!btn) return;
+
+    const run = () => {
+      const rect = btn.getBoundingClientRect();
+      const topSafe = 12;
+      const bottomSafe = window.innerHeight - 12;
+
+      if (rect.top < topSafe || rect.bottom > bottomSafe) {
+        btn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+      }
+    };
+
+    requestAnimationFrame(() => requestAnimationFrame(run));
+    window.setTimeout(run, 180);
+    window.setTimeout(run, 320);
+  }
+
   function animateTo(nextExpanded: boolean) {
     const contentEl = contentRef.current;
     const boxEl = animBoxRef.current;
@@ -303,7 +317,10 @@ export default function SponsoredOffersRow({
     if (!contentEl || !boxEl) {
       setExpanded(nextExpanded);
       setMaxH(nextExpanded ? 9999 : COLLAPSED_HEIGHT);
+
       if (nextExpanded) smoothRevealAfterExpand();
+      else smoothRevealCtaAfterCollapse();
+
       return;
     }
 
@@ -316,7 +333,9 @@ export default function SponsoredOffersRow({
     requestAnimationFrame(() => {
       setExpanded(nextExpanded);
       setMaxH(target);
+
       if (nextExpanded) smoothRevealAfterExpand();
+      else smoothRevealCtaAfterCollapse();
     });
   }
 
@@ -501,9 +520,6 @@ export default function SponsoredOffersRow({
             })}
           </div>
 
-          {/* Degradê + clique
-             ✅ mais suave (mais transparência no meio)
-          */}
           {!expanded && (
             <>
               <div
@@ -533,13 +549,15 @@ export default function SponsoredOffersRow({
           )}
         </div>
 
+        {/* ✅ CTA em primeiro plano */}
         <button
+          ref={ctaRef}
           type="button"
           onClick={toggleExpanded}
           onPointerDown={onPointerDown}
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerCancel}
-          className="mt-3 w-full touch-manipulation select-none flex flex-col items-center justify-center gap-[5px]"
+          className="relative z-[50] mt-3 w-full touch-manipulation select-none flex flex-col items-center justify-center gap-[5px]"
           style={{ touchAction: 'pan-y' }}
           aria-label={expanded ? 'Ver menos patrocinados' : 'Ver mais patrocinados'}
         >
