@@ -167,7 +167,6 @@ function SponsoredSideModal({
             Fechar
           </button>
 
-          {/* sem arredondar onde encosta: direita e baixo retos */}
           <div className="h-full w-full rounded-tr-none rounded-br-none rounded-bl-none rounded-tl-md bg-zinc-100 ring-1 ring-black/10">
             {/* conteúdo futuro */}
           </div>
@@ -247,6 +246,7 @@ export default function SponsoredOffersRow({
   const COLLAPSED_HEIGHT = Math.round(CARD_ROW_HEIGHT * 1.5) + 5;
 
   const contentRef = useRef<HTMLDivElement | null>(null);
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
   const [maxH, setMaxH] = useState<number>(COLLAPSED_HEIGHT);
 
   // modal lateral
@@ -270,11 +270,29 @@ export default function SponsoredOffersRow({
     setFavIds((prev) => ({ ...prev, [id]: !prev[id] }));
   }
 
+  // ✅ ao expandir: rolar pra mostrar os novos cards
+  function scrollToReveal() {
+    const el = wrapperRef.current;
+    if (!el) return;
+
+    // espera um tick pra layout refletir o maxHeight
+    window.setTimeout(() => {
+      const rect = el.getBoundingClientRect();
+      const viewportBottom = window.innerHeight - 12;
+
+      if (rect.bottom > viewportBottom) {
+        const delta = rect.bottom - viewportBottom;
+        window.scrollBy({ top: delta, behavior: 'smooth' });
+      }
+    }, 60);
+  }
+
   function animateTo(nextExpanded: boolean) {
     const el = contentRef.current;
     if (!el) {
       setExpanded(nextExpanded);
       setMaxH(nextExpanded ? 9999 : COLLAPSED_HEIGHT);
+      if (nextExpanded) scrollToReveal();
       return;
     }
 
@@ -286,6 +304,7 @@ export default function SponsoredOffersRow({
     requestAnimationFrame(() => {
       setExpanded(nextExpanded);
       setMaxH(target);
+      if (nextExpanded) scrollToReveal();
     });
   }
 
@@ -325,11 +344,9 @@ export default function SponsoredOffersRow({
     <section className={['w-full', className || ''].join(' ')}>
       <SponsoredSideModal open={modalOpen} closing={modalClosing} onClose={closeModal} />
 
-      {/* título pequeno (do card correto) */}
       <div className="mb-1 px-4 text-[12px] font-medium text-zinc-500">{title}</div>
 
-      {/* wrapper com altura animada + degradê */}
-      <div className="relative px-3">
+      <div ref={wrapperRef} className="relative px-3">
         <div
           className="relative overflow-hidden"
           style={{
@@ -345,12 +362,10 @@ export default function SponsoredOffersRow({
               const rating = item.rating ?? 4.8;
               const reviews = item.reviews ?? 0;
 
-              // quando fechado: a partir do 2º item (idx>=1) não interage
               const disableWhenCollapsed = !expanded && idx >= 1;
 
               return (
                 <div key={item.id} className="relative">
-                  {/* CARD (EXATAMENTE o do código correto) */}
                   <Link
                     href={item.href}
                     className={[
@@ -361,12 +376,11 @@ export default function SponsoredOffersRow({
                     tabIndex={disableWhenCollapsed ? -1 : 0}
                     onClick={(e) => {
                       if (disableWhenCollapsed) return;
-                      e.preventDefault(); // abre modal ao invés de navegar (por enquanto)
+                      e.preventDefault();
                       openModal();
                     }}
                   >
                     <div className="flex gap-3">
-                      {/* FOTO */}
                       <div className="h-24 w-24 flex-none overflow-hidden rounded-md bg-zinc-200">
                         <img
                           src={item.imageUrl}
@@ -376,20 +390,16 @@ export default function SponsoredOffersRow({
                         />
                       </div>
 
-                      {/* TEXTO */}
                       <div className="min-w-0 flex-1">
-                        {/* LINHA 1 — TÍTULO */}
                         <div className="pr-14 text-[11px] font-extrabold leading-snug text-zinc-900 line-clamp-2">
                           {item.title}
                         </div>
 
-                        {/* LINHA 2 + 3 */}
                         <div className="mt-[4px]">
                           <div className="text-[11px] text-zinc-500 line-clamp-1">
                             {tagsLine}
                           </div>
 
-                          {/* LINHA 3 — ECONOMIA (mantém o padrão do card correto) */}
                           {item.priceText ? (
                             <div className="-mt-[2px] text-[11px] font-medium text-zinc-900">
                               Economia de {item.priceText}
@@ -397,7 +407,6 @@ export default function SponsoredOffersRow({
                           ) : null}
                         </div>
 
-                        {/* ESTRELAS + VER MAIS */}
                         <div className="mt-1.5 flex items-end justify-between">
                           <div>
                             <StarsRow rating={rating} />
@@ -418,7 +427,6 @@ export default function SponsoredOffersRow({
                       </div>
                     </div>
 
-                    {/* CORAÇÃO (mantém o padrão do card correto) */}
                     <button
                       type="button"
                       aria-label={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
@@ -445,7 +453,6 @@ export default function SponsoredOffersRow({
                     </button>
                   </Link>
 
-                  {/* DIVISÓRIA (mantém o padrão do card correto) */}
                   {idx < shown.length - 1 ? (
                     <div className="mx-2 border-b border-dotted border-zinc-300" />
                   ) : null}
@@ -454,14 +461,18 @@ export default function SponsoredOffersRow({
             })}
           </div>
 
-          {/* degradê + clique abre (do segundo código) */}
+          {/* ✅ Degradê reforçado (Safari iOS) + clique abre */}
           {!expanded && (
             <>
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-b from-transparent to-zinc-100" />
+              <div
+                className="pointer-events-none absolute inset-x-0 bottom-0 z-[5] h-20 bg-gradient-to-b from-zinc-100/0 via-zinc-100/70 to-zinc-100"
+                style={{ transform: 'translateZ(0)' }}
+              />
+
               <button
                 type="button"
                 aria-label="Ver mais patrocinados"
-                className="absolute inset-x-0 bottom-0 h-16 pointer-events-auto"
+                className="absolute inset-x-0 bottom-0 z-[6] h-20 pointer-events-auto"
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -472,7 +483,6 @@ export default function SponsoredOffersRow({
           )}
         </div>
 
-        {/* faixa ver mais + seta + swipe (do segundo código) */}
         <button
           type="button"
           onClick={toggleExpanded}
