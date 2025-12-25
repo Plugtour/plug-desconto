@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 
 export type ExposedCarouselItem = {
@@ -98,6 +98,31 @@ export default function ExposedCarouselRow({
   const [fav, setFav] = useState<Record<string, boolean>>({});
   const [open, setOpen] = useState(false);
 
+  // ✅ esconde "Ver todas" quando chega no fim do scroll
+  const [hideViewAll, setHideViewAll] = useState(false);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    function onScroll() {
+      const el = scrollRef.current;
+      if (!el) return;
+
+      const tolerance = 4; // px
+      const reachedEnd =
+        el.scrollLeft + el.clientWidth >= el.scrollWidth - tolerance;
+
+      setHideViewAll(reachedEnd);
+    }
+
+    const el = scrollRef.current;
+    if (!el) return;
+
+    el.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+
+    return () => el.removeEventListener('scroll', onScroll);
+  }, []);
+
   function openModal(e?: React.SyntheticEvent) {
     if (e) {
       e.preventDefault();
@@ -122,17 +147,27 @@ export default function ExposedCarouselRow({
           </div>
         </div>
 
-        <Link
-          href={viewAllHref}
-          className="relative -top-[3px] text-sm font-semibold text-emerald-700 transition-colors duration-200 hover:text-emerald-800 active:opacity-80"
-        >
-          Ver todas ({categoryCount})
-        </Link>
+        {!hideViewAll ? (
+          <Link
+            href={viewAllHref}
+            className="relative -top-[3px] text-sm font-semibold text-emerald-700 transition-colors duration-200 hover:text-emerald-800 active:opacity-80"
+          >
+            Ver todas ({categoryCount})
+          </Link>
+        ) : (
+          // placeholder pra não “puxar” o layout quando esconder
+          <span className="relative -top-[3px] text-sm font-semibold text-emerald-700 opacity-0 select-none">
+            Ver todas ({categoryCount})
+          </span>
+        )}
       </div>
 
       {/* Carrossel */}
       <div className="relative">
-        <div className="no-scrollbar flex gap-3 px-4 overflow-x-auto scroll-smooth overscroll-x-contain touch-pan-x">
+        <div
+          ref={scrollRef}
+          className="no-scrollbar flex gap-3 px-4 overflow-x-auto scroll-smooth overscroll-x-contain touch-pan-x"
+        >
           {list.map((item) => {
             const rating = item.rating ?? 4.9;
             const reviews = item.reviews ?? 812;
@@ -164,7 +199,9 @@ export default function ExposedCarouselRow({
                     {/* ★ TEXTO DENTRO DA FOTO */}
                     <div className="absolute left-2 top-2 rounded-md bg-black/25 px-2 py-1 backdrop-blur-[4px] ring-1 ring-white/15 pointer-events-none">
                       <div className="leading-none">
-                        <span className="text-[12px] font-semibold text-amber-400">★</span>{' '}
+                        <span className="text-[12px] font-semibold text-amber-400">
+                          ★
+                        </span>{' '}
                         <span className="text-[11px] font-semibold text-white">
                           {rating.toFixed(1)} de {reviews}
                         </span>
@@ -176,6 +213,7 @@ export default function ExposedCarouselRow({
                     <div className="text-sm font-semibold text-neutral-900 line-clamp-2">
                       {item.title}
                     </div>
+
                     <div className="mt-1 text-[12px] font-medium text-neutral-700">
                       {savings}
                     </div>
@@ -220,7 +258,9 @@ export default function ExposedCarouselRow({
             <div className="relative aspect-square overflow-hidden rounded-lg border border-dashed border-neutral-300 bg-white">
               <div className="absolute inset-0 grid place-items-center px-3 text-center">
                 <div className="leading-tight">
-                  <div className="text-sm font-semibold text-neutral-900">Ver todos</div>
+                  <div className="text-sm font-semibold text-neutral-900">
+                    Ver todos
+                  </div>
                   <div className="-mt-[2px] text-sm font-semibold text-neutral-900">
                     da {categoryLabel}
                   </div>
