@@ -244,7 +244,7 @@ export default function SponsoredOffersRow({
   // altura compacta por card (tem que bater com o layout atual)
   const CARD_ROW_HEIGHT = 108;
 
-  // ✅ ajuste: degradê mais baixo (mostra mais do 2º card)
+  // degradê mais baixo (mostra mais do 2º card)
   const GRADIENT_TOP_OFFSET = 14;
 
   const COLLAPSED_HEIGHT = Math.round(CARD_ROW_HEIGHT * 1.5) + 5;
@@ -274,11 +274,11 @@ export default function SponsoredOffersRow({
     setFavIds((prev) => ({ ...prev, [id]: !prev[id] }));
   }
 
-  function scrollToRevealAfterExpand() {
+  function smoothRevealAfterExpand() {
     const el = wrapperRef.current;
     if (!el) return;
 
-    const run = () => {
+    const step = () => {
       const rect = el.getBoundingClientRect();
       const viewportBottom = window.innerHeight - 12;
       if (rect.bottom > viewportBottom) {
@@ -287,12 +287,15 @@ export default function SponsoredOffersRow({
       }
     };
 
-    window.setTimeout(run, 120);
-    window.setTimeout(run, 260);
-    window.setTimeout(run, 360);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(step);
+    });
+
+    window.setTimeout(step, 220);
+    window.setTimeout(step, 420);
   }
 
-  // ✅ animação mais suave: trava menos no iPhone
+  // animação mais suave: menos engasgo (principalmente iPhone)
   function animateTo(nextExpanded: boolean) {
     const contentEl = contentRef.current;
     const boxEl = animBoxRef.current;
@@ -300,7 +303,7 @@ export default function SponsoredOffersRow({
     if (!contentEl || !boxEl) {
       setExpanded(nextExpanded);
       setMaxH(nextExpanded ? 9999 : COLLAPSED_HEIGHT);
-      if (nextExpanded) scrollToRevealAfterExpand();
+      if (nextExpanded) smoothRevealAfterExpand();
       return;
     }
 
@@ -313,7 +316,7 @@ export default function SponsoredOffersRow({
     requestAnimationFrame(() => {
       setExpanded(nextExpanded);
       setMaxH(target);
-      if (nextExpanded) scrollToRevealAfterExpand();
+      if (nextExpanded) smoothRevealAfterExpand();
     });
   }
 
@@ -361,23 +364,21 @@ export default function SponsoredOffersRow({
           className="relative overflow-hidden"
           style={{
             maxHeight: maxH,
-            transition: 'max-height 420ms cubic-bezier(0.2, 0.9, 0.2, 1)',
+            transition: 'max-height 520ms cubic-bezier(0.22, 0.95, 0.18, 1)',
             willChange: 'max-height',
             transform: 'translateZ(0)',
             WebkitTransform: 'translateZ(0)',
+            contain: 'layout paint',
+            overflowAnchor: 'none',
           }}
         >
-          <div ref={contentRef}>
+          <div ref={contentRef} style={{ overflowAnchor: 'none' as any }}>
             {shown.map((item, idx) => {
               const isFav = !!favIds[item.id];
               const tagsLine = buildTags(item);
               const rating = item.rating ?? 4.8;
               const reviews = item.reviews ?? 0;
 
-              // regra de clique no card:
-              // - card 1 sempre abre modal
-              // - fechado: cards 2+ expandem
-              // - expandido: cards 2+ abrem modal
               const clickAction = (e: React.MouseEvent) => {
                 if (idx === 0) {
                   e.preventDefault();
@@ -395,7 +396,6 @@ export default function SponsoredOffersRow({
                 openModal();
               };
 
-              // coração: quando fechado, só card 1 interativo
               const disableHeart = !expanded && idx >= 1;
 
               return (
@@ -501,8 +501,8 @@ export default function SponsoredOffersRow({
             })}
           </div>
 
-          {/* ✅ Degradê + clique (não cobre o card 1)
-              Ajuste: começa mais embaixo e mais transparente (mostra mais do 2º card)
+          {/* Degradê + clique
+             ✅ mais suave (mais transparência no meio)
           */}
           {!expanded && (
             <>
@@ -511,7 +511,7 @@ export default function SponsoredOffersRow({
                 style={{
                   top: CARD_ROW_HEIGHT + GRADIENT_TOP_OFFSET,
                   background:
-                    'linear-gradient(180deg, rgba(244,244,245,0) 0%, rgba(244,244,245,0.35) 55%, rgba(244,244,245,1) 100%)',
+                    'linear-gradient(180deg, rgba(244,244,245,0) 0%, rgba(244,244,245,0.18) 52%, rgba(244,244,245,0.6) 76%, rgba(244,244,245,1) 100%)',
                   transform: 'translateZ(0)',
                   WebkitTransform: 'translateZ(0)',
                   isolation: 'isolate',
