@@ -153,6 +153,7 @@ function SponsoredSideModal({
             closing ? 'side-exit' : 'side-enter',
           ].join(' ')}
         >
+          {/* ✅ Fechar vermelho igual o coração */}
           <button
             type="button"
             onClick={onClose}
@@ -160,8 +161,8 @@ function SponsoredSideModal({
               'absolute left-0 -top-9',
               'touch-manipulation rounded-md',
               'bg-white/80 ring-1 ring-black/10',
-              'px-3 py-1.5 text-[13px] font-normal text-black/75',
-              'hover:bg-white hover:text-black',
+              'px-3 py-1.5 text-[13px] font-normal',
+              'text-red-500 hover:text-red-600 hover:bg-white',
             ].join(' ')}
           >
             Fechar
@@ -249,7 +250,9 @@ export default function SponsoredOffersRow({
   const animBoxRef = useRef<HTMLDivElement | null>(null);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
 
-  const [maxH, setMaxH] = useState<number>(COLLAPSED_HEIGHT);
+  // ✅ trocamos max-height por height controlado (WAAPI)
+  const [boxH, setBoxH] = useState<number>(COLLAPSED_HEIGHT);
+  const heightAnimRef = useRef<Animation | null>(null);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [modalClosing, setModalClosing] = useState(false);
@@ -289,31 +292,70 @@ export default function SponsoredOffersRow({
     window.setTimeout(step, 420);
   }
 
+  function stopHeightAnim() {
+    try {
+      heightAnimRef.current?.cancel();
+    } catch {}
+    heightAnimRef.current = null;
+  }
+
+  function animateHeight(from: number, to: number, onDone?: () => void) {
+    const el = animBoxRef.current;
+    if (!el) {
+      setBoxH(to);
+      onDone?.();
+      return;
+    }
+
+    stopHeightAnim();
+    // garante o estado base
+    setBoxH(from);
+
+    // WAAPI (mais suave no iOS do que transition de max-height)
+    const anim = el.animate(
+      [{ height: `${from}px` }, { height: `${to}px` }],
+      {
+        duration: 520,
+        easing: 'cubic-bezier(0.22, 0.95, 0.18, 1)',
+        fill: 'both',
+      }
+    );
+
+    heightAnimRef.current = anim;
+
+    anim.onfinish = () => {
+      heightAnimRef.current = null;
+      setBoxH(to);
+      onDone?.();
+    };
+
+    anim.oncancel = () => {
+      heightAnimRef.current = null;
+      setBoxH(to);
+    };
+  }
+
   function animateTo(nextExpanded: boolean) {
     const contentEl = contentRef.current;
     const boxEl = animBoxRef.current;
 
     if (!contentEl || !boxEl) {
       setExpanded(nextExpanded);
-      setMaxH(nextExpanded ? 9999 : COLLAPSED_HEIGHT);
+      setBoxH(nextExpanded ? 9999 : COLLAPSED_HEIGHT);
       if (nextExpanded) smoothRevealAfterExpand();
       return;
     }
 
-    // 1) trava no tamanho atual (evita “pulo”)
-    const currentRendered = boxEl.getBoundingClientRect().height;
-    setMaxH(currentRendered);
-
-    // 2) no próximo frame, aplica o destino (evita engasgo no iOS)
+    const current = boxEl.getBoundingClientRect().height;
     const targetExpanded = Math.max(contentEl.scrollHeight, COLLAPSED_HEIGHT);
     const target = nextExpanded ? targetExpanded : COLLAPSED_HEIGHT;
 
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        setExpanded(nextExpanded);
-        setMaxH(target);
-        if (nextExpanded) smoothRevealAfterExpand();
-      });
+    // atualiza estado lógico no começo (mantém seu comportamento)
+    setExpanded(nextExpanded);
+
+    // anima altura (WAAPI)
+    animateHeight(current, target, () => {
+      if (nextExpanded) smoothRevealAfterExpand();
     });
   }
 
@@ -321,7 +363,7 @@ export default function SponsoredOffersRow({
     animateTo(!expanded);
   }
 
-  // swipe na faixa (puxa pra baixo abre / pra cima fecha)
+  // swipe na faixa
   const startY = useRef<number | null>(null);
   const dragging = useRef(false);
 
@@ -360,12 +402,8 @@ export default function SponsoredOffersRow({
           ref={animBoxRef}
           className="relative overflow-hidden"
           style={{
-            maxHeight: maxH,
-            // ✅ mais suave no iOS: duração maior + easing “macio”
-            transition: expanded
-              ? 'max-height 760ms cubic-bezier(0.2, 0.95, 0.2, 1)'
-              : 'max-height 820ms cubic-bezier(0.2, 0.95, 0.2, 1)',
-            willChange: 'max-height',
+            height: boxH,
+            willChange: 'height',
             transform: 'translateZ(0)',
             WebkitTransform: 'translateZ(0)',
             contain: 'layout paint',
