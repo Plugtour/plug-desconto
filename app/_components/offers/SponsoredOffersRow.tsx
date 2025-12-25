@@ -241,7 +241,6 @@ export default function SponsoredOffersRow({
   const [favIds, setFavIds] = useState<Record<string, boolean>>({});
   const [expanded, setExpanded] = useState(false);
 
-  // animação de altura (mostra 1 e meio)
   const CARD_ROW_HEIGHT = 108;
   const COLLAPSED_HEIGHT = Math.round(CARD_ROW_HEIGHT * 1.5) + 5;
 
@@ -249,7 +248,6 @@ export default function SponsoredOffersRow({
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const [maxH, setMaxH] = useState<number>(COLLAPSED_HEIGHT);
 
-  // modal lateral
   const [modalOpen, setModalOpen] = useState(false);
   const [modalClosing, setModalClosing] = useState(false);
 
@@ -270,7 +268,6 @@ export default function SponsoredOffersRow({
     setFavIds((prev) => ({ ...prev, [id]: !prev[id] }));
   }
 
-  // ✅ ao expandir: rolar pra mostrar os novos cards (mais “agressivo” e consistente)
   function scrollToRevealAfterExpand() {
     const el = wrapperRef.current;
     if (!el) return;
@@ -315,7 +312,6 @@ export default function SponsoredOffersRow({
     animateTo(!expanded);
   }
 
-  // swipe na faixa (puxa pra baixo abre / pra cima fecha)
   const startY = useRef<number | null>(null);
   const dragging = useRef(false);
 
@@ -365,30 +361,26 @@ export default function SponsoredOffersRow({
               const rating = item.rating ?? 4.8;
               const reviews = item.reviews ?? 0;
 
-              // ✅ regra: quando fechado
-              // - card 1 (idx 0): abre modal
-              // - card 2+ (idx>=1): clique deve EXPANDIR, não abrir modal
               const clickAction = (e: React.MouseEvent) => {
-                // card 1 sempre abre modal
+                // card 1: sempre modal
                 if (idx === 0) {
                   e.preventDefault();
                   openModal();
                   return;
                 }
 
-                // quando fechado, qualquer clique no card 2+ apenas expande
+                // fechado: card 2+ expande
                 if (!expanded && idx >= 1) {
                   e.preventDefault();
                   animateTo(true);
                   return;
                 }
 
-                // quando expandido, cards 2+ podem abrir modal
+                // expandido: card 2+ modal
                 e.preventDefault();
                 openModal();
               };
 
-              // ✅ coração: quando fechado, só no card 1 fica interativo
               const disableHeart = !expanded && idx >= 1;
 
               return (
@@ -434,9 +426,32 @@ export default function SponsoredOffersRow({
                             </div>
                           </div>
 
-                          <span className="text-[14px] font-semibold text-green-600">
+                          {/* ✅ “Ver mais” DO CARD: comportamento correto */}
+                          <button
+                            type="button"
+                            className="text-[14px] font-semibold text-green-600"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+
+                              // card 1: modal sempre
+                              if (idx === 0) {
+                                openModal();
+                                return;
+                              }
+
+                              // fechado e card 2+: expande
+                              if (!expanded && idx >= 1) {
+                                animateTo(true);
+                                return;
+                              }
+
+                              // expandido: modal
+                              openModal();
+                            }}
+                          >
                             Ver mais
-                          </span>
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -475,7 +490,7 @@ export default function SponsoredOffersRow({
             })}
           </div>
 
-          {/* ✅ Degradê (Safari iPhone) + clique abre EXPANSÃO */}
+          {/* ✅ Degradê + clique expande (Safari iOS) */}
           {!expanded && (
             <>
               <div
@@ -503,7 +518,7 @@ export default function SponsoredOffersRow({
           )}
         </div>
 
-        {/* ✅ botão “Ver mais” sempre EXPANDE (não abre modal) */}
+        {/* Botão “Ver mais” (faixa) sempre expande */}
         <button
           type="button"
           onClick={toggleExpanded}
