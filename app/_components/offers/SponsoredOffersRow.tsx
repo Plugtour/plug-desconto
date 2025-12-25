@@ -13,7 +13,6 @@ type Props = {
 /* =========================
    ESTRELAS (preenchimento proporcional, coladas)
 ========================= */
-
 function Star({ fillPct }: { fillPct: number }) {
   const id = React.useId();
   const pct = Math.max(0, Math.min(100, fillPct));
@@ -153,7 +152,6 @@ function SponsoredSideModal({
             closing ? 'side-exit' : 'side-enter',
           ].join(' ')}
         >
-          {/* ✅ Fechar vermelho igual o coração */}
           <button
             type="button"
             onClick={onClose}
@@ -250,9 +248,11 @@ export default function SponsoredOffersRow({
   const animBoxRef = useRef<HTMLDivElement | null>(null);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
 
-  // ✅ trocamos max-height por height controlado (WAAPI)
   const [boxH, setBoxH] = useState<number>(COLLAPSED_HEIGHT);
   const heightAnimRef = useRef<Animation | null>(null);
+
+  // ✅ só liga “otimizações” durante animação (melhora scroll iPhone)
+  const [animating, setAnimating] = useState(false);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [modalClosing, setModalClosing] = useState(false);
@@ -308,31 +308,28 @@ export default function SponsoredOffersRow({
     }
 
     stopHeightAnim();
-    // garante o estado base
     setBoxH(from);
 
-    // WAAPI (mais suave no iOS do que transition de max-height)
-    const anim = el.animate(
-      [{ height: `${from}px` }, { height: `${to}px` }],
-      {
-        duration: 520,
-        easing: 'cubic-bezier(0.22, 0.95, 0.18, 1)',
-        fill: 'both',
-      }
-    );
+    // ✅ liga só durante animação
+    setAnimating(true);
+
+    const anim = el.animate([{ height: `${from}px` }, { height: `${to}px` }], {
+      duration: 520,
+      easing: 'cubic-bezier(0.22, 0.95, 0.18, 1)',
+      fill: 'both',
+    });
 
     heightAnimRef.current = anim;
 
-    anim.onfinish = () => {
+    const end = () => {
       heightAnimRef.current = null;
       setBoxH(to);
+      setAnimating(false); // ✅ desliga depois (scroll fica leve)
       onDone?.();
     };
 
-    anim.oncancel = () => {
-      heightAnimRef.current = null;
-      setBoxH(to);
-    };
+    anim.onfinish = end;
+    anim.oncancel = end;
   }
 
   function animateTo(nextExpanded: boolean) {
@@ -350,10 +347,8 @@ export default function SponsoredOffersRow({
     const targetExpanded = Math.max(contentEl.scrollHeight, COLLAPSED_HEIGHT);
     const target = nextExpanded ? targetExpanded : COLLAPSED_HEIGHT;
 
-    // atualiza estado lógico no começo (mantém seu comportamento)
     setExpanded(nextExpanded);
 
-    // anima altura (WAAPI)
     animateHeight(current, target, () => {
       if (nextExpanded) smoothRevealAfterExpand();
     });
@@ -363,7 +358,6 @@ export default function SponsoredOffersRow({
     animateTo(!expanded);
   }
 
-  // swipe na faixa
   const startY = useRef<number | null>(null);
   const dragging = useRef(false);
 
@@ -403,10 +397,13 @@ export default function SponsoredOffersRow({
           className="relative overflow-hidden"
           style={{
             height: boxH,
-            willChange: 'height',
-            transform: 'translateZ(0)',
-            WebkitTransform: 'translateZ(0)',
-            contain: 'layout paint',
+
+            // ✅ só durante a animação
+            willChange: animating ? 'height' : undefined,
+            transform: animating ? 'translateZ(0)' : undefined,
+            WebkitTransform: animating ? 'translateZ(0)' : undefined,
+            contain: animating ? ('layout paint' as any) : undefined,
+
             overflowAnchor: 'none',
           }}
         >
@@ -547,9 +544,6 @@ export default function SponsoredOffersRow({
                   top: CARD_ROW_HEIGHT + GRADIENT_TOP_OFFSET,
                   background:
                     'linear-gradient(180deg, rgba(244,244,245,0) 0%, rgba(244,244,245,0.14) 52%, rgba(244,244,245,0.55) 78%, rgba(244,244,245,1) 100%)',
-                  transform: 'translateZ(0)',
-                  WebkitTransform: 'translateZ(0)',
-                  isolation: 'isolate',
                 }}
               />
 
