@@ -243,6 +243,10 @@ export default function SponsoredOffersRow({
 
   // altura compacta por card (tem que bater com o layout atual)
   const CARD_ROW_HEIGHT = 108;
+
+  // ✅ ajuste: degradê mais baixo (mostra mais do 2º card)
+  const GRADIENT_TOP_OFFSET = 14;
+
   const COLLAPSED_HEIGHT = Math.round(CARD_ROW_HEIGHT * 1.5) + 5;
 
   const contentRef = useRef<HTMLDivElement | null>(null);
@@ -300,7 +304,6 @@ export default function SponsoredOffersRow({
       return;
     }
 
-    // altura atual renderizada (não “maxH” teórico)
     const currentRendered = boxEl.getBoundingClientRect().height;
     setMaxH(currentRendered);
 
@@ -371,7 +374,7 @@ export default function SponsoredOffersRow({
               const rating = item.rating ?? 4.8;
               const reviews = item.reviews ?? 0;
 
-              // ✅ regra de clique no card:
+              // regra de clique no card:
               // - card 1 sempre abre modal
               // - fechado: cards 2+ expandem
               // - expandido: cards 2+ abrem modal
@@ -392,7 +395,7 @@ export default function SponsoredOffersRow({
                 openModal();
               };
 
-              // ✅ coração: quando fechado, só card 1 interativo
+              // coração: quando fechado, só card 1 interativo
               const disableHeart = !expanded && idx >= 1;
 
               return (
@@ -438,11 +441,6 @@ export default function SponsoredOffersRow({
                             </div>
                           </div>
 
-                          {/* ✅ “Ver mais” do card:
-                              - card 1: modal sempre (mesmo fechado)
-                              - fechado e card 2+: expande
-                              - expandido: modal
-                          */}
                           <button
                             type="button"
                             className="text-[14px] font-semibold text-green-600"
@@ -503,17 +501,17 @@ export default function SponsoredOffersRow({
             })}
           </div>
 
-          {/* ✅ Degradê + clique (NÃO cobre o card 1)
-              Começa a partir do topo do 2º card (top = CARD_ROW_HEIGHT)
+          {/* ✅ Degradê + clique (não cobre o card 1)
+              Ajuste: começa mais embaixo e mais transparente (mostra mais do 2º card)
           */}
           {!expanded && (
             <>
               <div
                 className="pointer-events-none absolute inset-x-0 bottom-0 z-[10]"
                 style={{
-                  top: CARD_ROW_HEIGHT, // ✅ não invade o card 1
+                  top: CARD_ROW_HEIGHT + GRADIENT_TOP_OFFSET,
                   background:
-                    'linear-gradient(180deg, rgba(244,244,245,0) 0%, rgba(244,244,245,0.65) 45%, rgba(244,244,245,1) 100%)',
+                    'linear-gradient(180deg, rgba(244,244,245,0) 0%, rgba(244,244,245,0.35) 55%, rgba(244,244,245,1) 100%)',
                   transform: 'translateZ(0)',
                   WebkitTransform: 'translateZ(0)',
                   isolation: 'isolate',
@@ -524,7 +522,7 @@ export default function SponsoredOffersRow({
                 type="button"
                 aria-label="Ver mais patrocinados"
                 className="absolute inset-x-0 bottom-0 z-[11] pointer-events-auto"
-                style={{ top: CARD_ROW_HEIGHT }} // ✅ clique só no pedaço do card 2
+                style={{ top: CARD_ROW_HEIGHT + GRADIENT_TOP_OFFSET }}
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -535,7 +533,6 @@ export default function SponsoredOffersRow({
           )}
         </div>
 
-        {/* Faixa “Ver mais” sempre expande */}
         <button
           type="button"
           onClick={toggleExpanded}
