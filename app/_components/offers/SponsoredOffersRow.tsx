@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useMemo, useRef, useState } from 'react';
-import Link from 'next/link';
 import type { SponsoredOffer } from '../../../_data/sponsoredOffers';
 
 type Props = {
@@ -251,7 +250,6 @@ export default function SponsoredOffersRow({
   const [boxH, setBoxH] = useState<number>(COLLAPSED_HEIGHT);
   const heightAnimRef = useRef<Animation | null>(null);
 
-  // ✅ só liga “otimizações” durante animação (melhora scroll iPhone)
   const [animating, setAnimating] = useState(false);
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -310,7 +308,6 @@ export default function SponsoredOffersRow({
     stopHeightAnim();
     setBoxH(from);
 
-    // ✅ liga só durante animação
     setAnimating(true);
 
     const anim = el.animate([{ height: `${from}px` }, { height: `${to}px` }], {
@@ -324,7 +321,7 @@ export default function SponsoredOffersRow({
     const end = () => {
       heightAnimRef.current = null;
       setBoxH(to);
-      setAnimating(false); // ✅ desliga depois (scroll fica leve)
+      setAnimating(false);
       onDone?.();
     };
 
@@ -397,13 +394,10 @@ export default function SponsoredOffersRow({
           className="relative overflow-hidden"
           style={{
             height: boxH,
-
-            // ✅ só durante a animação
             willChange: animating ? 'height' : undefined,
             transform: animating ? 'translateZ(0)' : undefined,
             WebkitTransform: animating ? 'translateZ(0)' : undefined,
             contain: animating ? ('layout paint' as any) : undefined,
-
             overflowAnchor: 'none',
           }}
         >
@@ -414,20 +408,17 @@ export default function SponsoredOffersRow({
               const rating = item.rating ?? 4.8;
               const reviews = item.reviews ?? 0;
 
-              const clickAction = (e: React.MouseEvent) => {
+              const handleCardClick = () => {
                 if (idx === 0) {
-                  e.preventDefault();
                   openModal();
                   return;
                 }
 
                 if (!expanded && idx >= 1) {
-                  e.preventDefault();
                   animateTo(true);
                   return;
                 }
 
-                e.preventDefault();
                 openModal();
               };
 
@@ -435,7 +426,16 @@ export default function SponsoredOffersRow({
 
               return (
                 <div key={item.id} className="relative">
-                  <Link href={item.href} className="block py-3" onClick={clickAction}>
+                  {/* ✅ NÃO usamos Link aqui para evitar nested interactive */}
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={handleCardClick}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') handleCardClick();
+                    }}
+                    className="block py-3 cursor-pointer"
+                  >
                     <div className="flex gap-3">
                       <div className="h-24 w-24 flex-none overflow-hidden rounded-md bg-zinc-200">
                         <img
@@ -476,28 +476,24 @@ export default function SponsoredOffersRow({
                             </div>
                           </div>
 
-                          <button
-                            type="button"
+                          {/* ✅ NÃO é button (evita interativo aninhado) */}
+                          <span
                             className="text-[14px] font-semibold text-green-600"
+                            role="button"
+                            tabIndex={0}
                             onClick={(e) => {
-                              e.preventDefault();
                               e.stopPropagation();
-
-                              if (idx === 0) {
-                                openModal();
-                                return;
+                              handleCardClick();
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.stopPropagation();
+                                handleCardClick();
                               }
-
-                              if (!expanded && idx >= 1) {
-                                animateTo(true);
-                                return;
-                              }
-
-                              openModal();
                             }}
                           >
                             Ver mais
-                          </button>
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -526,7 +522,7 @@ export default function SponsoredOffersRow({
                         ].join(' ')}
                       />
                     </button>
-                  </Link>
+                  </div>
 
                   {idx < shown.length - 1 ? (
                     <div className="mx-2 border-b border-dotted border-zinc-300" />

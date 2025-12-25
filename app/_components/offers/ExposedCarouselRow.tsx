@@ -98,6 +98,15 @@ export default function ExposedCarouselRow({
   const [fav, setFav] = useState<Record<string, boolean>>({});
   const [open, setOpen] = useState(false);
 
+  function openModal(e?: React.SyntheticEvent) {
+    if (e) {
+      e.preventDefault();
+      // @ts-ignore
+      e.stopPropagation?.();
+    }
+    setOpen(true);
+  }
+
   return (
     <section className={className}>
       <SponsoredSideModal open={open} onClose={() => setOpen(false)} />
@@ -138,10 +147,7 @@ export default function ExposedCarouselRow({
                 <Link
                   href={item.href}
                   className="block active:opacity-90"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setOpen(true);
-                  }}
+                  onClick={(e) => openModal(e)}
                 >
                   <div className="relative aspect-square overflow-hidden rounded-lg bg-neutral-200">
                     {item.imageUrl ? (
@@ -174,17 +180,18 @@ export default function ExposedCarouselRow({
                       {savings}
                     </div>
 
-                    <button
-                      type="button"
-                      className="mt-2 text-[14px] font-semibold text-green-600"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setOpen(true);
+                    {/* ✅ NÃO é button (evita HTML inválido dentro do Link) */}
+                    <span
+                      className="mt-2 inline-block text-[14px] font-semibold text-green-600"
+                      onClick={(e) => openModal(e)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') openModal(e);
                       }}
                     >
                       Ver mais
-                    </button>
+                    </span>
                   </div>
                 </Link>
 
@@ -213,9 +220,7 @@ export default function ExposedCarouselRow({
             <div className="relative aspect-square overflow-hidden rounded-lg border border-dashed border-neutral-300 bg-white">
               <div className="absolute inset-0 grid place-items-center px-3 text-center">
                 <div className="leading-tight">
-                  <div className="text-sm font-semibold text-neutral-900">
-                    Ver todos
-                  </div>
+                  <div className="text-sm font-semibold text-neutral-900">Ver todos</div>
                   <div className="-mt-[2px] text-sm font-semibold text-neutral-900">
                     da {categoryLabel}
                   </div>
