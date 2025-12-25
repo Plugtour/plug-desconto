@@ -450,7 +450,7 @@ export default function QuickSearch({
               <button
                 type="button"
                 onClick={closeSheet}
-                className="absolute right-[5px] -top-9 touch-manipulation rounded-md bg-white/80 ring-1 ring-black/10 px-3 py-1.5 text-[13px] font-normal text-black/75 hover:bg-white"
+                className="absolute right-[5px] -top-9 touch-manipulation rounded-md bg-white/80 ring-1 ring-black/10 px-3 py-1.5 text-[13px] font-normal text-red-600 hover:text-red-700 hover:bg-white"
               >
                 Fechar
               </button>
