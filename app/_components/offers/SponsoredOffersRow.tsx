@@ -247,10 +247,13 @@ export default function SponsoredOffersRow({
 
   const contentRef = useRef<HTMLDivElement | null>(null);
   const animBoxRef = useRef<HTMLDivElement | null>(null);
+  const innerRef = useRef<HTMLDivElement | null>(null);
+
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const ctaRef = useRef<HTMLButtonElement | null>(null);
 
-  const [maxH, setMaxH] = useState<number>(COLLAPSED_HEIGHT);
+  // agora é height fixo (FLIP), não max-height
+  const [heightPx, setHeightPx] = useState<number>(COLLAPSED_HEIGHT);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [modalClosing, setModalClosing] = useState(false);
@@ -290,7 +293,6 @@ export default function SponsoredOffersRow({
     window.setTimeout(step, 420);
   }
 
-  // ✅ NOVO: ao recolher, garante CTA (Ver mais + seta) visível em primeiro plano
   function smoothRevealCtaAfterCollapse() {
     const btn = ctaRef.current;
     if (!btn) return;
@@ -310,40 +312,86 @@ export default function SponsoredOffersRow({
     window.setTimeout(run, 320);
   }
 
-  function animateTo(nextExpanded: boolean) {
+  // ✅ FLIP com transform (Safari-friendly)
+  function flipHeightTo(nextExpanded: boolean) {
     const contentEl = contentRef.current;
     const boxEl = animBoxRef.current;
+    const innerEl = innerRef.current;
 
-    if (!contentEl || !boxEl) {
+    if (!contentEl || !boxEl || !innerEl) {
       setExpanded(nextExpanded);
-      setMaxH(nextExpanded ? 9999 : COLLAPSED_HEIGHT);
-
+      setHeightPx(nextExpanded ? 9999 : COLLAPSED_HEIGHT);
       if (nextExpanded) smoothRevealAfterExpand();
       else smoothRevealCtaAfterCollapse();
-
       return;
     }
 
-    const currentRendered = boxEl.getBoundingClientRect().height;
-    setMaxH(currentRendered);
+    const firstH = boxEl.getBoundingClientRect().height;
 
-    const targetExpanded = Math.max(contentEl.scrollHeight, COLLAPSED_HEIGHT);
-    const target = nextExpanded ? targetExpanded : COLLAPSED_HEIGHT;
+    // calcula destino
+    const expandedH = Math.max(contentEl.scrollHeight, COLLAPSED_HEIGHT);
+    const lastH = nextExpanded ? expandedH : COLLAPSED_HEIGHT;
+
+    // aplica estado final de layout (height), mas visualmente vamos "voltar" pro primeiro via transform
+    setExpanded(nextExpanded);
+    setHeightPx(lastH);
 
     requestAnimationFrame(() => {
-      setExpanded(nextExpanded);
-      setMaxH(target);
+      const boxNow = animBoxRef.current;
+      const innerNow = innerRef.current;
+      if (!boxNow || !innerNow) return;
 
+      const lastMeasured = boxNow.getBoundingClientRect().height || lastH;
+      const scale = firstH / lastMeasured;
+
+      // se scale ~ 1, só ajusta scroll
+      if (!isFinite(scale) || Math.abs(scale - 1) < 0.001) {
+        if (nextExpanded) smoothRevealAfterExpand();
+        else smoothRevealCtaAfterCollapse();
+        return;
+      }
+
+      // prepara: box volta ao "antes" via scaleY, e inner contra-escala pra não esmagar texto/imagens
+      boxNow.style.transformOrigin = 'top';
+      innerNow.style.transformOrigin = 'top';
+      boxNow.style.transform = `scaleY(${scale})`;
+      innerNow.style.transform = `scaleY(${1 / scale})`;
+
+      const timing: KeyframeAnimationOptions = {
+        duration: 420,
+        easing: 'cubic-bezier(0.22, 0.95, 0.18, 1)',
+        fill: 'both',
+      };
+
+      const a1 = boxNow.animate(
+        [{ transform: `scaleY(${scale})` }, { transform: 'scaleY(1)' }],
+        timing
+      );
+      const a2 = innerNow.animate(
+        [{ transform: `scaleY(${1 / scale})` }, { transform: 'scaleY(1)' }],
+        timing
+      );
+
+      const cleanup = () => {
+        if (!animBoxRef.current || !innerRef.current) return;
+        animBoxRef.current.style.transform = '';
+        innerRef.current.style.transform = '';
+      };
+
+      a1.onfinish = cleanup;
+      a2.onfinish = cleanup;
+
+      // scroll pós-anima (suave)
       if (nextExpanded) smoothRevealAfterExpand();
       else smoothRevealCtaAfterCollapse();
     });
   }
 
   function toggleExpanded() {
-    animateTo(!expanded);
+    flipHeightTo(!expanded);
   }
 
-  // swipe na faixa (puxa pra baixo abre / pra cima fecha)
+  // swipe na faixa
   const startY = useRef<number | null>(null);
   const dragging = useRef(false);
 
@@ -360,8 +408,8 @@ export default function SponsoredOffersRow({
     dragging.current = false;
 
     const THRESH = 18;
-    if (dy > THRESH && !expanded) animateTo(true);
-    if (dy < -THRESH && expanded) animateTo(false);
+    if (dy > THRESH && !expanded) flipHeightTo(true);
+    if (dy < -THRESH && expanded) flipHeightTo(false);
   }
 
   function onPointerCancel() {
@@ -382,174 +430,177 @@ export default function SponsoredOffersRow({
           ref={animBoxRef}
           className="relative overflow-hidden"
           style={{
-            maxHeight: maxH,
-            transition: 'max-height 520ms cubic-bezier(0.22, 0.95, 0.18, 1)',
-            willChange: 'max-height',
+            height: heightPx,
+            willChange: 'transform',
             transform: 'translateZ(0)',
             WebkitTransform: 'translateZ(0)',
             contain: 'layout paint',
             overflowAnchor: 'none',
           }}
         >
-          <div ref={contentRef} style={{ overflowAnchor: 'none' as any }}>
-            {shown.map((item, idx) => {
-              const isFav = !!favIds[item.id];
-              const tagsLine = buildTags(item);
-              const rating = item.rating ?? 4.8;
-              const reviews = item.reviews ?? 0;
+          {/* inner para contra-escala do FLIP */}
+          <div ref={innerRef} style={{ overflowAnchor: 'none' as any }}>
+            <div ref={contentRef} style={{ overflowAnchor: 'none' as any }}>
+              {shown.map((item, idx) => {
+                const isFav = !!favIds[item.id];
+                const tagsLine = buildTags(item);
+                const rating = item.rating ?? 4.8;
+                const reviews = item.reviews ?? 0;
 
-              const clickAction = (e: React.MouseEvent) => {
-                if (idx === 0) {
+                const clickAction = (e: React.MouseEvent) => {
+                  if (idx === 0) {
+                    e.preventDefault();
+                    openModal();
+                    return;
+                  }
+
+                  if (!expanded && idx >= 1) {
+                    e.preventDefault();
+                    flipHeightTo(true);
+                    return;
+                  }
+
                   e.preventDefault();
                   openModal();
-                  return;
-                }
+                };
 
-                if (!expanded && idx >= 1) {
-                  e.preventDefault();
-                  animateTo(true);
-                  return;
-                }
+                const disableHeart = !expanded && idx >= 1;
 
-                e.preventDefault();
-                openModal();
-              };
-
-              const disableHeart = !expanded && idx >= 1;
-
-              return (
-                <div key={item.id} className="relative">
-                  <Link href={item.href} className="block py-3" onClick={clickAction}>
-                    <div className="flex gap-3">
-                      <div className="h-24 w-24 flex-none overflow-hidden rounded-md bg-zinc-200">
-                        <img
-                          src={item.imageUrl}
-                          alt={item.title}
-                          className="h-full w-full object-cover"
-                          loading="lazy"
-                        />
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <div className="pr-14 text-[11px] font-extrabold leading-snug text-zinc-900 line-clamp-2">
-                          {item.title}
+                return (
+                  <div key={item.id} className="relative">
+                    <Link href={item.href} className="block py-3" onClick={clickAction}>
+                      <div className="flex gap-3">
+                        <div className="h-24 w-24 flex-none overflow-hidden rounded-md bg-zinc-200">
+                          <img
+                            src={item.imageUrl}
+                            alt={item.title}
+                            className="h-full w-full object-cover"
+                            loading="lazy"
+                          />
                         </div>
 
-                        <div className="mt-[4px]">
-                          <div className="text-[11px] text-zinc-500 line-clamp-1">
-                            {tagsLine}
+                        <div className="min-w-0 flex-1">
+                          <div className="pr-14 text-[11px] font-extrabold leading-snug text-zinc-900 line-clamp-2">
+                            {item.title}
                           </div>
 
-                          {item.priceText ? (
-                            <div className="-mt-[2px] text-[11px] font-medium text-zinc-900">
-                              Economia de {item.priceText}
+                          <div className="mt-[4px]">
+                            <div className="text-[11px] text-zinc-500 line-clamp-1">
+                              {tagsLine}
                             </div>
-                          ) : null}
-                        </div>
 
-                        <div className="mt-1.5 flex items-end justify-between">
-                          <div>
-                            <StarsRow rating={rating} />
-                            <div className="-mt-0.5 text-[11px] text-zinc-500">
-                              <span className="font-semibold text-zinc-700">
-                                {rating.toFixed(1)}
-                              </span>{' '}
-                              de{' '}
-                              <span className="font-semibold text-zinc-700">{reviews}</span>{' '}
-                              avaliações
-                            </div>
+                            {item.priceText ? (
+                              <div className="-mt-[2px] text-[11px] font-medium text-zinc-900">
+                                Economia de {item.priceText}
+                              </div>
+                            ) : null}
                           </div>
 
-                          <button
-                            type="button"
-                            className="text-[14px] font-semibold text-green-600"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
+                          <div className="mt-1.5 flex items-end justify-between">
+                            <div>
+                              <StarsRow rating={rating} />
+                              <div className="-mt-0.5 text-[11px] text-zinc-500">
+                                <span className="font-semibold text-zinc-700">
+                                  {rating.toFixed(1)}
+                                </span>{' '}
+                                de{' '}
+                                <span className="font-semibold text-zinc-700">{reviews}</span>{' '}
+                                avaliações
+                              </div>
+                            </div>
 
-                              if (idx === 0) {
+                            <button
+                              type="button"
+                              className="text-[14px] font-semibold text-green-600"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+
+                                if (idx === 0) {
+                                  openModal();
+                                  return;
+                                }
+
+                                if (!expanded && idx >= 1) {
+                                  flipHeightTo(true);
+                                  return;
+                                }
+
                                 openModal();
-                                return;
-                              }
-
-                              if (!expanded && idx >= 1) {
-                                animateTo(true);
-                                return;
-                              }
-
-                              openModal();
-                            }}
-                          >
-                            Ver mais
-                          </button>
+                              }}
+                            >
+                              Ver mais
+                            </button>
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <button
-                      type="button"
-                      aria-label={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
-                      disabled={disableHeart}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        if (disableHeart) return;
-                        toggleFav(item.id);
-                      }}
-                      className={[
-                        'absolute right-2 top-2 inline-flex h-10 w-10 items-center justify-center',
-                        disableHeart ? 'pointer-events-none opacity-0' : '',
-                      ].join(' ')}
-                      tabIndex={disableHeart ? -1 : 0}
-                    >
-                      <HeartIcon
-                        filled={isFav}
+                      <button
+                        type="button"
+                        aria-label={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+                        disabled={disableHeart}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (disableHeart) return;
+                          toggleFav(item.id);
+                        }}
                         className={[
-                          'h-9 w-9 transition',
-                          isFav ? 'text-red-500' : 'text-zinc-300 hover:text-zinc-400',
+                          'absolute right-2 top-2 inline-flex h-10 w-10 items-center justify-center',
+                          disableHeart ? 'pointer-events-none opacity-0' : '',
                         ].join(' ')}
-                      />
-                    </button>
-                  </Link>
+                        tabIndex={disableHeart ? -1 : 0}
+                      >
+                        <HeartIcon
+                          filled={isFav}
+                          className={[
+                            'h-9 w-9 transition',
+                            isFav ? 'text-red-500' : 'text-zinc-300 hover:text-zinc-400',
+                          ].join(' ')}
+                        />
+                      </button>
+                    </Link>
 
-                  {idx < shown.length - 1 ? (
-                    <div className="mx-2 border-b border-dotted border-zinc-300" />
-                  ) : null}
-                </div>
-              );
-            })}
+                    {idx < shown.length - 1 ? (
+                      <div className="mx-2 border-b border-dotted border-zinc-300" />
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* degradê + clique abre (quando fechado) */}
+            {!expanded && (
+              <>
+                <div
+                  className="pointer-events-none absolute inset-x-0 bottom-0 z-[10]"
+                  style={{
+                    top: CARD_ROW_HEIGHT + GRADIENT_TOP_OFFSET,
+                    background:
+                      'linear-gradient(180deg, rgba(244,244,245,0) 0%, rgba(244,244,245,0.14) 52%, rgba(244,244,245,0.55) 78%, rgba(244,244,245,1) 100%)',
+                    transform: 'translateZ(0)',
+                    WebkitTransform: 'translateZ(0)',
+                    isolation: 'isolate',
+                  }}
+                />
+
+                <button
+                  type="button"
+                  aria-label="Ver mais patrocinados"
+                  className="absolute inset-x-0 bottom-0 z-[11] pointer-events-auto"
+                  style={{ top: CARD_ROW_HEIGHT + GRADIENT_TOP_OFFSET }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    flipHeightTo(true);
+                  }}
+                />
+              </>
+            )}
           </div>
-
-          {!expanded && (
-            <>
-              <div
-                className="pointer-events-none absolute inset-x-0 bottom-0 z-[10]"
-                style={{
-                  top: CARD_ROW_HEIGHT + GRADIENT_TOP_OFFSET,
-                  background:
-                    'linear-gradient(180deg, rgba(244,244,245,0) 0%, rgba(244,244,245,0.18) 52%, rgba(244,244,245,0.6) 76%, rgba(244,244,245,1) 100%)',
-                  transform: 'translateZ(0)',
-                  WebkitTransform: 'translateZ(0)',
-                  isolation: 'isolate',
-                }}
-              />
-
-              <button
-                type="button"
-                aria-label="Ver mais patrocinados"
-                className="absolute inset-x-0 bottom-0 z-[11] pointer-events-auto"
-                style={{ top: CARD_ROW_HEIGHT + GRADIENT_TOP_OFFSET }}
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  animateTo(true);
-                }}
-              />
-            </>
-          )}
         </div>
 
-        {/* ✅ CTA em primeiro plano */}
+        {/* CTA sempre no primeiro plano */}
         <button
           ref={ctaRef}
           type="button"
