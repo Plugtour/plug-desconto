@@ -72,7 +72,7 @@ function SponsoredSideModal({
             Fechar
           </button>
 
-          <div className="h-full w-full rounded-tr-none rounded-br-none rounded-bl-none rounded-tl-md bg-zinc-100 ring-1 ring-black/10">
+          <div className="h-full w-full rounded-tl-md bg-zinc-100 ring-1 ring-black/10">
             {/* conteúdo futuro */}
           </div>
         </div>
@@ -155,7 +155,7 @@ export default function ExposedCarouselRow({
                       <div className="h-full w-full bg-neutral-300" />
                     )}
 
-                    {/* ⭐ TEXTO NA FOTO (estrela amarela + texto 1px menor) */}
+                    {/* ★ TEXTO DENTRO DA FOTO */}
                     <div className="absolute left-2 top-2 rounded-md bg-black/25 px-2 py-1 backdrop-blur-[4px] ring-1 ring-white/15 pointer-events-none">
                       <div className="leading-none">
                         <span className="text-[12px] font-semibold text-amber-400">★</span>{' '}
@@ -205,27 +205,25 @@ export default function ExposedCarouselRow({
             );
           })}
 
-          {/* Último card: ver todos */}
-          <Link href={viewAllHref} className="min-w-[144px] max-w-[144px] flex-shrink-0">
+          {/* ÚLTIMO CARD — SOMENTE CONTEÚDO INTERNO */}
+          <Link
+            href={viewAllHref}
+            className="min-w-[144px] max-w-[144px] flex-shrink-0"
+          >
             <div className="relative aspect-square overflow-hidden rounded-lg border border-dashed border-neutral-300 bg-white">
               <div className="absolute inset-0 grid place-items-center px-3 text-center">
-                <div>
-                  <div className="text-sm font-semibold text-neutral-900">Ver todos</div>
-                  <div className="mt-1 text-sm font-semibold text-neutral-900">
+                <div className="leading-tight">
+                  <div className="text-sm font-semibold text-neutral-900">
+                    Ver todos
+                  </div>
+                  <div className="-mt-[2px] text-sm font-semibold text-neutral-900">
                     da {categoryLabel}
                   </div>
-                  <div className="mt-2 text-xs font-medium text-neutral-500">
+                  <div className="mt-[2px] text-xs font-medium text-neutral-500">
                     {categoryCount} opções
                   </div>
                 </div>
               </div>
-            </div>
-
-            <div className="mt-2">
-              <div className="text-sm font-semibold text-emerald-700">
-                Ver todas ({categoryCount})
-              </div>
-              <div className="mt-1 text-[12px] text-neutral-500">Abrir lista completa</div>
             </div>
           </Link>
         </div>
