@@ -7,9 +7,9 @@ import HomeBanner from './HomeBanner';
 import QuickSearch from './search/QuickSearch';
 import type { SearchCategory, SearchOffer } from './search/types';
 
-// ✅ trocar alias @ por imports relativos (sem depender de tsconfig paths)
 import SponsoredOffersRow from './offers/SponsoredOffersRow';
-// ✅ como sua pasta _data está na raiz, subimos 2 níveis: app/_components -> app -> raiz
+import ExposedCarouselRow from './offers/ExposedCarouselRow';
+
 import { SPONSORED_OFFERS } from '../../_data/sponsoredOffers';
 
 /* =========================
@@ -195,12 +195,7 @@ function Icon({
             strokeWidth="2"
             strokeLinejoin="round"
           />
-          <path
-            d="M6 11h12v6H6v-6z"
-            stroke="#06B6D4"
-            strokeWidth="2"
-            strokeLinejoin="round"
-          />
+          <path d="M6 11h12v6H6v-6z" stroke="#06B6D4" strokeWidth="2" strokeLinejoin="round" />
           <path
             d="M8 17.2a1.2 1.2 0 1 0 0-2.4 1.2 1.2 0 0 0 0 2.4zM16 17.2a1.2 1.2 0 1 0 0-2.4 1.2 1.2 0 0 0 0 2.4z"
             stroke="#06B6D4"
@@ -255,6 +250,12 @@ export default function HomeScreenClient({
     ],
     []
   );
+
+  const gastronomyCount = useMemo(() => {
+    return categories
+      .filter((c) => c.title === 'Gastronomia')
+      .reduce((sum, c) => sum + (Number(c.count) || 0), 0);
+  }, [categories]);
 
   const searchCategories: SearchCategory[] = useMemo(() => {
     return categories.map((c) => ({ id: c.id, title: c.title, count: c.count }));
@@ -568,13 +569,29 @@ export default function HomeScreenClient({
 
       <HomeBanner className="mt-4" />
 
-      {/* BUSCA RÁPIDA (modal + resultados + categorias) */}
       <div className="px-4 mt-3 pb-2">
         <QuickSearch offers={searchData} categories={searchCategories} />
       </div>
 
-      {/* PATROCINADOS */}
       <SponsoredOffersRow items={SPONSORED_OFFERS} className="mt-4" />
+
+      <ExposedCarouselRow
+        className="mt-6"
+        title="Você também pode gostar"
+        categoryLabel="Gastronomia"
+        categoryCount={gastronomyCount}
+        viewAllHref="/gastronomia"
+        items={[
+          { id: 'r1', title: 'Cantina da Serra — Massas artesanais', imageUrl: '/images/gastronomia/rest-01.webp', href: '#', savingsText: 'Economia de R$30 a R$90', rating: 4.9, reviews: 812 },
+          { id: 'r2', title: 'Bistrô do Vale — Menu executivo', imageUrl: '/images/gastronomia/rest-02.webp', href: '#', savingsText: 'Economia de R$25 a R$80', rating: 4.8, reviews: 524 },
+          { id: 'r3', title: 'Casa do Fondue — Sequência completa', imageUrl: '/images/gastronomia/rest-03.webp', href: '#', savingsText: 'Economia de R$40 a R$120', rating: 4.8, reviews: 673 },
+          { id: 'r4', title: 'Churrasco & Brasa — Rodízio premium', imageUrl: '/images/gastronomia/rest-04.webp', href: '#', savingsText: 'Economia de R$35 a R$110', rating: 4.7, reviews: 391 },
+          { id: 'r5', title: 'Café Colonial do Centro — Tradição', imageUrl: '/images/gastronomia/rest-05.webp', href: '#', savingsText: 'Economia de R$20 a R$70', rating: 4.8, reviews: 980 },
+          { id: 'r6', title: 'Pizzaria da Rua Coberta — Forno a lenha', imageUrl: '/images/gastronomia/rest-06.webp', href: '#', savingsText: 'Economia de R$18 a R$60', rating: 4.6, reviews: 268 },
+          { id: 'r7', title: 'Hamburgueria da Praça — Combo especial', imageUrl: '/images/gastronomia/rest-07.webp', href: '#', savingsText: 'Economia de R$15 a R$50', rating: 4.7, reviews: 457 },
+          { id: 'r8', title: 'Doce & Cia — Sobremesas e cafés', imageUrl: '/images/gastronomia/rest-08.webp', href: '#', savingsText: 'Economia de R$10 a R$35', rating: 4.9, reviews: 621 },
+        ]}
+      />
 
       {/* resto da Home depois */}
     </div>
