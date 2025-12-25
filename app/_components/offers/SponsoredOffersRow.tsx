@@ -270,29 +270,32 @@ export default function SponsoredOffersRow({
     setFavIds((prev) => ({ ...prev, [id]: !prev[id] }));
   }
 
-  // ✅ ao expandir: rolar pra mostrar os novos cards
-  function scrollToReveal() {
+  // ✅ ao expandir: rolar pra mostrar os novos cards (mais “agressivo” e consistente)
+  function scrollToRevealAfterExpand() {
     const el = wrapperRef.current;
     if (!el) return;
 
-    // espera um tick pra layout refletir o maxHeight
-    window.setTimeout(() => {
+    const run = () => {
       const rect = el.getBoundingClientRect();
       const viewportBottom = window.innerHeight - 12;
-
       if (rect.bottom > viewportBottom) {
         const delta = rect.bottom - viewportBottom;
         window.scrollBy({ top: delta, behavior: 'smooth' });
       }
-    }, 60);
+    };
+
+    window.setTimeout(run, 120);
+    window.setTimeout(run, 260);
+    window.setTimeout(run, 360);
   }
 
   function animateTo(nextExpanded: boolean) {
     const el = contentRef.current;
+
     if (!el) {
       setExpanded(nextExpanded);
       setMaxH(nextExpanded ? 9999 : COLLAPSED_HEIGHT);
-      if (nextExpanded) scrollToReveal();
+      if (nextExpanded) scrollToRevealAfterExpand();
       return;
     }
 
@@ -304,7 +307,7 @@ export default function SponsoredOffersRow({
     requestAnimationFrame(() => {
       setExpanded(nextExpanded);
       setMaxH(target);
-      if (nextExpanded) scrollToReveal();
+      if (nextExpanded) scrollToRevealAfterExpand();
     });
   }
 
@@ -362,24 +365,35 @@ export default function SponsoredOffersRow({
               const rating = item.rating ?? 4.8;
               const reviews = item.reviews ?? 0;
 
-              const disableWhenCollapsed = !expanded && idx >= 1;
+              // ✅ regra: quando fechado
+              // - card 1 (idx 0): abre modal
+              // - card 2+ (idx>=1): clique deve EXPANDIR, não abrir modal
+              const clickAction = (e: React.MouseEvent) => {
+                // card 1 sempre abre modal
+                if (idx === 0) {
+                  e.preventDefault();
+                  openModal();
+                  return;
+                }
+
+                // quando fechado, qualquer clique no card 2+ apenas expande
+                if (!expanded && idx >= 1) {
+                  e.preventDefault();
+                  animateTo(true);
+                  return;
+                }
+
+                // quando expandido, cards 2+ podem abrir modal
+                e.preventDefault();
+                openModal();
+              };
+
+              // ✅ coração: quando fechado, só no card 1 fica interativo
+              const disableHeart = !expanded && idx >= 1;
 
               return (
                 <div key={item.id} className="relative">
-                  <Link
-                    href={item.href}
-                    className={[
-                      'block py-3',
-                      disableWhenCollapsed ? 'pointer-events-none' : '',
-                    ].join(' ')}
-                    aria-hidden={disableWhenCollapsed}
-                    tabIndex={disableWhenCollapsed ? -1 : 0}
-                    onClick={(e) => {
-                      if (disableWhenCollapsed) return;
-                      e.preventDefault();
-                      openModal();
-                    }}
-                  >
+                  <Link href={item.href} className="block py-3" onClick={clickAction}>
                     <div className="flex gap-3">
                       <div className="h-24 w-24 flex-none overflow-hidden rounded-md bg-zinc-200">
                         <img
@@ -430,18 +444,18 @@ export default function SponsoredOffersRow({
                     <button
                       type="button"
                       aria-label={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
-                      disabled={disableWhenCollapsed}
+                      disabled={disableHeart}
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        if (disableWhenCollapsed) return;
+                        if (disableHeart) return;
                         toggleFav(item.id);
                       }}
                       className={[
                         'absolute right-2 top-2 inline-flex h-10 w-10 items-center justify-center',
-                        disableWhenCollapsed ? 'pointer-events-none opacity-0' : '',
+                        disableHeart ? 'pointer-events-none opacity-0' : '',
                       ].join(' ')}
-                      tabIndex={disableWhenCollapsed ? -1 : 0}
+                      tabIndex={disableHeart ? -1 : 0}
                     >
                       <HeartIcon
                         filled={isFav}
@@ -461,18 +475,24 @@ export default function SponsoredOffersRow({
             })}
           </div>
 
-          {/* ✅ Degradê reforçado (Safari iOS) + clique abre */}
+          {/* ✅ Degradê (Safari iPhone) + clique abre EXPANSÃO */}
           {!expanded && (
             <>
               <div
-                className="pointer-events-none absolute inset-x-0 bottom-0 z-[5] h-20 bg-gradient-to-b from-zinc-100/0 via-zinc-100/70 to-zinc-100"
-                style={{ transform: 'translateZ(0)' }}
+                className="pointer-events-none absolute inset-x-0 bottom-0 z-[10] h-20"
+                style={{
+                  background:
+                    'linear-gradient(180deg, rgba(244,244,245,0) 0%, rgba(244,244,245,0.68) 45%, rgba(244,244,245,1) 100%)',
+                  transform: 'translateZ(0)',
+                  WebkitTransform: 'translateZ(0)',
+                  isolation: 'isolate',
+                }}
               />
 
               <button
                 type="button"
                 aria-label="Ver mais patrocinados"
-                className="absolute inset-x-0 bottom-0 z-[6] h-20 pointer-events-auto"
+                className="absolute inset-x-0 bottom-0 z-[11] h-20 pointer-events-auto"
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -483,6 +503,7 @@ export default function SponsoredOffersRow({
           )}
         </div>
 
+        {/* ✅ botão “Ver mais” sempre EXPANDE (não abre modal) */}
         <button
           type="button"
           onClick={toggleExpanded}
