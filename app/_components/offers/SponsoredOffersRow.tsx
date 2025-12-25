@@ -218,10 +218,10 @@ function SponsoredSideModal({
           }
         }
         .side-enter {
-          animation: sideEnter 260ms ease-out both;
+          animation: sideEnter 280ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
         }
         .side-exit {
-          animation: sideExit 240ms ease-in both;
+          animation: sideExit 240ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
         }
       `}</style>
     </div>
@@ -241,10 +241,12 @@ export default function SponsoredOffersRow({
   const [favIds, setFavIds] = useState<Record<string, boolean>>({});
   const [expanded, setExpanded] = useState(false);
 
+  // altura compacta por card (tem que bater com o layout atual)
   const CARD_ROW_HEIGHT = 108;
   const COLLAPSED_HEIGHT = Math.round(CARD_ROW_HEIGHT * 1.5) + 5;
 
   const contentRef = useRef<HTMLDivElement | null>(null);
+  const animBoxRef = useRef<HTMLDivElement | null>(null);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const [maxH, setMaxH] = useState<number>(COLLAPSED_HEIGHT);
 
@@ -286,21 +288,25 @@ export default function SponsoredOffersRow({
     window.setTimeout(run, 360);
   }
 
+  // ✅ animação mais suave: trava menos no iPhone
   function animateTo(nextExpanded: boolean) {
-    const el = contentRef.current;
+    const contentEl = contentRef.current;
+    const boxEl = animBoxRef.current;
 
-    if (!el) {
+    if (!contentEl || !boxEl) {
       setExpanded(nextExpanded);
       setMaxH(nextExpanded ? 9999 : COLLAPSED_HEIGHT);
       if (nextExpanded) scrollToRevealAfterExpand();
       return;
     }
 
-    const current = maxH;
-    const targetExpanded = Math.max(el.scrollHeight, COLLAPSED_HEIGHT);
+    // altura atual renderizada (não “maxH” teórico)
+    const currentRendered = boxEl.getBoundingClientRect().height;
+    setMaxH(currentRendered);
+
+    const targetExpanded = Math.max(contentEl.scrollHeight, COLLAPSED_HEIGHT);
     const target = nextExpanded ? targetExpanded : COLLAPSED_HEIGHT;
 
-    setMaxH(current);
     requestAnimationFrame(() => {
       setExpanded(nextExpanded);
       setMaxH(target);
@@ -312,6 +318,7 @@ export default function SponsoredOffersRow({
     animateTo(!expanded);
   }
 
+  // swipe na faixa (puxa pra baixo abre / pra cima fecha)
   const startY = useRef<number | null>(null);
   const dragging = useRef(false);
 
@@ -347,11 +354,14 @@ export default function SponsoredOffersRow({
 
       <div ref={wrapperRef} className="relative px-3">
         <div
+          ref={animBoxRef}
           className="relative overflow-hidden"
           style={{
             maxHeight: maxH,
-            transition: 'max-height 320ms ease-out',
+            transition: 'max-height 420ms cubic-bezier(0.2, 0.9, 0.2, 1)',
             willChange: 'max-height',
+            transform: 'translateZ(0)',
+            WebkitTransform: 'translateZ(0)',
           }}
         >
           <div ref={contentRef}>
@@ -361,26 +371,28 @@ export default function SponsoredOffersRow({
               const rating = item.rating ?? 4.8;
               const reviews = item.reviews ?? 0;
 
+              // ✅ regra de clique no card:
+              // - card 1 sempre abre modal
+              // - fechado: cards 2+ expandem
+              // - expandido: cards 2+ abrem modal
               const clickAction = (e: React.MouseEvent) => {
-                // card 1: sempre modal
                 if (idx === 0) {
                   e.preventDefault();
                   openModal();
                   return;
                 }
 
-                // fechado: card 2+ expande
                 if (!expanded && idx >= 1) {
                   e.preventDefault();
                   animateTo(true);
                   return;
                 }
 
-                // expandido: card 2+ modal
                 e.preventDefault();
                 openModal();
               };
 
+              // ✅ coração: quando fechado, só card 1 interativo
               const disableHeart = !expanded && idx >= 1;
 
               return (
@@ -426,7 +438,11 @@ export default function SponsoredOffersRow({
                             </div>
                           </div>
 
-                          {/* ✅ “Ver mais” DO CARD: comportamento correto */}
+                          {/* ✅ “Ver mais” do card:
+                              - card 1: modal sempre (mesmo fechado)
+                              - fechado e card 2+: expande
+                              - expandido: modal
+                          */}
                           <button
                             type="button"
                             className="text-[14px] font-semibold text-green-600"
@@ -434,19 +450,16 @@ export default function SponsoredOffersRow({
                               e.preventDefault();
                               e.stopPropagation();
 
-                              // card 1: modal sempre
                               if (idx === 0) {
                                 openModal();
                                 return;
                               }
 
-                              // fechado e card 2+: expande
                               if (!expanded && idx >= 1) {
                                 animateTo(true);
                                 return;
                               }
 
-                              // expandido: modal
                               openModal();
                             }}
                           >
@@ -490,14 +503,17 @@ export default function SponsoredOffersRow({
             })}
           </div>
 
-          {/* ✅ Degradê + clique expande (Safari iOS) */}
+          {/* ✅ Degradê + clique (NÃO cobre o card 1)
+              Começa a partir do topo do 2º card (top = CARD_ROW_HEIGHT)
+          */}
           {!expanded && (
             <>
               <div
-                className="pointer-events-none absolute inset-x-0 bottom-0 z-[10] h-20"
+                className="pointer-events-none absolute inset-x-0 bottom-0 z-[10]"
                 style={{
+                  top: CARD_ROW_HEIGHT, // ✅ não invade o card 1
                   background:
-                    'linear-gradient(180deg, rgba(244,244,245,0) 0%, rgba(244,244,245,0.68) 45%, rgba(244,244,245,1) 100%)',
+                    'linear-gradient(180deg, rgba(244,244,245,0) 0%, rgba(244,244,245,0.65) 45%, rgba(244,244,245,1) 100%)',
                   transform: 'translateZ(0)',
                   WebkitTransform: 'translateZ(0)',
                   isolation: 'isolate',
@@ -507,7 +523,8 @@ export default function SponsoredOffersRow({
               <button
                 type="button"
                 aria-label="Ver mais patrocinados"
-                className="absolute inset-x-0 bottom-0 z-[11] h-20 pointer-events-auto"
+                className="absolute inset-x-0 bottom-0 z-[11] pointer-events-auto"
+                style={{ top: CARD_ROW_HEIGHT }} // ✅ clique só no pedaço do card 2
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -518,7 +535,7 @@ export default function SponsoredOffersRow({
           )}
         </div>
 
-        {/* Botão “Ver mais” (faixa) sempre expande */}
+        {/* Faixa “Ver mais” sempre expande */}
         <button
           type="button"
           onClick={toggleExpanded}
