@@ -248,7 +248,6 @@ export default function SponsoredOffersRow({
   const contentRef = useRef<HTMLDivElement | null>(null);
   const animBoxRef = useRef<HTMLDivElement | null>(null);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
-  const ctaRef = useRef<HTMLButtonElement | null>(null);
 
   const [maxH, setMaxH] = useState<number>(COLLAPSED_HEIGHT);
 
@@ -290,26 +289,6 @@ export default function SponsoredOffersRow({
     window.setTimeout(step, 420);
   }
 
-  // ✅ NOVO: ao recolher, garante CTA (Ver mais + seta) visível em primeiro plano
-  function smoothRevealCtaAfterCollapse() {
-    const btn = ctaRef.current;
-    if (!btn) return;
-
-    const run = () => {
-      const rect = btn.getBoundingClientRect();
-      const topSafe = 12;
-      const bottomSafe = window.innerHeight - 12;
-
-      if (rect.top < topSafe || rect.bottom > bottomSafe) {
-        btn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
-      }
-    };
-
-    requestAnimationFrame(() => requestAnimationFrame(run));
-    window.setTimeout(run, 180);
-    window.setTimeout(run, 320);
-  }
-
   function animateTo(nextExpanded: boolean) {
     const contentEl = contentRef.current;
     const boxEl = animBoxRef.current;
@@ -317,25 +296,24 @@ export default function SponsoredOffersRow({
     if (!contentEl || !boxEl) {
       setExpanded(nextExpanded);
       setMaxH(nextExpanded ? 9999 : COLLAPSED_HEIGHT);
-
       if (nextExpanded) smoothRevealAfterExpand();
-      else smoothRevealCtaAfterCollapse();
-
       return;
     }
 
+    // 1) trava no tamanho atual (evita “pulo”)
     const currentRendered = boxEl.getBoundingClientRect().height;
     setMaxH(currentRendered);
 
+    // 2) no próximo frame, aplica o destino (evita engasgo no iOS)
     const targetExpanded = Math.max(contentEl.scrollHeight, COLLAPSED_HEIGHT);
     const target = nextExpanded ? targetExpanded : COLLAPSED_HEIGHT;
 
     requestAnimationFrame(() => {
-      setExpanded(nextExpanded);
-      setMaxH(target);
-
-      if (nextExpanded) smoothRevealAfterExpand();
-      else smoothRevealCtaAfterCollapse();
+      requestAnimationFrame(() => {
+        setExpanded(nextExpanded);
+        setMaxH(target);
+        if (nextExpanded) smoothRevealAfterExpand();
+      });
     });
   }
 
@@ -383,7 +361,10 @@ export default function SponsoredOffersRow({
           className="relative overflow-hidden"
           style={{
             maxHeight: maxH,
-            transition: 'max-height 520ms cubic-bezier(0.22, 0.95, 0.18, 1)',
+            // ✅ mais suave no iOS: duração maior + easing “macio”
+            transition: expanded
+              ? 'max-height 760ms cubic-bezier(0.2, 0.95, 0.2, 1)'
+              : 'max-height 820ms cubic-bezier(0.2, 0.95, 0.2, 1)',
             willChange: 'max-height',
             transform: 'translateZ(0)',
             WebkitTransform: 'translateZ(0)',
@@ -527,7 +508,7 @@ export default function SponsoredOffersRow({
                 style={{
                   top: CARD_ROW_HEIGHT + GRADIENT_TOP_OFFSET,
                   background:
-                    'linear-gradient(180deg, rgba(244,244,245,0) 0%, rgba(244,244,245,0.18) 52%, rgba(244,244,245,0.6) 76%, rgba(244,244,245,1) 100%)',
+                    'linear-gradient(180deg, rgba(244,244,245,0) 0%, rgba(244,244,245,0.14) 52%, rgba(244,244,245,0.55) 78%, rgba(244,244,245,1) 100%)',
                   transform: 'translateZ(0)',
                   WebkitTransform: 'translateZ(0)',
                   isolation: 'isolate',
@@ -549,15 +530,13 @@ export default function SponsoredOffersRow({
           )}
         </div>
 
-        {/* ✅ CTA em primeiro plano */}
         <button
-          ref={ctaRef}
           type="button"
           onClick={toggleExpanded}
           onPointerDown={onPointerDown}
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerCancel}
-          className="relative z-[50] mt-3 w-full touch-manipulation select-none flex flex-col items-center justify-center gap-[5px]"
+          className="mt-3 w-full touch-manipulation select-none flex flex-col items-center justify-center gap-[5px]"
           style={{ touchAction: 'pan-y' }}
           aria-label={expanded ? 'Ver menos patrocinados' : 'Ver mais patrocinados'}
         >
