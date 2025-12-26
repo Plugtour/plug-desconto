@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { SponsoredOffer } from '../../../_data/sponsoredOffers';
 
 type Props = {
@@ -82,7 +82,7 @@ function HeartIcon({
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      <path d="M12 21C12 21 4 15.36 4 9.5C4 7.02 6.02 5 8.5 5C10.04 5 11.4 5.81 12 7C12.6 5.81 13.96 5 15.5 5C17.98 5 20 7.02 20 9.5C20 15.36 12 21 12 21Z" />
+      <path d="M12 21C12 21 4 15.36 4 9.5C4 7.02 6.02 5 8.5 5C10.04 5.81 11.4 5.81 12 7C12.6 5.81 13.96 5 15.5 5C17.98 5 20 7.02 20 9.5C20 15.36 12 21 12 21Z" />
     </svg>
   );
 }
@@ -117,6 +117,7 @@ function DoubleChevronOpen({
 
 /* =========================
    MODAL LATERAL (entra da direita)
+   + TRAVA SCROLL DO SITE ATRÁS
 ========================= */
 function SponsoredSideModal({
   open,
@@ -127,6 +128,34 @@ function SponsoredSideModal({
   closing: boolean;
   onClose: () => void;
 }) {
+  // ✅ trava o scroll do site atrás enquanto o modal estiver aberto
+  useEffect(() => {
+    if (!open) return;
+
+    const scrollY = window.scrollY || 0;
+
+    // trava
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.left = '0';
+    document.body.style.right = '0';
+    document.body.style.width = '100%';
+
+    // destrava + volta no mesmo ponto
+    return () => {
+      const top = document.body.style.top;
+      const y = top ? Math.abs(parseInt(top, 10)) : scrollY;
+
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.left = '';
+      document.body.style.right = '';
+      document.body.style.width = '';
+
+      window.scrollTo(0, y);
+    };
+  }, [open]);
+
   if (!open) return null;
 
   return (
@@ -426,7 +455,6 @@ export default function SponsoredOffersRow({
 
               return (
                 <div key={item.id} className="relative">
-                  {/* ✅ NÃO usamos Link aqui para evitar nested interactive */}
                   <div
                     role="button"
                     tabIndex={0}
@@ -452,9 +480,7 @@ export default function SponsoredOffersRow({
                         </div>
 
                         <div className="mt-[4px]">
-                          <div className="text-[11px] text-zinc-500 line-clamp-1">
-                            {tagsLine}
-                          </div>
+                          <div className="text-[11px] text-zinc-500 line-clamp-1">{tagsLine}</div>
 
                           {item.priceText ? (
                             <div className="-mt-[2px] text-[11px] font-medium text-zinc-900">
@@ -467,16 +493,12 @@ export default function SponsoredOffersRow({
                           <div>
                             <StarsRow rating={rating} />
                             <div className="-mt-0.5 text-[11px] text-zinc-500">
-                              <span className="font-semibold text-zinc-700">
-                                {rating.toFixed(1)}
-                              </span>{' '}
-                              de{' '}
-                              <span className="font-semibold text-zinc-700">{reviews}</span>{' '}
+                              <span className="font-semibold text-zinc-700">{rating.toFixed(1)}</span>{' '}
+                              de <span className="font-semibold text-zinc-700">{reviews}</span>{' '}
                               avaliações
                             </div>
                           </div>
 
-                          {/* ✅ NÃO é button (evita interativo aninhado) */}
                           <span
                             className="text-[14px] font-semibold text-green-600"
                             role="button"

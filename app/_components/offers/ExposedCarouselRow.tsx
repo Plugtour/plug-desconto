@@ -43,7 +43,8 @@ function HeartIcon({ filled }: { filled: boolean }) {
 }
 
 /* =========================
-   MODAL LATERAL (MESMO DO PATROCINADO)
+   MODAL LATERAL (mesmo padrão do patrocinado)
+   + TRAVA SCROLL ATRÁS
 ========================= */
 function SponsoredSideModal({
   open,
@@ -54,6 +55,34 @@ function SponsoredSideModal({
   closing: boolean;
   onClose: () => void;
 }) {
+  // 🔒 trava o scroll do site enquanto o modal estiver aberto
+  useEffect(() => {
+    if (!open) return;
+
+    const scrollY = window.scrollY || 0;
+
+    // trava
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.left = '0';
+    document.body.style.right = '0';
+    document.body.style.width = '100%';
+
+    // destrava e volta pro mesmo ponto
+    return () => {
+      const top = document.body.style.top;
+      const y = top ? Math.abs(parseInt(top, 10)) : scrollY;
+
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.left = '';
+      document.body.style.right = '';
+      document.body.style.width = '';
+
+      window.scrollTo(0, y);
+    };
+  }, [open]);
+
   if (!open) return null;
 
   return (
@@ -245,9 +274,7 @@ export default function ExposedCarouselRow({
               <div className="mt-1 text-sm font-semibold text-neutral-900">
                 da {categoryLabel}
               </div>
-              <div className="mt-2 text-xs font-medium text-neutral-500">
-                {categoryCount} opções
-              </div>
+              <div className="mt-2 text-xs font-medium text-neutral-500">{categoryCount} opções</div>
             </div>
           </div>
         </div>
@@ -265,9 +292,7 @@ export default function ExposedCarouselRow({
               <div className="mt-1 text-sm font-semibold text-neutral-900">
                 da {categoryLabel}
               </div>
-              <div className="mt-2 text-xs font-medium text-neutral-500">
-                {categoryCount} opções
-              </div>
+              <div className="mt-2 text-xs font-medium text-neutral-500">{categoryCount} opções</div>
             </div>
           </div>
         </div>
@@ -283,9 +308,7 @@ export default function ExposedCarouselRow({
       <div className="px-4 mb-2 flex items-center justify-between">
         <div className="leading-tight">
           <h2 className="text-base font-semibold text-neutral-900 leading-tight">{title}</h2>
-          <div className="text-sm font-medium text-neutral-600 leading-tight">
-            {categoryLabel}
-          </div>
+          <div className="text-sm font-medium text-neutral-600 leading-tight">{categoryLabel}</div>
         </div>
 
         {!hideViewAll ? (
@@ -319,10 +342,7 @@ export default function ExposedCarouselRow({
               const savings = item.savingsText ?? 'Economia de R$50 a R$190';
 
               return (
-                <div
-                  key={item.id}
-                  className="relative min-w-[144px] max-w-[144px] flex-shrink-0"
-                >
+                <div key={item.id} className="relative min-w-[144px] max-w-[144px] flex-shrink-0">
                   <Link
                     href={item.href}
                     className="block active:opacity-90"
@@ -348,9 +368,7 @@ export default function ExposedCarouselRow({
                         {item.title}
                       </div>
 
-                      <div className="mt-1 text-[12px] font-medium text-neutral-700">
-                        {savings}
-                      </div>
+                      <div className="mt-1 text-[12px] font-medium text-neutral-700">{savings}</div>
 
                       <button
                         type="button"
@@ -396,10 +414,7 @@ export default function ExposedCarouselRow({
               const isFav = !!fav[item.id];
 
               return (
-                <div
-                  key={item.id}
-                  className="relative min-w-[144px] max-w-[144px] flex-shrink-0"
-                >
+                <div key={item.id} className="relative min-w-[144px] max-w-[144px] flex-shrink-0">
                   <Link
                     href={item.href}
                     className="block active:opacity-90"
@@ -437,7 +452,7 @@ export default function ExposedCarouselRow({
                       <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/80 to-transparent" />
 
                       <div className="absolute bottom-2 left-2 right-2 overflow-hidden">
-                        {/* 3 linhas “na marra”: sem reticências, apenas corta */}
+                        {/* sem reticências: apenas corta o excesso */}
                         <div className="text-sm font-medium text-white leading-snug max-h-[3.9em] overflow-hidden">
                           {item.title}
                         </div>
