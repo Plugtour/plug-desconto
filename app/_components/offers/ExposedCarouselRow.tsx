@@ -57,12 +57,10 @@ function SponsoredSideModal({
 }) {
   const [mounted, setMounted] = useState(open);
 
-  // monta quando abrir
   useEffect(() => {
     if (open) setMounted(true);
   }, [open]);
 
-  // trava scroll do body e preserva posição
   useEffect(() => {
     if (!open) return;
 
@@ -92,7 +90,6 @@ function SponsoredSideModal({
 
   return (
     <div className="fixed inset-0 z-[999]">
-      {/* Backdrop */}
       <button
         type="button"
         aria-label="Fechar"
@@ -105,7 +102,6 @@ function SponsoredSideModal({
         ].join(' ')}
       />
 
-      {/* Painel */}
       <div className="absolute inset-0">
         <div
           className={[
@@ -196,6 +192,9 @@ export default function ExposedCarouselRow({
     );
   }
 
+  /* =========================
+     ÚLTIMO CARD (1º carrossel) — sem texto embaixo
+  ========================= */
   function ViewAllCardDefault() {
     return (
       <Link href={viewAllHref} className="min-w-[144px] max-w-[144px] flex-shrink-0">
@@ -211,13 +210,6 @@ export default function ExposedCarouselRow({
               </div>
             </div>
           </div>
-        </div>
-
-        <div className="mt-2">
-          <div className="text-sm font-semibold text-emerald-700">
-            Ver todas ({categoryCount})
-          </div>
-          <div className="mt-1 text-[12px] text-neutral-500">Abrir lista completa</div>
         </div>
       </Link>
     );
@@ -247,7 +239,6 @@ export default function ExposedCarouselRow({
     <section className={className}>
       <SponsoredSideModal open={open} onClose={() => setOpen(false)} />
 
-      {/* Cabeçalho + ocultar ao chegar no último card */}
       <div className="px-4 mb-2 flex items-center justify-between">
         <div className="leading-tight">
           <h2 className="text-base font-semibold text-neutral-900 leading-tight">{title}</h2>
@@ -270,7 +261,6 @@ export default function ExposedCarouselRow({
         )}
       </div>
 
-      {/* Carrossel */}
       <div className="relative">
         <div
           ref={scrollRef}
