@@ -24,7 +24,7 @@ type Props = {
 };
 
 /* =========================
-   CORAÇÃO (path aprovado)
+   CORAÇÃO
 ========================= */
 function HeartIcon({ filled }: { filled: boolean }) {
   return (
@@ -43,7 +43,7 @@ function HeartIcon({ filled }: { filled: boolean }) {
 }
 
 /* =========================
-   MODAL (estrutura igual patrocinado)
+   MODAL LATERAL
 ========================= */
 function SponsoredSideModal({
   open,
@@ -60,22 +60,20 @@ function SponsoredSideModal({
         type="button"
         aria-label="Fechar"
         onClick={onClose}
-        className="absolute inset-0 rounded-md bg-black/35 backdrop-blur-[6px] touch-manipulation"
+        className="absolute inset-0 rounded-md bg-black/35 backdrop-blur-[6px]"
       />
 
       <div className="absolute inset-0">
-        <div className="absolute right-0 top-[50px] bottom-0 w-[calc(100%-12px)] max-w-md touch-manipulation">
+        <div className="absolute right-0 top-[50px] bottom-0 w-[calc(100%-12px)] max-w-md">
           <button
             type="button"
             onClick={onClose}
-            className="absolute left-0 -top-9 touch-manipulation rounded-md bg-white/80 ring-1 ring-black/10 px-3 py-1.5 text-[13px] font-normal text-red-500 hover:text-red-600 hover:bg-white"
+            className="absolute left-0 -top-9 rounded-md bg-white/80 ring-1 ring-black/10 px-3 py-1.5 text-[13px] text-red-500 hover:text-red-600"
           >
             Fechar
           </button>
 
-          <div className="h-full w-full rounded-tl-md bg-zinc-100 ring-1 ring-black/10">
-            {/* conteúdo futuro */}
-          </div>
+          <div className="h-full w-full rounded-tl-md bg-zinc-100 ring-1 ring-black/10" />
         </div>
       </div>
     </div>
@@ -100,7 +98,6 @@ export default function ExposedCarouselRow({
   const [fav, setFav] = useState<Record<string, boolean>>({});
   const [open, setOpen] = useState(false);
 
-  // ✅ esconde "Ver todas" quando chega no fim do scroll
   const [hideViewAll, setHideViewAll] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
@@ -108,11 +105,8 @@ export default function ExposedCarouselRow({
     function onScroll() {
       const el = scrollRef.current;
       if (!el) return;
-
-      const tolerance = 4; // px
-      const reachedEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - tolerance;
-
-      setHideViewAll(reachedEnd);
+      const tol = 4;
+      setHideViewAll(el.scrollLeft + el.clientWidth >= el.scrollWidth - tol);
     }
 
     const el = scrollRef.current;
@@ -125,11 +119,9 @@ export default function ExposedCarouselRow({
   }, []);
 
   function openModal(e?: React.SyntheticEvent) {
-    if (e) {
-      e.preventDefault();
-      // @ts-ignore
-      e.stopPropagation?.();
-    }
+    e?.preventDefault();
+    // @ts-ignore
+    e?.stopPropagation?.();
     setOpen(true);
   }
 
@@ -139,24 +131,20 @@ export default function ExposedCarouselRow({
 
       {/* Cabeçalho */}
       <div className="px-4 mb-2 flex items-center justify-between">
-        <div className="leading-tight">
-          <h2 className="text-base font-semibold text-neutral-900 leading-tight">
-            {title}
-          </h2>
-          <div className="text-sm font-medium text-neutral-600 leading-tight">
-            {categoryLabel}
-          </div>
+        <div>
+          <h2 className="text-base font-semibold text-neutral-900">{title}</h2>
+          <div className="text-sm font-medium text-neutral-600">{categoryLabel}</div>
         </div>
 
         {!hideViewAll ? (
           <Link
             href={viewAllHref}
-            className="relative -top-[3px] text-sm font-semibold text-emerald-700 transition-colors duration-200 hover:text-emerald-800 active:opacity-80"
+            className="text-sm font-semibold text-emerald-700 relative -top-[3px]"
           >
             Ver todas ({categoryCount})
           </Link>
         ) : (
-          <span className="relative -top-[3px] text-sm font-semibold text-emerald-700 opacity-0 select-none">
+          <span className="text-sm font-semibold text-emerald-700 opacity-0 select-none relative -top-[3px]">
             Ver todas ({categoryCount})
           </span>
         )}
@@ -166,17 +154,16 @@ export default function ExposedCarouselRow({
       <div className="relative">
         <div
           ref={scrollRef}
-          className="no-scrollbar flex gap-3 px-4 overflow-x-auto scroll-smooth overscroll-x-contain touch-pan-x"
+          className="no-scrollbar flex gap-3 px-4 overflow-x-auto scroll-smooth overscroll-x-contain"
         >
           {list.map((item) => {
-            const rating = item.rating ?? 4.9;
-            const reviews = item.reviews ?? 812;
+            const rating = item.rating ?? 4.8;
             const isFav = !!fav[item.id];
-            const savings = item.savingsText ?? 'Economia de R$50 a R$190';
 
             /* =========================
-               VARIANTE: PASSEIOS / TRANSFERS
-               (texto dentro da imagem)
+               VARIANTE — PASSEIOS / TRANSFERS
+               - texto dentro da imagem
+               - MÁX 2 linhas + reticências
             ========================= */
             if (variant === 'tours') {
               return (
@@ -184,12 +171,8 @@ export default function ExposedCarouselRow({
                   key={item.id}
                   className="relative min-w-[144px] max-w-[144px] flex-shrink-0"
                 >
-                  <Link
-                    href={item.href}
-                    className="block active:opacity-90"
-                    onClick={(e) => openModal(e)}
-                  >
-                    <div className="relative aspect-[3/4] overflow-hidden rounded-xl bg-neutral-200">
+                  <Link href={item.href} onClick={openModal}>
+                    <div className="relative aspect-[3/3.2] overflow-hidden rounded-xl bg-neutral-200">
                       {item.imageUrl ? (
                         <img
                           src={item.imageUrl}
@@ -201,33 +184,29 @@ export default function ExposedCarouselRow({
                         <div className="h-full w-full bg-neutral-300" />
                       )}
 
-                      {/* ⭐ Nota (canto superior esquerdo) */}
-                      <div className="absolute left-2 top-2 z-[5] rounded-full bg-black/55 px-2 py-0.5 backdrop-blur">
-                        <span className="text-[12px] font-semibold text-amber-400">★</span>{' '}
-                        <span className="text-[12px] font-semibold text-white">
-                          {rating.toFixed(1)}
-                        </span>
+                      {/* Nota */}
+                      <div className="absolute left-2 top-2 z-10 rounded-full bg-black/55 px-2 py-0.5 text-xs text-white backdrop-blur">
+                        <span className="text-amber-400">★</span> {rating.toFixed(1)}
                       </div>
 
-                      {/* ❤️ Favorito (canto superior direito) */}
+                      {/* Favorito */}
                       <button
                         type="button"
-                        aria-label={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
                           setFav((p) => ({ ...p, [item.id]: !p[item.id] }));
                         }}
-                        className="absolute right-2 top-2 z-[5] inline-flex h-8 w-8 items-center justify-center rounded-full bg-black/40 backdrop-blur"
+                        className="absolute right-2 top-2 z-10 h-8 w-8 rounded-full bg-black/40 backdrop-blur flex items-center justify-center"
                       >
                         <HeartIcon filled={isFav} />
                       </button>
 
-                      {/* Gradiente inferior */}
-                      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+                      {/* Gradiente */}
+                      <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
 
-                      {/* Texto dentro da imagem */}
-                      <div className="pointer-events-none absolute bottom-2 left-2 right-2 z-[6]">
+                      {/* TEXTO — máx 2 linhas com reticências */}
+                      <div className="absolute bottom-2 left-2 right-2 z-10">
                         <div className="text-sm font-semibold leading-snug text-white line-clamp-2">
                           {item.title}
                         </div>
@@ -239,18 +218,14 @@ export default function ExposedCarouselRow({
             }
 
             /* =========================
-               VARIANTE PADRÃO (Gastronomia)
+               VARIANTE PADRÃO — GASTRONOMIA
             ========================= */
             return (
               <div
                 key={item.id}
                 className="relative min-w-[144px] max-w-[144px] flex-shrink-0"
               >
-                <Link
-                  href={item.href}
-                  className="block active:opacity-90"
-                  onClick={(e) => openModal(e)}
-                >
+                <Link href={item.href} onClick={openModal}>
                   <div className="relative aspect-square overflow-hidden rounded-lg bg-neutral-200">
                     {item.imageUrl ? (
                       <img
@@ -263,14 +238,8 @@ export default function ExposedCarouselRow({
                       <div className="h-full w-full bg-neutral-300" />
                     )}
 
-                    {/* ★ TEXTO DENTRO DA FOTO */}
-                    <div className="absolute left-2 top-2 rounded-md bg-black/25 px-2 py-1 backdrop-blur-[4px] ring-1 ring-white/15 pointer-events-none">
-                      <div className="leading-none">
-                        <span className="text-[12px] font-semibold text-amber-400">★</span>{' '}
-                        <span className="text-[11px] font-semibold text-white">
-                          {rating.toFixed(1)} de {reviews}
-                        </span>
-                      </div>
+                    <div className="absolute left-2 top-2 rounded-md bg-black/25 px-2 py-1 backdrop-blur text-xs text-white">
+                      ★ {(item.rating ?? 4.9).toFixed(1)} de {item.reviews ?? 812}
                     </div>
                   </div>
 
@@ -278,35 +247,23 @@ export default function ExposedCarouselRow({
                     <div className="text-sm font-semibold text-neutral-900 line-clamp-2">
                       {item.title}
                     </div>
-
-                    <div className="mt-1 text-[12px] font-medium text-neutral-700">
-                      {savings}
+                    <div className="mt-1 text-xs text-neutral-700">
+                      {item.savingsText ?? 'Economia exclusiva'}
                     </div>
-
-                    <span
-                      className="mt-2 inline-block text-[14px] font-semibold text-green-600"
-                      onClick={(e) => openModal(e)}
-                      role="button"
-                      tabIndex={0}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') openModal(e);
-                      }}
-                    >
+                    <span className="mt-2 inline-block text-sm font-semibold text-green-600">
                       Ver mais
                     </span>
                   </div>
                 </Link>
 
-                {/* ❤️ Coração */}
                 <button
                   type="button"
-                  aria-label={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
                     setFav((p) => ({ ...p, [item.id]: !p[item.id] }));
                   }}
-                  className="absolute right-2 top-2 z-[5] inline-flex h-7 w-7 items-center justify-center rounded-full bg-black/20 backdrop-blur-[4px] ring-1 ring-white/15"
+                  className="absolute right-2 top-2 h-7 w-7 rounded-full bg-black/20 backdrop-blur flex items-center justify-center"
                 >
                   <HeartIcon filled={isFav} />
                 </button>
@@ -314,23 +271,13 @@ export default function ExposedCarouselRow({
             );
           })}
 
-          {/* ÚLTIMO CARD — SOMENTE CONTEÚDO INTERNO */}
+          {/* Card final */}
           <Link
             href={viewAllHref}
             className="min-w-[144px] max-w-[144px] flex-shrink-0"
           >
-            <div className="relative aspect-square overflow-hidden rounded-lg border border-dashed border-neutral-300 bg-white">
-              <div className="absolute inset-0 grid place-items-center px-3 text-center">
-                <div className="leading-tight">
-                  <div className="text-sm font-semibold text-neutral-900">Ver todos</div>
-                  <div className="-mt-[2px] text-sm font-semibold text-neutral-900">
-                    da {categoryLabel}
-                  </div>
-                  <div className="mt-[2px] text-xs font-medium text-neutral-500">
-                    {categoryCount} opções
-                  </div>
-                </div>
-              </div>
+            <div className="aspect-square rounded-lg border border-dashed border-neutral-300 bg-white flex items-center justify-center text-center text-sm font-semibold text-neutral-900">
+              Ver todos<br />({categoryCount})
             </div>
           </Link>
         </div>
