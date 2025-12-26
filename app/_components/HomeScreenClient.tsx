@@ -10,6 +10,8 @@ import type { SearchCategory, SearchOffer } from './search/types';
 import SponsoredOffersRow from './offers/SponsoredOffersRow';
 import ExposedCarouselRow from './offers/ExposedCarouselRow';
 
+import CategoryCardsSection from './categories/CategoryCardsSection';
+
 import { SPONSORED_OFFERS } from '../../_data/sponsoredOffers';
 import { EXPOSED_GASTRONOMY, EXPOSED_TOURS_TRANSFERS } from '../../_data/exposedOffers';
 
@@ -470,12 +472,10 @@ export default function HomeScreenClient({
                 'grid auto-cols-[100%] grid-flow-col',
                 'overflow-x-auto',
                 'px-1',
-                // ✅ troca: permite rolar a página pra baixo mesmo tocando no menu
                 'touch-manipulation',
                 'overscroll-x-contain',
                 'scroll-smooth',
               ].join(' ')}
-              // ✅ essencial: não travar o pan-y no mobile
               style={{ touchAction: 'pan-x pan-y' }}
             >
               {Array.from({ length: pagesCount }).map((_, pageIndex) => (
@@ -585,7 +585,11 @@ export default function HomeScreenClient({
         items={EXPOSED_GASTRONOMY}
       />
 
-      {/* CARROSSEL 2 — Passeios e Transfers (mt-6 + 20px => 44px) */}
+      {/* ✅ NOVO: Cards redondos (2 linhas de 3) */}
+      <CategoryCardsSection className="mt-8" />
+
+      {/* CARROSSEL 2 — Passeios e Transfers (oculto por enquanto) */}
+      {/*
       <ExposedCarouselRow
         className="mt-[44px]"
         title="Planeje seu dia"
@@ -595,9 +599,9 @@ export default function HomeScreenClient({
         items={EXPOSED_TOURS_TRANSFERS}
         variant="tours"
       />
+      */}
 
       {/* resto da Home depois */}
     </div>
   );
 }
- 
