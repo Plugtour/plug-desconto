@@ -24,6 +24,66 @@ type Props = {
 };
 
 /* =========================
+   SCROLL LOCK (robusto, com contador global)
+========================= */
+declare global {
+  interface Window {
+    __PLUG_SCROLL_LOCK_COUNT__?: number;
+    __PLUG_SCROLL_LOCK_Y__?: number;
+  }
+}
+
+function useBodyScrollLock(locked: boolean) {
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const w = window as any;
+
+    if (locked) {
+      w.__PLUG_SCROLL_LOCK_COUNT__ = (w.__PLUG_SCROLL_LOCK_COUNT__ || 0) + 1;
+
+      // só aplica estilos na PRIMEIRA trava
+      if (w.__PLUG_SCROLL_LOCK_COUNT__ === 1) {
+        const y = window.scrollY || 0;
+        w.__PLUG_SCROLL_LOCK_Y__ = y;
+
+        // trava com position fixed (mais confiável no iOS)
+        document.body.style.position = 'fixed';
+        document.body.style.top = `-${y}px`;
+        document.body.style.left = '0';
+        document.body.style.right = '0';
+        document.body.style.width = '100%';
+      }
+
+      return () => {
+        // cleanup do "locked"
+        w.__PLUG_SCROLL_LOCK_COUNT__ = Math.max(0, (w.__PLUG_SCROLL_LOCK_COUNT__ || 1) - 1);
+
+        // só destrava quando TODOS os locks fecharem
+        if (w.__PLUG_SCROLL_LOCK_COUNT__ === 0) {
+          const y = Number(w.__PLUG_SCROLL_LOCK_Y__ || 0);
+
+          document.body.style.position = '';
+          document.body.style.top = '';
+          document.body.style.left = '';
+          document.body.style.right = '';
+          document.body.style.width = '';
+
+          // restaura scroll com segurança
+          requestAnimationFrame(() => {
+            window.scrollTo(0, y);
+          });
+
+          w.__PLUG_SCROLL_LOCK_Y__ = 0;
+        }
+      };
+    }
+
+    return;
+  }, [locked]);
+}
+
+/* =========================
    CORAÇÃO (path aprovado)
 ========================= */
 function HeartIcon({ filled }: { filled: boolean }) {
@@ -43,10 +103,10 @@ function HeartIcon({ filled }: { filled: boolean }) {
 }
 
 /* =========================
-   MODAL LATERAL (mesmo padrão do patrocinado)
-   + TRAVA SCROLL ATRÁS
-   + FECHA AO CLICAR FORA
-   + MANTÉM BOTÃO FECHAR
+   MODAL LATERAL (padrão patrocinado)
+   + trava scroll (robusto)
+   + fecha clicando fora
+   + mantém botão "Fechar"
 ========================= */
 function SponsoredSideModal({
   open,
@@ -57,33 +117,8 @@ function SponsoredSideModal({
   closing: boolean;
   onClose: () => void;
 }) {
-  // 🔒 trava o scroll do site enquanto o modal estiver aberto
-  useEffect(() => {
-    if (!open) return;
-
-    const scrollY = window.scrollY || 0;
-
-    // trava
-    document.body.style.position = 'fixed';
-    document.body.style.top = `-${scrollY}px`;
-    document.body.style.left = '0';
-    document.body.style.right = '0';
-    document.body.style.width = '100%';
-
-    // destrava e volta pro mesmo ponto
-    return () => {
-      const top = document.body.style.top;
-      const y = top ? Math.abs(parseInt(top, 10)) : scrollY;
-
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.left = '';
-      document.body.style.right = '';
-      document.body.style.width = '';
-
-      window.scrollTo(0, y);
-    };
-  }, [open]);
+  // 🔒 trava scroll enquanto o modal existir (inclusive durante "closing")
+  useBodyScrollLock(open);
 
   if (!open) return null;
 
@@ -93,7 +128,6 @@ function SponsoredSideModal({
       onMouseDown={() => onClose()} // ✅ clicar fora fecha
       role="presentation"
     >
-      {/* backdrop (visual) */}
       <div
         className={[
           'absolute inset-0 rounded-md bg-black/35 backdrop-blur-[6px] touch-manipulation',
@@ -283,9 +317,7 @@ export default function ExposedCarouselRow({
           <div className="absolute inset-0 grid place-items-center px-3 text-center">
             <div>
               <div className="text-sm font-semibold text-neutral-900">Ver todos</div>
-              <div className="mt-1 text-sm font-semibold text-neutral-900">
-                da {categoryLabel}
-              </div>
+              <div className="mt-1 text-sm font-semibold text-neutral-900">da {categoryLabel}</div>
               <div className="mt-2 text-xs font-medium text-neutral-500">{categoryCount} opções</div>
             </div>
           </div>
@@ -297,14 +329,11 @@ export default function ExposedCarouselRow({
   function ViewAllCardTours() {
     return (
       <Link href={viewAllHref} className="min-w-[144px] max-w-[144px] flex-shrink-0">
-        {/* ✅ também segue a altura do card do carrossel 2 */}
         <div className="relative aspect-[3/3.84] overflow-hidden rounded-xl border border-dashed border-neutral-300 bg-white">
           <div className="absolute inset-0 grid place-items-center px-3 text-center">
             <div className="leading-tight">
               <div className="text-sm font-semibold text-neutral-900">Ver todos</div>
-              <div className="mt-1 text-sm font-semibold text-neutral-900">
-                da {categoryLabel}
-              </div>
+              <div className="mt-1 text-sm font-semibold text-neutral-900">da {categoryLabel}</div>
               <div className="mt-2 text-xs font-medium text-neutral-500">{categoryCount} opções</div>
             </div>
           </div>
@@ -344,9 +373,7 @@ export default function ExposedCarouselRow({
           ref={scrollRef}
           className="no-scrollbar flex gap-3 px-4 overflow-x-auto scroll-smooth overscroll-x-contain touch-pan-x"
         >
-          {/* =========================
-              VARIANT DEFAULT (1º carrossel)
-          ========================= */}
+          {/* DEFAULT (carrossel 1) */}
           {variant === 'default' &&
             list.map((item) => {
               const rating = item.rating ?? 4.9;
@@ -356,31 +383,18 @@ export default function ExposedCarouselRow({
 
               return (
                 <div key={item.id} className="relative min-w-[144px] max-w-[144px] flex-shrink-0">
-                  <Link
-                    href={item.href}
-                    className="block active:opacity-90"
-                    onClick={(e) => openModal(e)}
-                  >
+                  <Link href={item.href} className="block active:opacity-90" onClick={(e) => openModal(e)}>
                     <div className="relative aspect-square overflow-hidden rounded-lg bg-neutral-200">
                       {item.imageUrl ? (
-                        <img
-                          src={item.imageUrl}
-                          alt={item.title}
-                          className="h-full w-full object-cover"
-                          loading="lazy"
-                        />
+                        <img src={item.imageUrl} alt={item.title} className="h-full w-full object-cover" loading="lazy" />
                       ) : (
                         <div className="h-full w-full bg-neutral-300" />
                       )}
-
                       <RatingBadge rating={rating} reviews={reviews} />
                     </div>
 
                     <div className="mt-2">
-                      <div className="text-sm font-semibold text-neutral-900 line-clamp-2">
-                        {item.title}
-                      </div>
-
+                      <div className="text-sm font-semibold text-neutral-900 line-clamp-2">{item.title}</div>
                       <div className="mt-1 text-[12px] font-medium text-neutral-700">{savings}</div>
 
                       <button
@@ -398,7 +412,6 @@ export default function ExposedCarouselRow({
                     </div>
                   </Link>
 
-                  {/* ❤️ Coração */}
                   <button
                     type="button"
                     aria-label={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
@@ -417,10 +430,7 @@ export default function ExposedCarouselRow({
 
           {variant === 'default' && <ViewAllCardDefault />}
 
-          {/* =========================
-              VARIANT TOURS (2º carrossel)
-              ✅ ALTURA +20%
-          ========================= */}
+          {/* TOURS (carrossel 2) ✅ altura +20% */}
           {variant === 'tours' &&
             list.map((item) => {
               const rating = item.rating ?? 4.9;
@@ -429,27 +439,16 @@ export default function ExposedCarouselRow({
 
               return (
                 <div key={item.id} className="relative min-w-[144px] max-w-[144px] flex-shrink-0">
-                  <Link
-                    href={item.href}
-                    className="block active:opacity-90"
-                    onClick={(e) => openModal(e)}
-                  >
-                    {/* ✅ antes: aspect-[3/3.2] | agora: +20% => 3.84 */}
+                  <Link href={item.href} className="block active:opacity-90" onClick={(e) => openModal(e)}>
                     <div className="relative aspect-[3/3.84] overflow-hidden rounded-xl bg-neutral-200">
                       {item.imageUrl ? (
-                        <img
-                          src={item.imageUrl}
-                          alt={item.title}
-                          className="h-full w-full object-cover"
-                          loading="lazy"
-                        />
+                        <img src={item.imageUrl} alt={item.title} className="h-full w-full object-cover" loading="lazy" />
                       ) : (
                         <div className="h-full w-full bg-neutral-300" />
                       )}
 
                       <RatingBadge rating={rating} reviews={reviews} />
 
-                      {/* ❤️ Coração */}
                       <button
                         type="button"
                         aria-label={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
@@ -463,11 +462,9 @@ export default function ExposedCarouselRow({
                         <HeartIcon filled={isFav} />
                       </button>
 
-                      {/* faixa escura + título dentro da imagem */}
                       <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/80 to-transparent" />
 
                       <div className="absolute bottom-2 left-2 right-2 overflow-hidden">
-                        {/* sem reticências: apenas corta o excesso */}
                         <div className="text-sm font-medium text-white leading-snug max-h-[3.9em] overflow-hidden">
                           {item.title}
                         </div>

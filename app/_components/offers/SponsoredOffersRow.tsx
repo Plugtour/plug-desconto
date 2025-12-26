@@ -10,6 +10,64 @@ type Props = {
 };
 
 /* =========================
+   SCROLL LOCK GLOBAL (robusto)
+   - evita bug de scroll quando há mais de 1 modal no site
+========================= */
+declare global {
+  interface Window {
+    __PLUG_SCROLL_LOCK_COUNT__?: number;
+    __PLUG_SCROLL_LOCK_Y__?: number;
+  }
+}
+
+function useBodyScrollLock(active: boolean) {
+  useEffect(() => {
+    if (!active) return;
+
+    const w = window as any;
+    w.__PLUG_SCROLL_LOCK_COUNT__ = (w.__PLUG_SCROLL_LOCK_COUNT__ || 0) + 1;
+
+    // primeiro lock de verdade
+    if (w.__PLUG_SCROLL_LOCK_COUNT__ === 1) {
+      const y = window.scrollY || 0;
+      w.__PLUG_SCROLL_LOCK_Y__ = y;
+
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${y}px`;
+      document.body.style.left = '0';
+      document.body.style.right = '0';
+      document.body.style.width = '100%';
+      document.body.style.overflow = 'hidden';
+    }
+
+    return () => {
+      w.__PLUG_SCROLL_LOCK_COUNT__ = Math.max(
+        0,
+        (w.__PLUG_SCROLL_LOCK_COUNT__ || 1) - 1
+      );
+
+      // só destrava quando o último modal liberar
+      if (w.__PLUG_SCROLL_LOCK_COUNT__ === 0) {
+        const y = Number(w.__PLUG_SCROLL_LOCK_Y__ || 0);
+
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.left = '';
+        document.body.style.right = '';
+        document.body.style.width = '';
+        document.body.style.overflow = '';
+
+        requestAnimationFrame(() => {
+          window.scrollTo(0, y);
+        });
+
+        w.__PLUG_SCROLL_LOCK_Y__ = 0;
+      }
+    };
+  }, [active]);
+}
+
+/* =========================
    ESTRELAS (preenchimento proporcional, coladas)
 ========================= */
 function Star({ fillPct }: { fillPct: number }) {
@@ -82,7 +140,7 @@ function HeartIcon({
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      <path d="M12 21C12 21 4 15.36 4 9.5C4 7.02 6.02 5 8.5 5C10.04 5.81 11.4 5.81 12 7C12.6 5.81 13.96 5 15.5 5C17.98 5 20 7.02 20 9.5C20 15.36 12 21 12 21Z" />
+      <path d="M12 21C12 21 4 15.36 4 9.5C4 7.02 6.02 5 8.5 5C10.04 5 11.4 5.81 12 7C12.6 5.81 13.96 5 15.5 5C17.98 5 20 7.02 20 9.5C20 15.36 12 21 12 21Z" />
     </svg>
   );
 }
@@ -117,7 +175,8 @@ function DoubleChevronOpen({
 
 /* =========================
    MODAL LATERAL (entra da direita)
-   + TRAVA SCROLL DO SITE ATRÁS
+   + TRAVA SCROLL DO SITE ATRÁS (robusto)
+   + CLIQUE FORA FECHA (sem remover o botão Fechar)
 ========================= */
 function SponsoredSideModal({
   open,
@@ -128,42 +187,22 @@ function SponsoredSideModal({
   closing: boolean;
   onClose: () => void;
 }) {
-  // ✅ trava o scroll do site atrás enquanto o modal estiver aberto
-  useEffect(() => {
-    if (!open) return;
-
-    const scrollY = window.scrollY || 0;
-
-    // trava
-    document.body.style.position = 'fixed';
-    document.body.style.top = `-${scrollY}px`;
-    document.body.style.left = '0';
-    document.body.style.right = '0';
-    document.body.style.width = '100%';
-
-    // destrava + volta no mesmo ponto
-    return () => {
-      const top = document.body.style.top;
-      const y = top ? Math.abs(parseInt(top, 10)) : scrollY;
-
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.left = '';
-      document.body.style.right = '';
-      document.body.style.width = '';
-
-      window.scrollTo(0, y);
-    };
-  }, [open]);
+  // ✅ trava scroll com contador global
+  useBodyScrollLock(open);
 
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[999]">
-      <button
-        type="button"
-        aria-label="Fechar"
-        onClick={onClose}
+    <div
+      className="fixed inset-0 z-[999]"
+      // ✅ clique fora fecha (mouse)
+      onMouseDown={onClose}
+      // ✅ clique fora fecha (touch)
+      onTouchStart={onClose}
+      role="presentation"
+    >
+      {/* backdrop visual */}
+      <div
         className={[
           'absolute inset-0 rounded-md bg-black/35 backdrop-blur-[6px] touch-manipulation',
           closing ? 'backdrop-exit' : 'backdrop-enter',
@@ -179,10 +218,16 @@ function SponsoredSideModal({
             'touch-manipulation',
             closing ? 'side-exit' : 'side-enter',
           ].join(' ')}
+          // ✅ impede fechar quando clicar dentro
+          onMouseDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
         >
           <button
             type="button"
-            onClick={onClose}
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
             className={[
               'absolute left-0 -top-9',
               'touch-manipulation rounded-md',
@@ -455,6 +500,7 @@ export default function SponsoredOffersRow({
 
               return (
                 <div key={item.id} className="relative">
+                  {/* ✅ NÃO usamos Link aqui para evitar nested interactive */}
                   <div
                     role="button"
                     tabIndex={0}
@@ -480,7 +526,9 @@ export default function SponsoredOffersRow({
                         </div>
 
                         <div className="mt-[4px]">
-                          <div className="text-[11px] text-zinc-500 line-clamp-1">{tagsLine}</div>
+                          <div className="text-[11px] text-zinc-500 line-clamp-1">
+                            {tagsLine}
+                          </div>
 
                           {item.priceText ? (
                             <div className="-mt-[2px] text-[11px] font-medium text-zinc-900">
@@ -493,12 +541,16 @@ export default function SponsoredOffersRow({
                           <div>
                             <StarsRow rating={rating} />
                             <div className="-mt-0.5 text-[11px] text-zinc-500">
-                              <span className="font-semibold text-zinc-700">{rating.toFixed(1)}</span>{' '}
-                              de <span className="font-semibold text-zinc-700">{reviews}</span>{' '}
+                              <span className="font-semibold text-zinc-700">
+                                {rating.toFixed(1)}
+                              </span>{' '}
+                              de{' '}
+                              <span className="font-semibold text-zinc-700">{reviews}</span>{' '}
                               avaliações
                             </div>
                           </div>
 
+                          {/* ✅ NÃO é button (evita interativo aninhado) */}
                           <span
                             className="text-[14px] font-semibold text-green-600"
                             role="button"
