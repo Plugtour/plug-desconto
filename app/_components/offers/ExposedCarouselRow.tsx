@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 
 export type ExposedCarouselItem = {
@@ -21,9 +21,6 @@ type Props = {
   items: ExposedCarouselItem[];
   className?: string;
 
-  /** default = 1º carrossel (igual ao seu código “correto”)
-   *  tours = 2º carrossel (Passeios/Transfers) com card diferente
-   */
   variant?: 'default' | 'tours';
 };
 
@@ -48,6 +45,8 @@ function HeartIcon({ filled }: { filled: boolean }) {
 
 /* =========================
    MODAL (estrutura igual patrocinado)
+   - abre vindo da direita (mais suave)
+   - trava scroll do site atrás do modal
 ========================= */
 function SponsoredSideModal({
   open,
@@ -56,19 +55,70 @@ function SponsoredSideModal({
   open: boolean;
   onClose: () => void;
 }) {
-  if (!open) return null;
+  const [mounted, setMounted] = useState(open);
+
+  // monta quando abrir
+  useEffect(() => {
+    if (open) setMounted(true);
+  }, [open]);
+
+  // trava scroll do body e preserva posição
+  useEffect(() => {
+    if (!open) return;
+
+    const scrollY = window.scrollY || 0;
+
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.left = '0';
+    document.body.style.right = '0';
+    document.body.style.width = '100%';
+
+    return () => {
+      const top = document.body.style.top || '0px';
+      const y = Math.abs(parseInt(top, 10)) || 0;
+
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.left = '';
+      document.body.style.right = '';
+      document.body.style.width = '';
+
+      window.scrollTo(0, y);
+    };
+  }, [open]);
+
+  if (!mounted) return null;
 
   return (
     <div className="fixed inset-0 z-[999]">
+      {/* Backdrop */}
       <button
         type="button"
         aria-label="Fechar"
         onClick={onClose}
-        className="absolute inset-0 rounded-md bg-black/35 backdrop-blur-[6px] touch-manipulation"
+        className={[
+          'absolute inset-0 rounded-md bg-black/35 backdrop-blur-[6px] touch-manipulation',
+          'transition-opacity duration-[520ms]',
+          'ease-[cubic-bezier(0.16,1,0.3,1)]',
+          open ? 'opacity-100' : 'opacity-0',
+        ].join(' ')}
       />
 
+      {/* Painel */}
       <div className="absolute inset-0">
-        <div className="absolute right-0 top-[50px] bottom-0 w-[calc(100%-12px)] max-w-md touch-manipulation">
+        <div
+          className={[
+            'absolute right-0 top-[50px] bottom-0 w-[calc(100%-12px)] max-w-md touch-manipulation',
+            'transform-gpu will-change-transform',
+            'transition-transform duration-[650ms]',
+            'ease-[cubic-bezier(0.16,1,0.3,1)]',
+            open ? 'translate-x-0' : 'translate-x-full',
+          ].join(' ')}
+          onTransitionEnd={() => {
+            if (!open) setMounted(false);
+          }}
+        >
           <button
             type="button"
             onClick={onClose}
@@ -104,34 +154,35 @@ export default function ExposedCarouselRow({
   const [fav, setFav] = useState<Record<string, boolean>>({});
   const [open, setOpen] = useState(false);
 
-  /* =========================
-     HEADER (igual à sua versão correta)
-  ========================= */
-  function Header() {
-    return (
-      <div className="px-4 mb-2 flex items-center justify-between">
-        <div className="leading-tight">
-          <h2 className="text-base font-semibold text-neutral-900 leading-tight">
-            {title}
-          </h2>
-          <div className="text-sm font-medium text-neutral-600 leading-tight">
-            {categoryLabel}
-          </div>
-        </div>
+  // ✅ esconde "Ver todas" quando chega no último card
+  const [hideViewAll, setHideViewAll] = useState(false);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
 
-        <Link
-          href={viewAllHref}
-          className="relative -top-[3px] text-sm font-semibold text-emerald-700 transition-colors duration-200 hover:text-emerald-800 active:opacity-80"
-        >
-          Ver todas ({categoryCount})
-        </Link>
-      </div>
-    );
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+
+    const onScroll = () => {
+      const tolerance = 6;
+      const reachedEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - tolerance;
+      setHideViewAll(reachedEnd);
+    };
+
+    el.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+
+    return () => el.removeEventListener('scroll', onScroll);
+  }, []);
+
+  function openModal(e?: React.SyntheticEvent) {
+    if (e) {
+      e.preventDefault();
+      // @ts-ignore
+      e.stopPropagation?.();
+    }
+    setOpen(true);
   }
 
-  /* =========================
-     BADGE (igual ao 1º card)
-  ========================= */
   function RatingBadge({ rating, reviews }: { rating: number; reviews: number }) {
     return (
       <div className="absolute left-2 top-2 rounded-md bg-black/25 px-2 py-1 backdrop-blur-[4px] ring-1 ring-white/15 pointer-events-none">
@@ -145,11 +196,7 @@ export default function ExposedCarouselRow({
     );
   }
 
-  /* =========================
-     ÚLTIMO CARD: VER TODOS
-     (vamos usar no 1º e no 2º carrossel)
-  ========================= */
-  function ViewAllCard({ compactBelow = false }: { compactBelow?: boolean }) {
+  function ViewAllCardDefault() {
     return (
       <Link href={viewAllHref} className="min-w-[144px] max-w-[144px] flex-shrink-0">
         <div className="relative aspect-square overflow-hidden rounded-lg border border-dashed border-neutral-300 bg-white">
@@ -166,34 +213,71 @@ export default function ExposedCarouselRow({
           </div>
         </div>
 
-        {!compactBelow && (
-          <div className="mt-2">
-            <div className="text-sm font-semibold text-emerald-700">
-              Ver todas ({categoryCount})
-            </div>
-            <div className="mt-1 text-[12px] text-neutral-500">Abrir lista completa</div>
+        <div className="mt-2">
+          <div className="text-sm font-semibold text-emerald-700">
+            Ver todas ({categoryCount})
           </div>
-        )}
+          <div className="mt-1 text-[12px] text-neutral-500">Abrir lista completa</div>
+        </div>
       </Link>
     );
   }
 
-  /* =========================
-     RENDER
-  ========================= */
+  function ViewAllCardTours() {
+    return (
+      <Link href={viewAllHref} className="min-w-[144px] max-w-[144px] flex-shrink-0">
+        <div className="relative aspect-[3/3.2] overflow-hidden rounded-xl border border-dashed border-neutral-300 bg-white">
+          <div className="absolute inset-0 grid place-items-center px-3 text-center">
+            <div className="leading-tight">
+              <div className="text-sm font-semibold text-neutral-900">Ver todos</div>
+              <div className="mt-1 text-sm font-semibold text-neutral-900">
+                da {categoryLabel}
+              </div>
+              <div className="mt-2 text-xs font-medium text-neutral-500">
+                {categoryCount} opções
+              </div>
+            </div>
+          </div>
+        </div>
+      </Link>
+    );
+  }
+
   return (
     <section className={className}>
       <SponsoredSideModal open={open} onClose={() => setOpen(false)} />
 
-      <Header />
+      {/* Cabeçalho + ocultar ao chegar no último card */}
+      <div className="px-4 mb-2 flex items-center justify-between">
+        <div className="leading-tight">
+          <h2 className="text-base font-semibold text-neutral-900 leading-tight">{title}</h2>
+          <div className="text-sm font-medium text-neutral-600 leading-tight">
+            {categoryLabel}
+          </div>
+        </div>
 
-      {/* =========================
-          1º CARROSSEL (DEFAULT) — IGUAL AO SEU CÓDIGO CORRETO
-         ========================= */}
-      {variant === 'default' && (
-        <div className="relative">
-          <div className="no-scrollbar flex gap-3 px-4 overflow-x-auto scroll-smooth overscroll-x-contain touch-pan-x">
-            {list.map((item) => {
+        {!hideViewAll ? (
+          <Link
+            href={viewAllHref}
+            className="relative -top-[3px] text-sm font-semibold text-emerald-700 transition-colors duration-200 hover:text-emerald-800 active:opacity-80"
+          >
+            Ver todas ({categoryCount})
+          </Link>
+        ) : (
+          <span className="relative -top-[3px] text-sm font-semibold text-emerald-700 opacity-0 select-none">
+            Ver todas ({categoryCount})
+          </span>
+        )}
+      </div>
+
+      {/* Carrossel */}
+      <div className="relative">
+        <div
+          ref={scrollRef}
+          className="no-scrollbar flex gap-3 px-4 overflow-x-auto scroll-smooth overscroll-x-contain touch-pan-x"
+        >
+          {variant === 'default' &&
+            list.map((item) => {
               const rating = item.rating ?? 4.9;
               const reviews = item.reviews ?? 812;
               const isFav = !!fav[item.id];
@@ -207,10 +291,7 @@ export default function ExposedCarouselRow({
                   <Link
                     href={item.href}
                     className="block active:opacity-90"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setOpen(true);
-                    }}
+                    onClick={(e) => openModal(e)}
                   >
                     <div className="relative aspect-square overflow-hidden rounded-lg bg-neutral-200">
                       {item.imageUrl ? (
@@ -224,7 +305,6 @@ export default function ExposedCarouselRow({
                         <div className="h-full w-full bg-neutral-300" />
                       )}
 
-                      {/* ⭐ TEXTO NA FOTO (igual antes) */}
                       <RatingBadge rating={rating} reviews={reviews} />
                     </div>
 
@@ -250,7 +330,6 @@ export default function ExposedCarouselRow({
                     </div>
                   </Link>
 
-                  {/* ❤️ Coração (igual antes) */}
                   <button
                     type="button"
                     aria-label={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
@@ -267,23 +346,10 @@ export default function ExposedCarouselRow({
               );
             })}
 
-            {/* Último card: ver todos (igual ao seu código correto) */}
-            <ViewAllCard />
-          </div>
-        </div>
-      )}
+          {variant === 'default' && <ViewAllCardDefault />}
 
-      {/* =========================
-          2º CARROSSEL (TOURS) — CARD DIFERENTE
-          - Texto simples: somente título
-          - Sem reticências
-          - 3ª linha pode “cortar” (overflow hidden)
-          - No final: card Ver todos (NOVO)
-         ========================= */}
-      {variant === 'tours' && (
-        <div className="relative">
-          <div className="no-scrollbar flex gap-3 px-4 overflow-x-auto scroll-smooth overscroll-x-contain touch-pan-x">
-            {list.map((item) => {
+          {variant === 'tours' &&
+            list.map((item) => {
               const rating = item.rating ?? 4.9;
               const reviews = item.reviews ?? 812;
               const isFav = !!fav[item.id];
@@ -296,10 +362,7 @@ export default function ExposedCarouselRow({
                   <Link
                     href={item.href}
                     className="block active:opacity-90"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setOpen(true);
-                    }}
+                    onClick={(e) => openModal(e)}
                   >
                     <div className="relative aspect-[3/3.2] overflow-hidden rounded-xl bg-neutral-200">
                       {item.imageUrl ? (
@@ -313,10 +376,8 @@ export default function ExposedCarouselRow({
                         <div className="h-full w-full bg-neutral-300" />
                       )}
 
-                      {/* ⭐ badge igual ao 1º */}
                       <RatingBadge rating={rating} reviews={reviews} />
 
-                      {/* ❤️ coração igual ao padrão */}
                       <button
                         type="button"
                         aria-label={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
@@ -330,11 +391,8 @@ export default function ExposedCarouselRow({
                         <HeartIcon filled={isFav} />
                       </button>
 
-                      {/* gradiente para leitura */}
                       <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/80 to-transparent" />
 
-                      {/* TÍTULO: simples, sem enfeites, sem reticências.
-                         Se passar de 3 linhas, corta sem aparecer fora do card. */}
                       <div className="absolute bottom-2 left-2 right-2 overflow-hidden">
                         <div
                           className="text-sm font-medium text-white leading-snug"
@@ -349,11 +407,22 @@ export default function ExposedCarouselRow({
               );
             })}
 
-            {/* ✅ No fim do 2º carrossel: card Ver todos */}
-            <ViewAllCard />
-          </div>
+          {variant === 'tours' && <ViewAllCardTours />}
         </div>
-      )}
+      </div>
+
+      <style jsx global>{`
+        .no-scrollbar::-webkit-scrollbar {
+          width: 0;
+          height: 0;
+          display: none;
+        }
+        .no-scrollbar {
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+          -webkit-overflow-scrolling: touch;
+        }
+      `}</style>
     </section>
   );
 }

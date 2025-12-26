@@ -252,11 +252,7 @@ export default function HomeScreenClient({
     []
   );
 
-  const gastronomyCount = useMemo(() => {
-    return categories
-      .filter((c) => c.title === 'Gastronomia')
-      .reduce((sum, c) => sum + (Number(c.count) || 0), 0);
-  }, [categories]);
+  const gastronomyCount = useMemo(() => EXPOSED_GASTRONOMY.length, []);
 
   const searchCategories: SearchCategory[] = useMemo(() => {
     return categories.map((c) => ({ id: c.id, title: c.title, count: c.count }));
@@ -586,9 +582,9 @@ export default function HomeScreenClient({
         items={EXPOSED_GASTRONOMY}
       />
 
-      {/* CARROSSEL 2 — Passeios e Transfers (distância maior) */}
+      {/* CARROSSEL 2 — Passeios e Transfers (mt-6 + 20px => 44px) */}
       <ExposedCarouselRow
-        className="mt-10"
+        className="mt-[44px]"
         title="Planeje seu dia"
         categoryLabel="Passeios e Transfers"
         categoryCount={EXPOSED_TOURS_TRANSFERS.length}
