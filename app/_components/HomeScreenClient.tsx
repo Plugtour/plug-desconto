@@ -470,10 +470,13 @@ export default function HomeScreenClient({
                 'grid auto-cols-[100%] grid-flow-col',
                 'overflow-x-auto',
                 'px-1',
-                'touch-pan-x',
+                // ✅ troca: permite rolar a página pra baixo mesmo tocando no menu
+                'touch-manipulation',
                 'overscroll-x-contain',
                 'scroll-smooth',
               ].join(' ')}
+              // ✅ essencial: não travar o pan-y no mobile
+              style={{ touchAction: 'pan-x pan-y' }}
             >
               {Array.from({ length: pagesCount }).map((_, pageIndex) => (
                 <div key={pageIndex} className="grid grid-cols-4 gap-3 py-2 px-1">
