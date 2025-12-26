@@ -20,7 +20,6 @@ type Props = {
   viewAllHref: string;
   items: ExposedCarouselItem[];
   className?: string;
-
   variant?: 'default' | 'tours';
 };
 
@@ -44,49 +43,18 @@ function HeartIcon({ filled }: { filled: boolean }) {
 }
 
 /* =========================
-   MODAL (estrutura igual patrocinado)
-   - abre vindo da direita (mais suave)
-   - trava scroll do site atrás do modal
+   MODAL LATERAL (MESMO DO PATROCINADO)
 ========================= */
 function SponsoredSideModal({
   open,
+  closing,
   onClose,
 }: {
   open: boolean;
+  closing: boolean;
   onClose: () => void;
 }) {
-  const [mounted, setMounted] = useState(open);
-
-  useEffect(() => {
-    if (open) setMounted(true);
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-
-    const scrollY = window.scrollY || 0;
-
-    document.body.style.position = 'fixed';
-    document.body.style.top = `-${scrollY}px`;
-    document.body.style.left = '0';
-    document.body.style.right = '0';
-    document.body.style.width = '100%';
-
-    return () => {
-      const top = document.body.style.top || '0px';
-      const y = Math.abs(parseInt(top, 10)) || 0;
-
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.left = '';
-      document.body.style.right = '';
-      document.body.style.width = '';
-
-      window.scrollTo(0, y);
-    };
-  }, [open]);
-
-  if (!mounted) return null;
+  if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-[999]">
@@ -96,29 +64,30 @@ function SponsoredSideModal({
         onClick={onClose}
         className={[
           'absolute inset-0 rounded-md bg-black/35 backdrop-blur-[6px] touch-manipulation',
-          'transition-opacity duration-[520ms]',
-          'ease-[cubic-bezier(0.16,1,0.3,1)]',
-          open ? 'opacity-100' : 'opacity-0',
+          closing ? 'backdrop-exit' : 'backdrop-enter',
         ].join(' ')}
       />
 
       <div className="absolute inset-0">
         <div
           className={[
-            'absolute right-0 top-[50px] bottom-0 w-[calc(100%-12px)] max-w-md touch-manipulation',
-            'transform-gpu will-change-transform',
-            'transition-transform duration-[650ms]',
-            'ease-[cubic-bezier(0.16,1,0.3,1)]',
-            open ? 'translate-x-0' : 'translate-x-full',
+            'absolute right-0',
+            'top-[50px] bottom-0',
+            'w-[calc(100%-12px)] max-w-md',
+            'touch-manipulation',
+            closing ? 'side-exit' : 'side-enter',
           ].join(' ')}
-          onTransitionEnd={() => {
-            if (!open) setMounted(false);
-          }}
         >
           <button
             type="button"
             onClick={onClose}
-            className="absolute left-0 -top-9 touch-manipulation rounded-md bg-white/80 ring-1 ring-black/10 px-3 py-1.5 text-[13px] font-normal text-red-500 hover:text-red-600 hover:bg-white"
+            className={[
+              'absolute left-0 -top-9',
+              'touch-manipulation rounded-md',
+              'bg-white/80 ring-1 ring-black/10',
+              'px-3 py-1.5 text-[13px] font-normal',
+              'text-red-500 hover:text-red-600 hover:bg-white',
+            ].join(' ')}
           >
             Fechar
           </button>
@@ -128,6 +97,69 @@ function SponsoredSideModal({
           </div>
         </div>
       </div>
+
+      <style jsx global>{`
+        @keyframes backdropEnter {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+        @keyframes backdropExit {
+          from {
+            opacity: 1;
+          }
+          to {
+            opacity: 0;
+          }
+        }
+        .backdrop-enter {
+          animation: backdropEnter 240ms ease-out both;
+        }
+        .backdrop-exit {
+          animation: backdropExit 240ms ease-in both;
+        }
+
+        @keyframes sideEnter {
+          from {
+            transform: translateX(28px);
+            opacity: 0.98;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+        @keyframes sideExit {
+          from {
+            transform: translateX(0);
+            opacity: 1;
+          }
+          to {
+            transform: translateX(28px);
+            opacity: 0.98;
+          }
+        }
+        .side-enter {
+          animation: sideEnter 280ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
+        }
+        .side-exit {
+          animation: sideExit 240ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
+        }
+
+        .no-scrollbar::-webkit-scrollbar {
+          width: 0;
+          height: 0;
+          display: none;
+        }
+        .no-scrollbar {
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+          -webkit-overflow-scrolling: touch;
+        }
+      `}</style>
     </div>
   );
 }
@@ -148,7 +180,27 @@ export default function ExposedCarouselRow({
   if (!list.length) return null;
 
   const [fav, setFav] = useState<Record<string, boolean>>({});
-  const [open, setOpen] = useState(false);
+
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalClosing, setModalClosing] = useState(false);
+
+  function openModal(e?: React.SyntheticEvent) {
+    if (e) {
+      e.preventDefault();
+      // @ts-ignore
+      e.stopPropagation?.();
+    }
+    setModalOpen(true);
+    setModalClosing(false);
+  }
+
+  function closeModal() {
+    setModalClosing(true);
+    window.setTimeout(() => {
+      setModalOpen(false);
+      setModalClosing(false);
+    }, 240);
+  }
 
   // ✅ esconde "Ver todas" quando chega no último card
   const [hideViewAll, setHideViewAll] = useState(false);
@@ -170,15 +222,6 @@ export default function ExposedCarouselRow({
     return () => el.removeEventListener('scroll', onScroll);
   }, []);
 
-  function openModal(e?: React.SyntheticEvent) {
-    if (e) {
-      e.preventDefault();
-      // @ts-ignore
-      e.stopPropagation?.();
-    }
-    setOpen(true);
-  }
-
   function RatingBadge({ rating, reviews }: { rating: number; reviews: number }) {
     return (
       <div className="absolute left-2 top-2 rounded-md bg-black/25 px-2 py-1 backdrop-blur-[4px] ring-1 ring-white/15 pointer-events-none">
@@ -192,9 +235,6 @@ export default function ExposedCarouselRow({
     );
   }
 
-  /* =========================
-     ÚLTIMO CARD (1º carrossel) — sem texto embaixo
-  ========================= */
   function ViewAllCardDefault() {
     return (
       <Link href={viewAllHref} className="min-w-[144px] max-w-[144px] flex-shrink-0">
@@ -237,8 +277,9 @@ export default function ExposedCarouselRow({
 
   return (
     <section className={className}>
-      <SponsoredSideModal open={open} onClose={() => setOpen(false)} />
+      <SponsoredSideModal open={modalOpen} closing={modalClosing} onClose={closeModal} />
 
+      {/* Cabeçalho */}
       <div className="px-4 mb-2 flex items-center justify-between">
         <div className="leading-tight">
           <h2 className="text-base font-semibold text-neutral-900 leading-tight">{title}</h2>
@@ -261,11 +302,15 @@ export default function ExposedCarouselRow({
         )}
       </div>
 
+      {/* Carrossel */}
       <div className="relative">
         <div
           ref={scrollRef}
           className="no-scrollbar flex gap-3 px-4 overflow-x-auto scroll-smooth overscroll-x-contain touch-pan-x"
         >
+          {/* =========================
+              VARIANT DEFAULT (1º carrossel)
+          ========================= */}
           {variant === 'default' &&
             list.map((item) => {
               const rating = item.rating ?? 4.9;
@@ -302,6 +347,7 @@ export default function ExposedCarouselRow({
                       <div className="text-sm font-semibold text-neutral-900 line-clamp-2">
                         {item.title}
                       </div>
+
                       <div className="mt-1 text-[12px] font-medium text-neutral-700">
                         {savings}
                       </div>
@@ -312,7 +358,8 @@ export default function ExposedCarouselRow({
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          setOpen(true);
+                          setModalOpen(true);
+                          setModalClosing(false);
                         }}
                       >
                         Ver mais
@@ -320,6 +367,7 @@ export default function ExposedCarouselRow({
                     </div>
                   </Link>
 
+                  {/* ❤️ Coração */}
                   <button
                     type="button"
                     aria-label={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
@@ -338,6 +386,9 @@ export default function ExposedCarouselRow({
 
           {variant === 'default' && <ViewAllCardDefault />}
 
+          {/* =========================
+              VARIANT TOURS (2º carrossel)
+          ========================= */}
           {variant === 'tours' &&
             list.map((item) => {
               const rating = item.rating ?? 4.9;
@@ -368,6 +419,7 @@ export default function ExposedCarouselRow({
 
                       <RatingBadge rating={rating} reviews={reviews} />
 
+                      {/* ❤️ Coração */}
                       <button
                         type="button"
                         aria-label={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
@@ -381,13 +433,12 @@ export default function ExposedCarouselRow({
                         <HeartIcon filled={isFav} />
                       </button>
 
+                      {/* faixa escura + título dentro da imagem */}
                       <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/80 to-transparent" />
 
                       <div className="absolute bottom-2 left-2 right-2 overflow-hidden">
-                        <div
-                          className="text-sm font-medium text-white leading-snug"
-                          style={{ maxHeight: '3.9em' }}
-                        >
+                        {/* 3 linhas “na marra”: sem reticências, apenas corta */}
+                        <div className="text-sm font-medium text-white leading-snug max-h-[3.9em] overflow-hidden">
                           {item.title}
                         </div>
                       </div>
@@ -400,19 +451,6 @@ export default function ExposedCarouselRow({
           {variant === 'tours' && <ViewAllCardTours />}
         </div>
       </div>
-
-      <style jsx global>{`
-        .no-scrollbar::-webkit-scrollbar {
-          width: 0;
-          height: 0;
-          display: none;
-        }
-        .no-scrollbar {
-          scrollbar-width: none;
-          -ms-overflow-style: none;
-          -webkit-overflow-scrolling: touch;
-        }
-      `}</style>
     </section>
   );
 }
