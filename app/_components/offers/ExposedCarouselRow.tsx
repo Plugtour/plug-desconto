@@ -123,29 +123,40 @@ export default function ExposedCarouselRow({
     <section className={className}>
       <SponsoredSideModal open={open} onClose={() => setOpen(false)} />
 
-      {/* Cabeçalho */}
-      <div className="px-4 mb-2 flex justify-between">
-        <div>
-          <h2 className="text-base font-semibold text-neutral-900">{title}</h2>
-          <div className="text-sm font-medium text-neutral-600">{categoryLabel}</div>
+      {/* CABEÇALHO */}
+      <div className="px-4 mb-2 flex items-center justify-between">
+        <div className="leading-tight">
+          <h2 className="text-base font-semibold text-neutral-900">
+            {title}
+          </h2>
+          <div className="text-sm font-medium text-neutral-600">
+            {categoryLabel}
+          </div>
         </div>
 
         {!hideViewAll ? (
-          <Link
-            href={viewAllHref}
-            className="text-sm font-semibold text-emerald-700 relative -top-[3px]"
-          >
-            Ver todas ({categoryCount})
-          </Link>
+          <div className="flex items-center">
+            <Link
+              href={viewAllHref}
+              className="text-sm font-semibold text-emerald-700"
+            >
+              Ver todas ({categoryCount})
+            </Link>
+          </div>
         ) : (
-          <span className="opacity-0 select-none text-sm font-semibold">
-            Ver todas
-          </span>
+          <div className="flex items-center opacity-0 select-none">
+            <span className="text-sm font-semibold">
+              Ver todas ({categoryCount})
+            </span>
+          </div>
         )}
       </div>
 
-      {/* Carrossel */}
-      <div ref={scrollRef} className="flex gap-3 px-4 overflow-x-auto no-scrollbar">
+      {/* CARROSSEL */}
+      <div
+        ref={scrollRef}
+        className="flex gap-3 px-4 overflow-x-auto no-scrollbar"
+      >
         {list.map((item) => {
           const rating = item.rating ?? 4.9;
           const reviews = item.reviews ?? 812;
@@ -174,10 +185,7 @@ export default function ExposedCarouselRow({
             </button>
           );
 
-          /* =========================
-             2º CARROSSEL — PASSEIOS / TRANSFERS
-             3 LINHAS MÁX, SEM RETICÊNCIAS
-          ========================= */
+          /* 2º CARROSSEL — PASSEIOS / TRANSFERS */
           if (variant === 'tours') {
             return (
               <div key={item.id} className="min-w-[144px]">
@@ -194,11 +202,10 @@ export default function ExposedCarouselRow({
 
                     <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/80 to-transparent" />
 
-                    {/* TEXTO — corte seco após 3 linhas */}
                     <div className="absolute bottom-2 left-2 right-2 overflow-hidden">
                       <div
                         className="text-sm font-medium text-white leading-snug"
-                        style={{ maxHeight: '3.9em' }} // 3 linhas (~1.3em cada)
+                        style={{ maxHeight: '3.9em' }}
                       >
                         {item.title}
                       </div>
@@ -209,9 +216,7 @@ export default function ExposedCarouselRow({
             );
           }
 
-          /* =========================
-             1º CARROSSEL — GASTRONOMIA
-          ========================= */
+          /* 1º CARROSSEL — GASTRONOMIA */
           return (
             <div key={item.id} className="min-w-[144px]">
               <Link href={item.href} onClick={openModal}>
