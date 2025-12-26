@@ -20,6 +20,7 @@ type Props = {
   viewAllHref: string;
   items: ExposedCarouselItem[];
   className?: string;
+  variant?: 'default' | 'tours';
 };
 
 /* =========================
@@ -91,6 +92,7 @@ export default function ExposedCarouselRow({
   viewAllHref,
   items,
   className,
+  variant = 'default',
 }: Props) {
   const list = useMemo(() => items ?? [], [items]);
   if (!list.length) return null;
@@ -108,8 +110,7 @@ export default function ExposedCarouselRow({
       if (!el) return;
 
       const tolerance = 4; // px
-      const reachedEnd =
-        el.scrollLeft + el.clientWidth >= el.scrollWidth - tolerance;
+      const reachedEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - tolerance;
 
       setHideViewAll(reachedEnd);
     }
@@ -155,7 +156,6 @@ export default function ExposedCarouselRow({
             Ver todas ({categoryCount})
           </Link>
         ) : (
-          // placeholder pra não “puxar” o layout quando esconder
           <span className="relative -top-[3px] text-sm font-semibold text-emerald-700 opacity-0 select-none">
             Ver todas ({categoryCount})
           </span>
@@ -174,6 +174,73 @@ export default function ExposedCarouselRow({
             const isFav = !!fav[item.id];
             const savings = item.savingsText ?? 'Economia de R$50 a R$190';
 
+            /* =========================
+               VARIANTE: PASSEIOS / TRANSFERS
+               (texto dentro da imagem)
+            ========================= */
+            if (variant === 'tours') {
+              return (
+                <div
+                  key={item.id}
+                  className="relative min-w-[144px] max-w-[144px] flex-shrink-0"
+                >
+                  <Link
+                    href={item.href}
+                    className="block active:opacity-90"
+                    onClick={(e) => openModal(e)}
+                  >
+                    <div className="relative aspect-[3/4] overflow-hidden rounded-xl bg-neutral-200">
+                      {item.imageUrl ? (
+                        <img
+                          src={item.imageUrl}
+                          alt={item.title}
+                          className="h-full w-full object-cover"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="h-full w-full bg-neutral-300" />
+                      )}
+
+                      {/* ⭐ Nota (canto superior esquerdo) */}
+                      <div className="absolute left-2 top-2 z-[5] rounded-full bg-black/55 px-2 py-0.5 backdrop-blur">
+                        <span className="text-[12px] font-semibold text-amber-400">★</span>{' '}
+                        <span className="text-[12px] font-semibold text-white">
+                          {rating.toFixed(1)}
+                        </span>
+                      </div>
+
+                      {/* ❤️ Favorito (canto superior direito) */}
+                      <button
+                        type="button"
+                        aria-label={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setFav((p) => ({ ...p, [item.id]: !p[item.id] }));
+                        }}
+                        className="absolute right-2 top-2 z-[5] inline-flex h-8 w-8 items-center justify-center rounded-full bg-black/40 backdrop-blur"
+                      >
+                        <HeartIcon filled={isFav} />
+                      </button>
+
+                      {/* Gradiente inferior */}
+                      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+
+                      {/* Texto dentro da imagem */}
+                      <div className="pointer-events-none absolute bottom-2 left-2 right-2 z-[6]">
+                        <div className="text-sm font-semibold leading-snug text-white line-clamp-2">
+                          {item.title}
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                </div>
+              );
+            }
+
+            /* =========================
+               VARIANTE PADRÃO (Gastronomia)
+            ========================= */
             return (
               <div
                 key={item.id}
@@ -199,9 +266,7 @@ export default function ExposedCarouselRow({
                     {/* ★ TEXTO DENTRO DA FOTO */}
                     <div className="absolute left-2 top-2 rounded-md bg-black/25 px-2 py-1 backdrop-blur-[4px] ring-1 ring-white/15 pointer-events-none">
                       <div className="leading-none">
-                        <span className="text-[12px] font-semibold text-amber-400">
-                          ★
-                        </span>{' '}
+                        <span className="text-[12px] font-semibold text-amber-400">★</span>{' '}
                         <span className="text-[11px] font-semibold text-white">
                           {rating.toFixed(1)} de {reviews}
                         </span>
@@ -218,7 +283,6 @@ export default function ExposedCarouselRow({
                       {savings}
                     </div>
 
-                    {/* ✅ NÃO é button (evita HTML inválido dentro do Link) */}
                     <span
                       className="mt-2 inline-block text-[14px] font-semibold text-green-600"
                       onClick={(e) => openModal(e)}
@@ -258,9 +322,7 @@ export default function ExposedCarouselRow({
             <div className="relative aspect-square overflow-hidden rounded-lg border border-dashed border-neutral-300 bg-white">
               <div className="absolute inset-0 grid place-items-center px-3 text-center">
                 <div className="leading-tight">
-                  <div className="text-sm font-semibold text-neutral-900">
-                    Ver todos
-                  </div>
+                  <div className="text-sm font-semibold text-neutral-900">Ver todos</div>
                   <div className="-mt-[2px] text-sm font-semibold text-neutral-900">
                     da {categoryLabel}
                   </div>

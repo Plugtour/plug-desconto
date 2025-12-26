@@ -11,6 +11,7 @@ import SponsoredOffersRow from './offers/SponsoredOffersRow';
 import ExposedCarouselRow from './offers/ExposedCarouselRow';
 
 import { SPONSORED_OFFERS } from '../../_data/sponsoredOffers';
+import { EXPOSED_GASTRONOMY, EXPOSED_TOURS_TRANSFERS } from '../../_data/exposedOffers';
 
 /* =========================
    TIPOS
@@ -575,22 +576,25 @@ export default function HomeScreenClient({
 
       <SponsoredOffersRow items={SPONSORED_OFFERS} className="mt-4" />
 
+      {/* CARROSSEL 1 — Gastronomia (padrão) */}
       <ExposedCarouselRow
         className="mt-6"
         title="Você também pode gostar"
         categoryLabel="Gastronomia"
         categoryCount={gastronomyCount}
         viewAllHref="/gastronomia"
-        items={[
-          { id: 'r1', title: 'Cantina da Serra — Massas artesanais', imageUrl: '/images/gastronomia/rest-01.webp', href: '#', savingsText: 'Economia de R$30 a R$90', rating: 4.9, reviews: 812 },
-          { id: 'r2', title: 'Bistrô do Vale — Menu executivo', imageUrl: '/images/gastronomia/rest-02.webp', href: '#', savingsText: 'Economia de R$25 a R$80', rating: 4.8, reviews: 524 },
-          { id: 'r3', title: 'Casa do Fondue — Sequência completa', imageUrl: '/images/gastronomia/rest-03.webp', href: '#', savingsText: 'Economia de R$40 a R$120', rating: 4.8, reviews: 673 },
-          { id: 'r4', title: 'Churrasco & Brasa — Rodízio premium', imageUrl: '/images/gastronomia/rest-04.webp', href: '#', savingsText: 'Economia de R$35 a R$110', rating: 4.7, reviews: 391 },
-          { id: 'r5', title: 'Café Colonial do Centro — Tradição', imageUrl: '/images/gastronomia/rest-05.webp', href: '#', savingsText: 'Economia de R$20 a R$70', rating: 4.8, reviews: 980 },
-          { id: 'r6', title: 'Pizzaria da Rua Coberta — Forno a lenha', imageUrl: '/images/gastronomia/rest-06.webp', href: '#', savingsText: 'Economia de R$18 a R$60', rating: 4.6, reviews: 268 },
-          { id: 'r7', title: 'Hamburgueria da Praça — Combo especial', imageUrl: '/images/gastronomia/rest-07.webp', href: '#', savingsText: 'Economia de R$15 a R$50', rating: 4.7, reviews: 457 },
-          { id: 'r8', title: 'Doce & Cia — Sobremesas e cafés', imageUrl: '/images/gastronomia/rest-08.webp', href: '#', savingsText: 'Economia de R$10 a R$35', rating: 4.9, reviews: 621 },
-        ]}
+        items={EXPOSED_GASTRONOMY}
+      />
+
+      {/* CARROSSEL 2 — Passeios e Transfers (distância maior) */}
+      <ExposedCarouselRow
+        className="mt-10"
+        title="Planeje seu dia"
+        categoryLabel="Passeios e Transfers"
+        categoryCount={EXPOSED_TOURS_TRANSFERS.length}
+        viewAllHref="/passeios-transfers"
+        items={EXPOSED_TOURS_TRANSFERS}
+        variant="tours"
       />
 
       {/* resto da Home depois */}
