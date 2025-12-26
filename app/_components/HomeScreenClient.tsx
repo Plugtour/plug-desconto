@@ -270,6 +270,12 @@ export default function HomeScreenClient({
     []
   );
 
+  const categoryTitleById = useMemo(() => {
+    const map = new Map<string, string>();
+    categories.forEach((c) => map.set(c.id, c.title));
+    return map;
+  }, [categories]);
+
   const searchCategories: SearchCategory[] = useMemo(() => {
     return categories.map((c) => ({ id: c.id, title: c.title, count: c.count }));
   }, [categories]);
@@ -307,7 +313,7 @@ export default function HomeScreenClient({
         return { id, slug, title, subtitle, categoryId, city, priceText, imageUrl };
       })
       .filter(Boolean) as SearchOffer[];
-  }, [offers]);
+  }, [offers, categories]);
 
   /* =========================
      TOP 10 MELHORES AVALIADOS
@@ -321,7 +327,7 @@ export default function HomeScreenClient({
         if (!id || !title) return null;
 
         const rating = safeNum(o?.rating ?? o?.avaliacao ?? o?.stars, NaN);
-        if (!Number.isFinite(rating)) return null; // só entra no ranking se tiver avaliação
+        if (!Number.isFinite(rating)) return null;
 
         const reviews = safeNum(o?.reviews ?? o?.avaliacoes ?? o?.reviewCount, 0);
 
@@ -329,6 +335,9 @@ export default function HomeScreenClient({
           (o?.imageUrl ?? o?.image ?? o?.cover ?? o?.coverImage ?? o?.banner ?? null) as
             | string
             | null;
+
+        const categoryId = String(o?.categoryId ?? o?.category ?? o?.categoriaId ?? '').trim();
+        const categoryLabel = categoryTitleById.get(categoryId) ?? 'Geral';
 
         return {
           id,
@@ -338,18 +347,21 @@ export default function HomeScreenClient({
           savingsText: o?.savingsText ?? o?.economiaTexto ?? null,
           rating,
           reviews,
+          categoryLabel,
         };
       })
       .filter(Boolean) as ExposedCarouselItem[];
 
-    // fallback: mockados para completar até 10
-    const fallbackPool = [...EXPOSED_GASTRONOMY, ...EXPOSED_TOURS_TRANSFERS].map((x) => ({
-      ...x,
-      rating: x.rating ?? 4.9,
-      reviews: x.reviews ?? 800,
-    }));
+    // fallback para completar até 10
+    const fallbackPool: ExposedCarouselItem[] = [...EXPOSED_GASTRONOMY, ...EXPOSED_TOURS_TRANSFERS].map(
+      (x: any) => ({
+        ...x,
+        rating: x.rating ?? 4.9,
+        reviews: x.reviews ?? 800,
+        categoryLabel: x.categoryLabel ?? x.category ?? 'Geral',
+      })
+    );
 
-    // junta, remove duplicados por id e ordena
     const merged = [...fromOffers, ...fallbackPool];
 
     const unique: ExposedCarouselItem[] = [];
@@ -371,7 +383,7 @@ export default function HomeScreenClient({
     });
 
     return unique.slice(0, 10);
-  }, [offers]);
+  }, [offers, categoryTitleById]);
 
   /* =========================
      MENU TOPO (igual estava)
@@ -658,7 +670,7 @@ export default function HomeScreenClient({
 
       <SponsoredOffersRow items={SPONSORED_OFFERS} className="mt-4" />
 
-      {/* ✅ CARROSSEL — TOP 10 MELHORES AVALIADOS (misturado) */}
+      {/* TOP 10 MELHORES AVALIADOS */}
       <ExposedCarouselRow
         className="mt-6"
         title="Top 10 melhores avaliados"
@@ -668,21 +680,7 @@ export default function HomeScreenClient({
         items={topRatedItems}
       />
 
-      {/* ✅ Cards redondos (carrossel) */}
       <CategoryCardsSection className="mt-8" />
-
-      {/* (Opcional) Mantido para testar depois: carrossel 2 */}
-      {/*
-      <ExposedCarouselRow
-        className="mt-[44px]"
-        title="Planeje seu dia"
-        categoryLabel="Passeios e Transfers"
-        categoryCount={EXPOSED_TOURS_TRANSFERS.length}
-        viewAllHref="/passeios-transfers"
-        items={EXPOSED_TOURS_TRANSFERS}
-        variant="tours"
-      />
-      */}
 
       {/* resto da Home depois */}
     </div>
