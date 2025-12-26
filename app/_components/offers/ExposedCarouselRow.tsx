@@ -25,7 +25,6 @@ type Props = {
 
 /* =========================
    SCROLL LOCK GLOBAL (robusto)
-   - evita bug de scroll quando há mais de 1 modal no site
 ========================= */
 declare global {
   interface Window {
@@ -101,9 +100,9 @@ function HeartIcon({ filled }: { filled: boolean }) {
 /* =========================
    MODAL LATERAL
    - entra da direita
-   - trava scroll atrás (hook robusto)
+   - trava scroll atrás
    - clicar fora fecha
-   - mantém botão "Fechar"
+   - mantém botão Fechar
 ========================= */
 function SideModal({
   open,
@@ -324,7 +323,7 @@ export default function ExposedCarouselRow({
     );
   }
 
-  // ✅ carrossel 2: altura +20% (mantendo largura)
+  // ✅ carrossel 2: altura +20%
   // antes: aspect-[3/3.2] -> altura 3.2
   // agora: 3.2 * 1.2 = 3.84
   function ViewAllCardTours() {
@@ -376,11 +375,14 @@ export default function ExposedCarouselRow({
       <div className="relative">
         <div
           ref={scrollRef}
-          className="no-scrollbar flex gap-3 px-4 overflow-x-auto scroll-smooth overscroll-x-contain touch-pan-x"
+          className={[
+            'no-scrollbar flex gap-3 px-4 overflow-x-auto',
+            'scroll-smooth overscroll-x-contain',
+            // ✅ IMPORTANTE: não bloquear o scroll vertical
+            'touch-auto',
+          ].join(' ')}
         >
-          {/* =========================
-              VARIANT DEFAULT (1º carrossel)
-          ========================= */}
+          {/* VARIANT DEFAULT */}
           {variant === 'default' &&
             list.map((item) => {
               const rating = item.rating ?? 4.9;
@@ -434,7 +436,6 @@ export default function ExposedCarouselRow({
                     </div>
                   </Link>
 
-                  {/* ❤️ Coração */}
                   <button
                     type="button"
                     aria-label={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
@@ -453,10 +454,7 @@ export default function ExposedCarouselRow({
 
           {variant === 'default' && <ViewAllCardDefault />}
 
-          {/* =========================
-              VARIANT TOURS (2º carrossel)
-              ✅ altura +20% no card (aspect-[3/3.84])
-          ========================= */}
+          {/* VARIANT TOURS */}
           {variant === 'tours' &&
             list.map((item) => {
               const rating = item.rating ?? 4.9;
@@ -484,7 +482,6 @@ export default function ExposedCarouselRow({
 
                       <RatingBadge rating={rating} reviews={reviews} />
 
-                      {/* ❤️ Coração */}
                       <button
                         type="button"
                         aria-label={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
@@ -498,7 +495,6 @@ export default function ExposedCarouselRow({
                         <HeartIcon filled={isFav} />
                       </button>
 
-                      {/* faixa escura + título dentro da imagem */}
                       <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/80 to-transparent" />
 
                       <div className="absolute bottom-2 left-2 right-2 overflow-hidden">
