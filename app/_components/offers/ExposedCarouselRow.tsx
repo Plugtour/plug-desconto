@@ -3,14 +3,23 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 
+import ProductSideModal from './ProductSideModal';
+
 export type ExposedCarouselItem = {
   id: string;
   title: string;
   imageUrl?: string | null;
   href: string;
+
   savingsText?: string | null;
   rating?: number | null;
   reviews?: number | null;
+
+  // ===== Conteúdo do modal (expansível) =====
+  gallery?: string[] | null;
+  description?: string | null;
+  highlights?: string[] | null;
+  couponCode?: string | null;
 };
 
 type Props = {
@@ -23,218 +32,6 @@ type Props = {
   variant?: 'default' | 'tours';
 };
 
-/* =========================
-   SCROLL LOCK GLOBAL (robusto)
-========================= */
-declare global {
-  interface Window {
-    __PLUG_SCROLL_LOCK_COUNT__?: number;
-    __PLUG_SCROLL_LOCK_Y__?: number;
-  }
-}
-
-function useBodyScrollLock(active: boolean) {
-  useEffect(() => {
-    if (!active) return;
-
-    const w = window as any;
-    w.__PLUG_SCROLL_LOCK_COUNT__ = (w.__PLUG_SCROLL_LOCK_COUNT__ || 0) + 1;
-
-    if (w.__PLUG_SCROLL_LOCK_COUNT__ === 1) {
-      const y = window.scrollY || 0;
-      w.__PLUG_SCROLL_LOCK_Y__ = y;
-
-      document.body.style.position = 'fixed';
-      document.body.style.top = `-${y}px`;
-      document.body.style.left = '0';
-      document.body.style.right = '0';
-      document.body.style.width = '100%';
-      document.body.style.overflow = 'hidden';
-    }
-
-    return () => {
-      w.__PLUG_SCROLL_LOCK_COUNT__ = Math.max(
-        0,
-        (w.__PLUG_SCROLL_LOCK_COUNT__ || 1) - 1
-      );
-
-      if (w.__PLUG_SCROLL_LOCK_COUNT__ === 0) {
-        const y = Number(w.__PLUG_SCROLL_LOCK_Y__ || 0);
-
-        document.body.style.position = '';
-        document.body.style.top = '';
-        document.body.style.left = '';
-        document.body.style.right = '';
-        document.body.style.width = '';
-        document.body.style.overflow = '';
-
-        requestAnimationFrame(() => {
-          window.scrollTo(0, y);
-        });
-
-        w.__PLUG_SCROLL_LOCK_Y__ = 0;
-      }
-    };
-  }, [active]);
-}
-
-/* =========================
-   CORAÇÃO (path aprovado)
-========================= */
-function HeartIcon({ filled }: { filled: boolean }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className={`h-6 w-6 transition ${filled ? 'text-red-500' : 'text-white'}`}
-      fill={filled ? 'currentColor' : 'none'}
-      stroke="currentColor"
-      strokeWidth={filled ? 0 : 2}
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M12 21C12 21 4 15.36 4 9.5C4 7.02 6.02 5 8.5 5C10.04 5 11.4 5.81 12 7C12.6 5.81 13.96 5 15.5 5C17.98 5 20 7.02 20 9.5C20 15.36 12 21 12 21Z" />
-    </svg>
-  );
-}
-
-/* =========================
-   MODAL LATERAL
-   - entra da direita
-   - trava scroll atrás
-   - clicar fora fecha
-   - mantém botão Fechar
-========================= */
-function SideModal({
-  open,
-  closing,
-  onClose,
-}: {
-  open: boolean;
-  closing: boolean;
-  onClose: () => void;
-}) {
-  useBodyScrollLock(open);
-
-  if (!open) return null;
-
-  return (
-    <div
-      className="fixed inset-0 z-[999]"
-      role="presentation"
-      onMouseDown={onClose}
-      onTouchStart={onClose}
-    >
-      <div
-        className={[
-          'absolute inset-0 rounded-md bg-black/35 backdrop-blur-[6px] touch-manipulation',
-          closing ? 'backdrop-exit' : 'backdrop-enter',
-        ].join(' ')}
-      />
-
-      <div className="absolute inset-0">
-        <div
-          className={[
-            'absolute right-0',
-            'top-[50px] bottom-0',
-            'w-[calc(100%-12px)] max-w-md',
-            'touch-manipulation',
-            closing ? 'side-exit' : 'side-enter',
-          ].join(' ')}
-          onMouseDown={(e) => e.stopPropagation()}
-          onTouchStart={(e) => e.stopPropagation()}
-        >
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onClose();
-            }}
-            className={[
-              'absolute left-0 -top-9',
-              'touch-manipulation rounded-md',
-              'bg-white/80 ring-1 ring-black/10',
-              'px-3 py-1.5 text-[13px] font-normal',
-              'text-red-500 hover:text-red-600 hover:bg-white',
-            ].join(' ')}
-          >
-            Fechar
-          </button>
-
-          <div className="h-full w-full rounded-tr-none rounded-br-none rounded-bl-none rounded-tl-md bg-zinc-100 ring-1 ring-black/10">
-            {/* conteúdo futuro */}
-          </div>
-        </div>
-      </div>
-
-      <style jsx global>{`
-        @keyframes backdropEnter {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
-        }
-        @keyframes backdropExit {
-          from {
-            opacity: 1;
-          }
-          to {
-            opacity: 0;
-          }
-        }
-        .backdrop-enter {
-          animation: backdropEnter 240ms ease-out both;
-        }
-        .backdrop-exit {
-          animation: backdropExit 240ms ease-in both;
-        }
-
-        @keyframes sideEnter {
-          from {
-            transform: translateX(28px);
-            opacity: 0.98;
-          }
-          to {
-            transform: translateX(0);
-            opacity: 1;
-          }
-        }
-        @keyframes sideExit {
-          from {
-            transform: translateX(0);
-            opacity: 1;
-          }
-          to {
-            transform: translateX(28px);
-            opacity: 0.98;
-          }
-        }
-        .side-enter {
-          animation: sideEnter 280ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
-        }
-        .side-exit {
-          animation: sideExit 240ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
-        }
-
-        .no-scrollbar::-webkit-scrollbar {
-          width: 0;
-          height: 0;
-          display: none;
-        }
-        .no-scrollbar {
-          scrollbar-width: none;
-          -ms-overflow-style: none;
-          -webkit-overflow-scrolling: touch;
-        }
-      `}</style>
-    </div>
-  );
-}
-
-/* =========================
-   COMPONENTE PRINCIPAL
-========================= */
 export default function ExposedCarouselRow({
   title = 'Você também pode gostar',
   categoryLabel = 'Gastronomia',
@@ -251,13 +48,22 @@ export default function ExposedCarouselRow({
 
   const [modalOpen, setModalOpen] = useState(false);
   const [modalClosing, setModalClosing] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  function openModal(e?: React.SyntheticEvent) {
+  const selectedItem = useMemo(() => {
+    if (!selectedId) return null;
+    return list.find((x) => x.id === selectedId) ?? null;
+  }, [selectedId, list]);
+
+  const isSelectedFav = selectedId ? !!fav[selectedId] : false;
+
+  function openModalFor(itemId: string, e?: React.SyntheticEvent) {
     if (e) {
       e.preventDefault();
       // @ts-ignore
       e.stopPropagation?.();
     }
+    setSelectedId(itemId);
     setModalOpen(true);
     setModalClosing(false);
   }
@@ -267,10 +73,43 @@ export default function ExposedCarouselRow({
     window.setTimeout(() => {
       setModalOpen(false);
       setModalClosing(false);
+      setSelectedId(null);
     }, 240);
   }
 
-  // ✅ esconde "Ver todas" quando chega no último card
+  function toggleSelectedFav() {
+    if (!selectedId) return;
+    setFav((p) => ({ ...p, [selectedId]: !p[selectedId] }));
+  }
+
+  async function shareSelected() {
+    try {
+      const it = selectedItem;
+      if (!it) return;
+
+      const url =
+        typeof window !== 'undefined'
+          ? it.href
+            ? new URL(it.href, window.location.origin).toString()
+            : window.location.href
+          : '';
+
+      if (navigator.share) {
+        await navigator.share({
+          title: it.title ?? 'Plug Desconto',
+          text: '',
+          url,
+        });
+        return;
+      }
+
+      if (navigator.clipboard && url) {
+        await navigator.clipboard.writeText(url);
+      }
+    } catch {}
+  }
+
+  // esconde "Ver todas" quando chega no último card
   const [hideViewAll, setHideViewAll] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
@@ -323,9 +162,6 @@ export default function ExposedCarouselRow({
     );
   }
 
-  // ✅ carrossel 2: altura +20%
-  // antes: aspect-[3/3.2] -> altura 3.2
-  // agora: 3.2 * 1.2 = 3.84
   function ViewAllCardTours() {
     return (
       <Link href={viewAllHref} className="min-w-[144px] max-w-[144px] flex-shrink-0">
@@ -348,7 +184,17 @@ export default function ExposedCarouselRow({
 
   return (
     <section className={className}>
-      <SideModal open={modalOpen} closing={modalClosing} onClose={closeModal} />
+      <ProductSideModal
+        open={modalOpen}
+        closing={modalClosing}
+        onClose={closeModal}
+        item={selectedItem}
+        categoryLabel={categoryLabel}
+        variant={variant}
+        isFav={isSelectedFav}
+        onToggleFav={toggleSelectedFav}
+        onShare={shareSelected}
+      />
 
       {/* Cabeçalho */}
       <div className="px-4 mb-2 flex items-center justify-between">
@@ -378,7 +224,6 @@ export default function ExposedCarouselRow({
           className={[
             'no-scrollbar flex gap-3 px-4 overflow-x-auto',
             'scroll-smooth overscroll-x-contain',
-            // ✅ IMPORTANTE: não bloquear o scroll vertical
             'touch-auto',
           ].join(' ')}
         >
@@ -395,7 +240,7 @@ export default function ExposedCarouselRow({
                   <Link
                     href={item.href}
                     className="block active:opacity-90"
-                    onClick={(e) => openModal(e)}
+                    onClick={(e) => openModalFor(item.id, e)}
                   >
                     <div className="relative aspect-square overflow-hidden rounded-lg bg-neutral-200">
                       {item.imageUrl ? (
@@ -424,12 +269,7 @@ export default function ExposedCarouselRow({
                       <button
                         type="button"
                         className="mt-2 text-[14px] font-semibold text-green-600"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setModalOpen(true);
-                          setModalClosing(false);
-                        }}
+                        onClick={(e) => openModalFor(item.id, e)}
                       >
                         Ver mais
                       </button>
@@ -446,7 +286,17 @@ export default function ExposedCarouselRow({
                     }}
                     className="absolute right-2 top-2 z-[5] inline-flex h-7 w-7 items-center justify-center rounded-full bg-black/20 backdrop-blur-[4px] ring-1 ring-white/15"
                   >
-                    <HeartIcon filled={isFav} />
+                    <svg
+                      viewBox="0 0 24 24"
+                      className={`h-6 w-6 transition ${isFav ? 'text-red-500' : 'text-white'}`}
+                      fill={isFav ? 'currentColor' : 'none'}
+                      stroke="currentColor"
+                      strokeWidth={isFav ? 0 : 2}
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M12 21C12 21 4 15.36 4 9.5C4 7.02 6.02 5 8.5 5C10.04 5 11.4 5.81 12 7C12.6 5.81 13.96 5 15.5 5C17.98 5 20 7.02 20 9.5C20 15.36 12 21 12 21Z" />
+                    </svg>
                   </button>
                 </div>
               );
@@ -466,7 +316,7 @@ export default function ExposedCarouselRow({
                   <Link
                     href={item.href}
                     className="block active:opacity-90"
-                    onClick={(e) => openModal(e)}
+                    onClick={(e) => openModalFor(item.id, e)}
                   >
                     <div className="relative aspect-[3/3.84] overflow-hidden rounded-xl bg-neutral-200">
                       {item.imageUrl ? (
@@ -482,19 +332,6 @@ export default function ExposedCarouselRow({
 
                       <RatingBadge rating={rating} reviews={reviews} />
 
-                      <button
-                        type="button"
-                        aria-label={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setFav((p) => ({ ...p, [item.id]: !p[item.id] }));
-                        }}
-                        className="absolute right-2 top-2 z-[5] inline-flex h-7 w-7 items-center justify-center rounded-full bg-black/20 backdrop-blur-[4px] ring-1 ring-white/15"
-                      >
-                        <HeartIcon filled={isFav} />
-                      </button>
-
                       <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/80 to-transparent" />
 
                       <div className="absolute bottom-2 left-2 right-2 overflow-hidden">
@@ -504,6 +341,29 @@ export default function ExposedCarouselRow({
                       </div>
                     </div>
                   </Link>
+
+                  <button
+                    type="button"
+                    aria-label={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setFav((p) => ({ ...p, [item.id]: !p[item.id] }));
+                    }}
+                    className="absolute right-2 top-2 z-[5] inline-flex h-7 w-7 items-center justify-center rounded-full bg-black/20 backdrop-blur-[4px] ring-1 ring-white/15"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      className={`h-6 w-6 transition ${isFav ? 'text-red-500' : 'text-white'}`}
+                      fill={isFav ? 'currentColor' : 'none'}
+                      stroke="currentColor"
+                      strokeWidth={isFav ? 0 : 2}
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M12 21C12 21 4 15.36 4 9.5C4 7.02 6.02 5 8.5 5C10.04 5 11.4 5.81 12 7C12.6 5.81 13.96 5 15.5 5C17.98 5 20 7.02 20 9.5C20 15.36 12 21 12 21Z" />
+                    </svg>
+                  </button>
                 </div>
               );
             })}
@@ -511,6 +371,19 @@ export default function ExposedCarouselRow({
           {variant === 'tours' && <ViewAllCardTours />}
         </div>
       </div>
+
+      <style jsx global>{`
+        .no-scrollbar::-webkit-scrollbar {
+          width: 0;
+          height: 0;
+          display: none;
+        }
+        .no-scrollbar {
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+          -webkit-overflow-scrolling: touch;
+        }
+      `}</style>
     </section>
   );
 }
