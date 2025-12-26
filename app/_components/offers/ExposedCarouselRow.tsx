@@ -30,7 +30,7 @@ function HeartIcon({ filled }: { filled: boolean }) {
   return (
     <svg
       viewBox="0 0 24 24"
-      className={`h-6 w-6 transition ${filled ? 'text-red-500' : 'text-white'}`}
+      className={`h-6 w-6 ${filled ? 'text-red-500' : 'text-white'}`}
       fill={filled ? 'currentColor' : 'none'}
       stroke="currentColor"
       strokeWidth={filled ? 0 : 2}
@@ -58,23 +58,20 @@ function SponsoredSideModal({
     <div className="fixed inset-0 z-[999]">
       <button
         type="button"
-        aria-label="Fechar"
         onClick={onClose}
-        className="absolute inset-0 rounded-md bg-black/35 backdrop-blur-[6px]"
+        className="absolute inset-0 bg-black/35 backdrop-blur-[6px]"
       />
 
-      <div className="absolute inset-0">
-        <div className="absolute right-0 top-[50px] bottom-0 w-[calc(100%-12px)] max-w-md">
-          <button
-            type="button"
-            onClick={onClose}
-            className="absolute left-0 -top-9 rounded-md bg-white/80 ring-1 ring-black/10 px-3 py-1.5 text-[13px] text-red-500 hover:text-red-600"
-          >
-            Fechar
-          </button>
+      <div className="absolute right-0 top-[50px] bottom-0 w-[calc(100%-12px)] max-w-md">
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute left-0 -top-9 bg-white/80 px-3 py-1.5 text-[13px] text-red-500 rounded-md"
+        >
+          Fechar
+        </button>
 
-          <div className="h-full w-full rounded-tl-md bg-zinc-100 ring-1 ring-black/10" />
-        </div>
+        <div className="h-full w-full bg-zinc-100 rounded-tl-md" />
       </div>
     </div>
   );
@@ -102,19 +99,16 @@ export default function ExposedCarouselRow({
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    function onScroll() {
-      const el = scrollRef.current;
-      if (!el) return;
-      const tol = 4;
-      setHideViewAll(el.scrollLeft + el.clientWidth >= el.scrollWidth - tol);
-    }
-
     const el = scrollRef.current;
     if (!el) return;
 
+    const onScroll = () => {
+      const tol = 4;
+      setHideViewAll(el.scrollLeft + el.clientWidth >= el.scrollWidth - tol);
+    };
+
     el.addEventListener('scroll', onScroll, { passive: true });
     onScroll();
-
     return () => el.removeEventListener('scroll', onScroll);
   }, []);
 
@@ -130,7 +124,7 @@ export default function ExposedCarouselRow({
       <SponsoredSideModal open={open} onClose={() => setOpen(false)} />
 
       {/* Cabeçalho */}
-      <div className="px-4 mb-2 flex items-center justify-between">
+      <div className="px-4 mb-2 flex justify-between">
         <div>
           <h2 className="text-base font-semibold text-neutral-900">{title}</h2>
           <div className="text-sm font-medium text-neutral-600">{categoryLabel}</div>
@@ -144,143 +138,103 @@ export default function ExposedCarouselRow({
             Ver todas ({categoryCount})
           </Link>
         ) : (
-          <span className="text-sm font-semibold text-emerald-700 opacity-0 select-none relative -top-[3px]">
-            Ver todas ({categoryCount})
+          <span className="opacity-0 select-none text-sm font-semibold">
+            Ver todas
           </span>
         )}
       </div>
 
       {/* Carrossel */}
-      <div className="relative">
-        <div
-          ref={scrollRef}
-          className="no-scrollbar flex gap-3 px-4 overflow-x-auto scroll-smooth overscroll-x-contain"
-        >
-          {list.map((item) => {
-            const rating = item.rating ?? 4.8;
-            const isFav = !!fav[item.id];
+      <div ref={scrollRef} className="flex gap-3 px-4 overflow-x-auto no-scrollbar">
+        {list.map((item) => {
+          const rating = item.rating ?? 4.9;
+          const reviews = item.reviews ?? 812;
+          const isFav = !!fav[item.id];
 
-            /* =========================
-               VARIANTE — PASSEIOS / TRANSFERS
-               - texto dentro da imagem
-               - MÁX 2 linhas + reticências
-            ========================= */
-            if (variant === 'tours') {
-              return (
-                <div
-                  key={item.id}
-                  className="relative min-w-[144px] max-w-[144px] flex-shrink-0"
-                >
-                  <Link href={item.href} onClick={openModal}>
-                    <div className="relative aspect-[3/3.2] overflow-hidden rounded-xl bg-neutral-200">
-                      {item.imageUrl ? (
-                        <img
-                          src={item.imageUrl}
-                          alt={item.title}
-                          className="h-full w-full object-cover"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div className="h-full w-full bg-neutral-300" />
-                      )}
+          const RatingBadge = (
+            <div className="absolute left-2 top-2 rounded-md bg-black/25 px-2 py-1 backdrop-blur">
+              <span className="text-[14px] font-semibold text-amber-400">★</span>{' '}
+              <span className="text-[11px] font-semibold text-white">
+                {rating.toFixed(1)} de {reviews}
+              </span>
+            </div>
+          );
 
-                      {/* Nota */}
-                      <div className="absolute left-2 top-2 z-10 rounded-full bg-black/55 px-2 py-0.5 text-xs text-white backdrop-blur">
-                        <span className="text-amber-400">★</span> {rating.toFixed(1)}
-                      </div>
+          const FavoriteButton = (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setFav((p) => ({ ...p, [item.id]: !p[item.id] }));
+              }}
+              className="absolute right-2 top-2 bg-black/20 backdrop-blur rounded-full h-7 w-7 flex items-center justify-center"
+            >
+              <HeartIcon filled={isFav} />
+            </button>
+          );
 
-                      {/* Favorito */}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setFav((p) => ({ ...p, [item.id]: !p[item.id] }));
-                        }}
-                        className="absolute right-2 top-2 z-10 h-8 w-8 rounded-full bg-black/40 backdrop-blur flex items-center justify-center"
-                      >
-                        <HeartIcon filled={isFav} />
-                      </button>
-
-                      {/* Gradiente */}
-                      <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
-
-                      {/* TEXTO — máx 2 linhas com reticências */}
-                      <div className="absolute bottom-2 left-2 right-2 z-10">
-                        <div className="text-sm font-semibold leading-snug text-white line-clamp-2">
-                          {item.title}
-                        </div>
-                      </div>
-                    </div>
-                  </Link>
-                </div>
-              );
-            }
-
-            /* =========================
-               VARIANTE PADRÃO — GASTRONOMIA
-            ========================= */
+          /* =========================
+             2º CARROSSEL — PASSEIOS / TRANSFERS
+             3 LINHAS MÁX, SEM RETICÊNCIAS
+          ========================= */
+          if (variant === 'tours') {
             return (
-              <div
-                key={item.id}
-                className="relative min-w-[144px] max-w-[144px] flex-shrink-0"
-              >
+              <div key={item.id} className="min-w-[144px]">
                 <Link href={item.href} onClick={openModal}>
-                  <div className="relative aspect-square overflow-hidden rounded-lg bg-neutral-200">
-                    {item.imageUrl ? (
-                      <img
-                        src={item.imageUrl}
-                        alt={item.title}
-                        className="h-full w-full object-cover"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="h-full w-full bg-neutral-300" />
-                    )}
+                  <div className="relative aspect-[3/3.2] rounded-xl overflow-hidden">
+                    <img
+                      src={item.imageUrl ?? ''}
+                      alt={item.title}
+                      className="h-full w-full object-cover"
+                    />
 
-                    <div className="absolute left-2 top-2 rounded-md bg-black/25 px-2 py-1 backdrop-blur text-xs text-white">
-                      ★ {(item.rating ?? 4.9).toFixed(1)} de {item.reviews ?? 812}
-                    </div>
-                  </div>
+                    {RatingBadge}
+                    {FavoriteButton}
 
-                  <div className="mt-2">
-                    <div className="text-sm font-semibold text-neutral-900 line-clamp-2">
-                      {item.title}
+                    <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/80 to-transparent" />
+
+                    {/* TEXTO — corte seco após 3 linhas */}
+                    <div className="absolute bottom-2 left-2 right-2 overflow-hidden">
+                      <div
+                        className="text-sm font-medium text-white leading-snug"
+                        style={{ maxHeight: '3.9em' }} // 3 linhas (~1.3em cada)
+                      >
+                        {item.title}
+                      </div>
                     </div>
-                    <div className="mt-1 text-xs text-neutral-700">
-                      {item.savingsText ?? 'Economia exclusiva'}
-                    </div>
-                    <span className="mt-2 inline-block text-sm font-semibold text-green-600">
-                      Ver mais
-                    </span>
                   </div>
                 </Link>
-
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setFav((p) => ({ ...p, [item.id]: !p[item.id] }));
-                  }}
-                  className="absolute right-2 top-2 h-7 w-7 rounded-full bg-black/20 backdrop-blur flex items-center justify-center"
-                >
-                  <HeartIcon filled={isFav} />
-                </button>
               </div>
             );
-          })}
+          }
 
-          {/* Card final */}
-          <Link
-            href={viewAllHref}
-            className="min-w-[144px] max-w-[144px] flex-shrink-0"
-          >
-            <div className="aspect-square rounded-lg border border-dashed border-neutral-300 bg-white flex items-center justify-center text-center text-sm font-semibold text-neutral-900">
-              Ver todos<br />({categoryCount})
+          /* =========================
+             1º CARROSSEL — GASTRONOMIA
+          ========================= */
+          return (
+            <div key={item.id} className="min-w-[144px]">
+              <Link href={item.href} onClick={openModal}>
+                <div className="relative aspect-square rounded-lg overflow-hidden">
+                  <img
+                    src={item.imageUrl ?? ''}
+                    alt={item.title}
+                    className="h-full w-full object-cover"
+                  />
+
+                  {RatingBadge}
+                  {FavoriteButton}
+                </div>
+
+                <div className="mt-2">
+                  <div className="text-sm font-semibold text-neutral-900 line-clamp-2">
+                    {item.title}
+                  </div>
+                </div>
+              </Link>
             </div>
-          </Link>
-        </div>
+          );
+        })}
       </div>
     </section>
   );
