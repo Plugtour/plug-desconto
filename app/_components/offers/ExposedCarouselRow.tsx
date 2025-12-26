@@ -24,7 +24,8 @@ type Props = {
 };
 
 /* =========================
-   SCROLL LOCK (robusto, com contador global)
+   SCROLL LOCK GLOBAL (robusto)
+   - evita bug de scroll quando há mais de 1 modal no site
 ========================= */
 declare global {
   interface Window {
@@ -33,54 +34,49 @@ declare global {
   }
 }
 
-function useBodyScrollLock(locked: boolean) {
+function useBodyScrollLock(active: boolean) {
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (!active) return;
 
     const w = window as any;
+    w.__PLUG_SCROLL_LOCK_COUNT__ = (w.__PLUG_SCROLL_LOCK_COUNT__ || 0) + 1;
 
-    if (locked) {
-      w.__PLUG_SCROLL_LOCK_COUNT__ = (w.__PLUG_SCROLL_LOCK_COUNT__ || 0) + 1;
+    if (w.__PLUG_SCROLL_LOCK_COUNT__ === 1) {
+      const y = window.scrollY || 0;
+      w.__PLUG_SCROLL_LOCK_Y__ = y;
 
-      // só aplica estilos na PRIMEIRA trava
-      if (w.__PLUG_SCROLL_LOCK_COUNT__ === 1) {
-        const y = window.scrollY || 0;
-        w.__PLUG_SCROLL_LOCK_Y__ = y;
-
-        // trava com position fixed (mais confiável no iOS)
-        document.body.style.position = 'fixed';
-        document.body.style.top = `-${y}px`;
-        document.body.style.left = '0';
-        document.body.style.right = '0';
-        document.body.style.width = '100%';
-      }
-
-      return () => {
-        // cleanup do "locked"
-        w.__PLUG_SCROLL_LOCK_COUNT__ = Math.max(0, (w.__PLUG_SCROLL_LOCK_COUNT__ || 1) - 1);
-
-        // só destrava quando TODOS os locks fecharem
-        if (w.__PLUG_SCROLL_LOCK_COUNT__ === 0) {
-          const y = Number(w.__PLUG_SCROLL_LOCK_Y__ || 0);
-
-          document.body.style.position = '';
-          document.body.style.top = '';
-          document.body.style.left = '';
-          document.body.style.right = '';
-          document.body.style.width = '';
-
-          // restaura scroll com segurança
-          requestAnimationFrame(() => {
-            window.scrollTo(0, y);
-          });
-
-          w.__PLUG_SCROLL_LOCK_Y__ = 0;
-        }
-      };
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${y}px`;
+      document.body.style.left = '0';
+      document.body.style.right = '0';
+      document.body.style.width = '100%';
+      document.body.style.overflow = 'hidden';
     }
 
-    return;
-  }, [locked]);
+    return () => {
+      w.__PLUG_SCROLL_LOCK_COUNT__ = Math.max(
+        0,
+        (w.__PLUG_SCROLL_LOCK_COUNT__ || 1) - 1
+      );
+
+      if (w.__PLUG_SCROLL_LOCK_COUNT__ === 0) {
+        const y = Number(w.__PLUG_SCROLL_LOCK_Y__ || 0);
+
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.left = '';
+        document.body.style.right = '';
+        document.body.style.width = '';
+        document.body.style.overflow = '';
+
+        requestAnimationFrame(() => {
+          window.scrollTo(0, y);
+        });
+
+        w.__PLUG_SCROLL_LOCK_Y__ = 0;
+      }
+    };
+  }, [active]);
 }
 
 /* =========================
@@ -103,12 +99,13 @@ function HeartIcon({ filled }: { filled: boolean }) {
 }
 
 /* =========================
-   MODAL LATERAL (padrão patrocinado)
-   + trava scroll (robusto)
-   + fecha clicando fora
-   + mantém botão "Fechar"
+   MODAL LATERAL
+   - entra da direita
+   - trava scroll atrás (hook robusto)
+   - clicar fora fecha
+   - mantém botão "Fechar"
 ========================= */
-function SponsoredSideModal({
+function SideModal({
   open,
   closing,
   onClose,
@@ -117,7 +114,6 @@ function SponsoredSideModal({
   closing: boolean;
   onClose: () => void;
 }) {
-  // 🔒 trava scroll enquanto o modal existir (inclusive durante "closing")
   useBodyScrollLock(open);
 
   if (!open) return null;
@@ -125,8 +121,9 @@ function SponsoredSideModal({
   return (
     <div
       className="fixed inset-0 z-[999]"
-      onMouseDown={() => onClose()} // ✅ clicar fora fecha
       role="presentation"
+      onMouseDown={onClose}
+      onTouchStart={onClose}
     >
       <div
         className={[
@@ -144,15 +141,12 @@ function SponsoredSideModal({
             'touch-manipulation',
             closing ? 'side-exit' : 'side-enter',
           ].join(' ')}
-          onMouseDown={(e) => {
-            // ✅ clique dentro NÃO fecha
-            e.stopPropagation();
-          }}
+          onMouseDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
         >
           <button
             type="button"
             onClick={(e) => {
-              e.preventDefault();
               e.stopPropagation();
               onClose();
             }}
@@ -317,8 +311,12 @@ export default function ExposedCarouselRow({
           <div className="absolute inset-0 grid place-items-center px-3 text-center">
             <div>
               <div className="text-sm font-semibold text-neutral-900">Ver todos</div>
-              <div className="mt-1 text-sm font-semibold text-neutral-900">da {categoryLabel}</div>
-              <div className="mt-2 text-xs font-medium text-neutral-500">{categoryCount} opções</div>
+              <div className="mt-1 text-sm font-semibold text-neutral-900">
+                da {categoryLabel}
+              </div>
+              <div className="mt-2 text-xs font-medium text-neutral-500">
+                {categoryCount} opções
+              </div>
             </div>
           </div>
         </div>
@@ -326,6 +324,9 @@ export default function ExposedCarouselRow({
     );
   }
 
+  // ✅ carrossel 2: altura +20% (mantendo largura)
+  // antes: aspect-[3/3.2] -> altura 3.2
+  // agora: 3.2 * 1.2 = 3.84
   function ViewAllCardTours() {
     return (
       <Link href={viewAllHref} className="min-w-[144px] max-w-[144px] flex-shrink-0">
@@ -333,8 +334,12 @@ export default function ExposedCarouselRow({
           <div className="absolute inset-0 grid place-items-center px-3 text-center">
             <div className="leading-tight">
               <div className="text-sm font-semibold text-neutral-900">Ver todos</div>
-              <div className="mt-1 text-sm font-semibold text-neutral-900">da {categoryLabel}</div>
-              <div className="mt-2 text-xs font-medium text-neutral-500">{categoryCount} opções</div>
+              <div className="mt-1 text-sm font-semibold text-neutral-900">
+                da {categoryLabel}
+              </div>
+              <div className="mt-2 text-xs font-medium text-neutral-500">
+                {categoryCount} opções
+              </div>
             </div>
           </div>
         </div>
@@ -344,7 +349,7 @@ export default function ExposedCarouselRow({
 
   return (
     <section className={className}>
-      <SponsoredSideModal open={modalOpen} closing={modalClosing} onClose={closeModal} />
+      <SideModal open={modalOpen} closing={modalClosing} onClose={closeModal} />
 
       {/* Cabeçalho */}
       <div className="px-4 mb-2 flex items-center justify-between">
@@ -373,7 +378,9 @@ export default function ExposedCarouselRow({
           ref={scrollRef}
           className="no-scrollbar flex gap-3 px-4 overflow-x-auto scroll-smooth overscroll-x-contain touch-pan-x"
         >
-          {/* DEFAULT (carrossel 1) */}
+          {/* =========================
+              VARIANT DEFAULT (1º carrossel)
+          ========================= */}
           {variant === 'default' &&
             list.map((item) => {
               const rating = item.rating ?? 4.9;
@@ -383,19 +390,34 @@ export default function ExposedCarouselRow({
 
               return (
                 <div key={item.id} className="relative min-w-[144px] max-w-[144px] flex-shrink-0">
-                  <Link href={item.href} className="block active:opacity-90" onClick={(e) => openModal(e)}>
+                  <Link
+                    href={item.href}
+                    className="block active:opacity-90"
+                    onClick={(e) => openModal(e)}
+                  >
                     <div className="relative aspect-square overflow-hidden rounded-lg bg-neutral-200">
                       {item.imageUrl ? (
-                        <img src={item.imageUrl} alt={item.title} className="h-full w-full object-cover" loading="lazy" />
+                        <img
+                          src={item.imageUrl}
+                          alt={item.title}
+                          className="h-full w-full object-cover"
+                          loading="lazy"
+                        />
                       ) : (
                         <div className="h-full w-full bg-neutral-300" />
                       )}
+
                       <RatingBadge rating={rating} reviews={reviews} />
                     </div>
 
                     <div className="mt-2">
-                      <div className="text-sm font-semibold text-neutral-900 line-clamp-2">{item.title}</div>
-                      <div className="mt-1 text-[12px] font-medium text-neutral-700">{savings}</div>
+                      <div className="text-sm font-semibold text-neutral-900 line-clamp-2">
+                        {item.title}
+                      </div>
+
+                      <div className="mt-1 text-[12px] font-medium text-neutral-700">
+                        {savings}
+                      </div>
 
                       <button
                         type="button"
@@ -412,6 +434,7 @@ export default function ExposedCarouselRow({
                     </div>
                   </Link>
 
+                  {/* ❤️ Coração */}
                   <button
                     type="button"
                     aria-label={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
@@ -430,7 +453,10 @@ export default function ExposedCarouselRow({
 
           {variant === 'default' && <ViewAllCardDefault />}
 
-          {/* TOURS (carrossel 2) ✅ altura +20% */}
+          {/* =========================
+              VARIANT TOURS (2º carrossel)
+              ✅ altura +20% no card (aspect-[3/3.84])
+          ========================= */}
           {variant === 'tours' &&
             list.map((item) => {
               const rating = item.rating ?? 4.9;
@@ -439,16 +465,26 @@ export default function ExposedCarouselRow({
 
               return (
                 <div key={item.id} className="relative min-w-[144px] max-w-[144px] flex-shrink-0">
-                  <Link href={item.href} className="block active:opacity-90" onClick={(e) => openModal(e)}>
+                  <Link
+                    href={item.href}
+                    className="block active:opacity-90"
+                    onClick={(e) => openModal(e)}
+                  >
                     <div className="relative aspect-[3/3.84] overflow-hidden rounded-xl bg-neutral-200">
                       {item.imageUrl ? (
-                        <img src={item.imageUrl} alt={item.title} className="h-full w-full object-cover" loading="lazy" />
+                        <img
+                          src={item.imageUrl}
+                          alt={item.title}
+                          className="h-full w-full object-cover"
+                          loading="lazy"
+                        />
                       ) : (
                         <div className="h-full w-full bg-neutral-300" />
                       )}
 
                       <RatingBadge rating={rating} reviews={reviews} />
 
+                      {/* ❤️ Coração */}
                       <button
                         type="button"
                         aria-label={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
@@ -462,6 +498,7 @@ export default function ExposedCarouselRow({
                         <HeartIcon filled={isFav} />
                       </button>
 
+                      {/* faixa escura + título dentro da imagem */}
                       <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/80 to-transparent" />
 
                       <div className="absolute bottom-2 left-2 right-2 overflow-hidden">
