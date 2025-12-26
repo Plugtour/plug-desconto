@@ -8,7 +8,7 @@ import QuickSearch from './search/QuickSearch';
 import type { SearchCategory, SearchOffer } from './search/types';
 
 import SponsoredOffersRow from './offers/SponsoredOffersRow';
-import ExposedCarouselRow from './offers/ExposedCarouselRow';
+import ExposedCarouselRow, { type ExposedCarouselItem } from './offers/ExposedCarouselRow';
 
 import CategoryCardsSection from './categories/CategoryCardsSection';
 
@@ -224,6 +224,22 @@ function Icon({
   }
 }
 
+/* =========================
+   HELPERS
+========================= */
+
+function safeNum(v: any, fallback: number) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function buildOfferHref(o: any) {
+  const id = String(o?.id ?? o?._id ?? '').trim();
+  const slug = String(o?.slug ?? o?.seoSlug ?? o?.slugId ?? '').trim();
+  const key = slug || id;
+  return key ? `/ofertas/${encodeURIComponent(key)}` : '/ofertas';
+}
+
 export default function HomeScreenClient({
   regionLabel = 'Serra Gaúcha',
   offers = [],
@@ -253,8 +269,6 @@ export default function HomeScreenClient({
     ],
     []
   );
-
-  const gastronomyCount = useMemo(() => EXPOSED_GASTRONOMY.length, []);
 
   const searchCategories: SearchCategory[] = useMemo(() => {
     return categories.map((c) => ({ id: c.id, title: c.title, count: c.count }));
@@ -294,6 +308,74 @@ export default function HomeScreenClient({
       })
       .filter(Boolean) as SearchOffer[];
   }, [offers]);
+
+  /* =========================
+     TOP 10 MELHORES AVALIADOS
+  ========================= */
+
+  const topRatedItems: ExposedCarouselItem[] = useMemo(() => {
+    const fromOffers: ExposedCarouselItem[] = (Array.isArray(offers) ? offers : [])
+      .map((o: any): ExposedCarouselItem | null => {
+        const id = String(o?.id ?? o?._id ?? '').trim();
+        const title = String(o?.title ?? o?.name ?? o?.nome ?? o?.titulo ?? '').trim();
+        if (!id || !title) return null;
+
+        const rating = safeNum(o?.rating ?? o?.avaliacao ?? o?.stars, NaN);
+        if (!Number.isFinite(rating)) return null; // só entra no ranking se tiver avaliação
+
+        const reviews = safeNum(o?.reviews ?? o?.avaliacoes ?? o?.reviewCount, 0);
+
+        const imageUrl =
+          (o?.imageUrl ?? o?.image ?? o?.cover ?? o?.coverImage ?? o?.banner ?? null) as
+            | string
+            | null;
+
+        return {
+          id,
+          title,
+          imageUrl,
+          href: buildOfferHref(o),
+          savingsText: o?.savingsText ?? o?.economiaTexto ?? null,
+          rating,
+          reviews,
+        };
+      })
+      .filter(Boolean) as ExposedCarouselItem[];
+
+    // fallback: mockados para completar até 10
+    const fallbackPool = [...EXPOSED_GASTRONOMY, ...EXPOSED_TOURS_TRANSFERS].map((x) => ({
+      ...x,
+      rating: x.rating ?? 4.9,
+      reviews: x.reviews ?? 800,
+    }));
+
+    // junta, remove duplicados por id e ordena
+    const merged = [...fromOffers, ...fallbackPool];
+
+    const unique: ExposedCarouselItem[] = [];
+    const seen = new Set<string>();
+    for (const it of merged) {
+      if (!it?.id) continue;
+      if (seen.has(it.id)) continue;
+      seen.add(it.id);
+      unique.push(it);
+    }
+
+    unique.sort((a, b) => {
+      const ar = safeNum(a.rating, 0);
+      const br = safeNum(b.rating, 0);
+      if (br !== ar) return br - ar;
+      const av = safeNum(a.reviews, 0);
+      const bv = safeNum(b.reviews, 0);
+      return bv - av;
+    });
+
+    return unique.slice(0, 10);
+  }, [offers]);
+
+  /* =========================
+     MENU TOPO (igual estava)
+  ========================= */
 
   const scrollerRef = useRef<HTMLDivElement | null>(null);
 
@@ -420,6 +502,7 @@ export default function HomeScreenClient({
         <div className="mt-3 border-t border-zinc-300" />
       </div>
 
+      {/* MENU TOPO */}
       <section className="relative px-4 pt-4">
         <div className="pointer-events-none absolute inset-0 z-[1]">
           <div className="absolute left-0 top-0 h-full w-10 bg-gradient-to-r from-zinc-100 to-transparent" />
@@ -575,20 +658,20 @@ export default function HomeScreenClient({
 
       <SponsoredOffersRow items={SPONSORED_OFFERS} className="mt-4" />
 
-      {/* CARROSSEL 1 — Gastronomia (padrão) */}
+      {/* ✅ CARROSSEL — TOP 10 MELHORES AVALIADOS (misturado) */}
       <ExposedCarouselRow
         className="mt-6"
-        title="Você também pode gostar"
-        categoryLabel="Gastronomia"
-        categoryCount={gastronomyCount}
-        viewAllHref="/gastronomia"
-        items={EXPOSED_GASTRONOMY}
+        title="Top 10 melhores avaliados"
+        categoryLabel="Melhores avaliados"
+        categoryCount={topRatedItems.length}
+        viewAllHref="/top-avaliados"
+        items={topRatedItems}
       />
 
-      {/* ✅ NOVO: Cards redondos (2 linhas de 3) */}
+      {/* ✅ Cards redondos (carrossel) */}
       <CategoryCardsSection className="mt-8" />
 
-      {/* CARROSSEL 2 — Passeios e Transfers (oculto por enquanto) */}
+      {/* (Opcional) Mantido para testar depois: carrossel 2 */}
       {/*
       <ExposedCarouselRow
         className="mt-[44px]"
