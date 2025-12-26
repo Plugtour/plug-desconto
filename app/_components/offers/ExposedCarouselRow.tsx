@@ -45,6 +45,8 @@ function HeartIcon({ filled }: { filled: boolean }) {
 /* =========================
    MODAL LATERAL (mesmo padrão do patrocinado)
    + TRAVA SCROLL ATRÁS
+   + FECHA AO CLICAR FORA
+   + MANTÉM BOTÃO FECHAR
 ========================= */
 function SponsoredSideModal({
   open,
@@ -86,11 +88,13 @@ function SponsoredSideModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[999]">
-      <button
-        type="button"
-        aria-label="Fechar"
-        onClick={onClose}
+    <div
+      className="fixed inset-0 z-[999]"
+      onMouseDown={() => onClose()} // ✅ clicar fora fecha
+      role="presentation"
+    >
+      {/* backdrop (visual) */}
+      <div
         className={[
           'absolute inset-0 rounded-md bg-black/35 backdrop-blur-[6px] touch-manipulation',
           closing ? 'backdrop-exit' : 'backdrop-enter',
@@ -106,10 +110,18 @@ function SponsoredSideModal({
             'touch-manipulation',
             closing ? 'side-exit' : 'side-enter',
           ].join(' ')}
+          onMouseDown={(e) => {
+            // ✅ clique dentro NÃO fecha
+            e.stopPropagation();
+          }}
         >
           <button
             type="button"
-            onClick={onClose}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onClose();
+            }}
             className={[
               'absolute left-0 -top-9',
               'touch-manipulation rounded-md',
@@ -285,7 +297,8 @@ export default function ExposedCarouselRow({
   function ViewAllCardTours() {
     return (
       <Link href={viewAllHref} className="min-w-[144px] max-w-[144px] flex-shrink-0">
-        <div className="relative aspect-[3/3.2] overflow-hidden rounded-xl border border-dashed border-neutral-300 bg-white">
+        {/* ✅ também segue a altura do card do carrossel 2 */}
+        <div className="relative aspect-[3/3.84] overflow-hidden rounded-xl border border-dashed border-neutral-300 bg-white">
           <div className="absolute inset-0 grid place-items-center px-3 text-center">
             <div className="leading-tight">
               <div className="text-sm font-semibold text-neutral-900">Ver todos</div>
@@ -406,6 +419,7 @@ export default function ExposedCarouselRow({
 
           {/* =========================
               VARIANT TOURS (2º carrossel)
+              ✅ ALTURA +20%
           ========================= */}
           {variant === 'tours' &&
             list.map((item) => {
@@ -420,7 +434,8 @@ export default function ExposedCarouselRow({
                     className="block active:opacity-90"
                     onClick={(e) => openModal(e)}
                   >
-                    <div className="relative aspect-[3/3.2] overflow-hidden rounded-xl bg-neutral-200">
+                    {/* ✅ antes: aspect-[3/3.2] | agora: +20% => 3.84 */}
+                    <div className="relative aspect-[3/3.84] overflow-hidden rounded-xl bg-neutral-200">
                       {item.imageUrl ? (
                         <img
                           src={item.imageUrl}
