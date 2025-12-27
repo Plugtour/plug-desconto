@@ -3,6 +3,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import SideDrawer from './SideDrawer';
 
 export type ExposedCarouselItem = {
   id: string;
@@ -116,104 +117,23 @@ function TrophyIcon({ className }: { className?: string }) {
 }
 
 /* =========================
-   MODAL (mesmo padrão do patrocinado — sem conteúdo)
+   TAG (estilo “Patrocinado” – compacto)
 ========================= */
-function CarouselDrawer({
-  open,
-  onClose,
-}: {
-  open: boolean;
-  onClose: () => void;
-}) {
-  useEffect(() => {
-    if (!open) return;
-
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [open, onClose]);
-
-  useEffect(() => {
-    if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [open]);
-
-  const TOP_GAP_PX = 50;
-  const SIDE_GAP_PX = 24;
-  const BUTTON_ABOVE_PX = 36;
-
+function TagPill({ text }: { text: string }) {
   return (
-    <div
+    <span
       className={[
-        'fixed inset-0 z-[999]',
-        open ? 'pointer-events-auto' : 'pointer-events-none',
+        'inline-flex items-center',
+        'rounded-full',
+        'bg-white/70',
+        'ring-1 ring-black/10',
+        'px-2 py-[2px]',
+        'text-[10px] font-semibold text-zinc-700',
+        'leading-none',
       ].join(' ')}
-      aria-hidden={!open}
     >
-      {/* Overlay */}
-      <div
-        onClick={onClose}
-        className={[
-          'absolute inset-0',
-          'bg-black/25 backdrop-blur-[6px]',
-          'transition-opacity duration-200 ease-out',
-          open ? 'opacity-100' : 'opacity-0',
-        ].join(' ')}
-      />
-
-      {/* Botão Fechar */}
-      <button
-        type="button"
-        aria-label="Fechar"
-        onClick={onClose}
-        className={[
-          'absolute z-[1001]',
-          'touch-manipulation',
-          'rounded-md',
-          'bg-white/80',
-          'ring-1 ring-black/10',
-          'px-3 py-1.5',
-          'text-[13px] font-normal text-red-500',
-          'hover:bg-white hover:text-red-600',
-          'transition-all duration-250 ease-out',
-          open ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-full',
-        ].join(' ')}
-        style={{
-          left: SIDE_GAP_PX,
-          top: TOP_GAP_PX - BUTTON_ABOVE_PX,
-        }}
-      >
-        Fechar
-      </button>
-
-      {/* Drawer */}
-      <div
-        className={[
-          'absolute right-0',
-          'bg-zinc-100 shadow-2xl',
-          'rounded-md',
-          'transition-transform duration-250 ease-out',
-          open ? 'translate-x-0' : 'translate-x-full',
-        ].join(' ')}
-        style={{
-          top: TOP_GAP_PX,
-          height: `calc(100% - ${TOP_GAP_PX}px)`,
-          width: `calc(100% - ${SIDE_GAP_PX}px)`,
-        }}
-        role="dialog"
-        aria-modal="true"
-      >
-        {/* sem conteúdo por enquanto */}
-        <div className="h-full w-full" />
-      </div>
-    </div>
+      {text}
+    </span>
   );
 }
 
@@ -234,10 +154,10 @@ export default function ExposedCarouselRow({
   const [fav, setFav] = useState<Record<string, boolean>>({});
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
-  // ✅ ocultar "Ver Rank" do topo quando o último card (Ver Rank Completo) ficar visível (mesmo parcial)
+  // ✅ ocultar "Ver Rank" quando o último card (Ver Rank Completo) ficar visível (mesmo parcial)
   const [hideViewRank, setHideViewRank] = useState(false);
 
-  // modal
+  // ✅ modal (AGORA usando o SideDrawer — mesmo efeito do carrossel)
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   useEffect(() => {
@@ -249,7 +169,6 @@ export default function ExposedCarouselRow({
       if (!children.length) return;
 
       const lastCard = children[children.length - 1] as HTMLElement;
-
       const scrollerRect = scroller.getBoundingClientRect();
       const lastRect = lastCard.getBoundingClientRect();
 
@@ -262,20 +181,23 @@ export default function ExposedCarouselRow({
     scroller.addEventListener('scroll', onScroll, { passive: true });
     onScroll();
 
-    return () => {
-      scroller.removeEventListener('scroll', onScroll);
-    };
+    return () => scroller.removeEventListener('scroll', onScroll);
   }, []);
 
   return (
     <section className={className}>
-      <CarouselDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+      {/* ✅ Modal com o efeito correto */}
+      <SideDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
 
       {/* Cabeçalho */}
       <div className="px-4 mb-2 flex items-center justify-between">
         <div className="leading-[1.1]">
-          <h2 className="text-base font-semibold text-zinc-900 leading-[1.15]">{title}</h2>
-          <div className="-mt-[2px] text-sm font-medium text-zinc-600">{categoryLabel}</div>
+          <h2 className="text-base font-semibold text-zinc-900 leading-[1.15]">
+            {title}
+          </h2>
+          <div className="-mt-[2px] text-sm font-medium text-zinc-600">
+            {categoryLabel}
+          </div>
         </div>
 
         {!hideViewRank ? (
@@ -289,8 +211,11 @@ export default function ExposedCarouselRow({
         )}
       </div>
 
-      {/* Carrossel */}
-      <div ref={scrollRef} className="no-scrollbar flex gap-3 px-4 overflow-x-auto scroll-smooth">
+      {/* Carrossel (com degradê/scrollbar oculto como antes) */}
+      <div
+        ref={scrollRef}
+        className="no-scrollbar flex gap-3 px-4 overflow-x-auto scroll-smooth"
+      >
         {list.map((item, idx) => {
           const isFav = !!fav[item.id];
           const rating = item.rating ?? 4.8;
@@ -347,35 +272,50 @@ export default function ExposedCarouselRow({
                 </button>
               </div>
 
-              {/* TEXTO — fundo cinza só aqui */}
+              {/* TEXTO — fundo cinza só aqui (como você pediu) */}
               <div className="bg-zinc-200 px-2 py-2">
-                {/* ✅ altura fixa da área de título (2 linhas), mesmo quando não quebra */}
+                {/* ✅ altura fixa do título (2 linhas) */}
                 <div className="min-h-[26px] text-[11px] font-extrabold leading-[1.15] text-zinc-900 line-clamp-2">
                   {item.title}
                 </div>
 
+                {/* Economia */}
                 <div className="mt-[6px]">
-                  <div className="text-[11px] text-zinc-500">{categoryLabel}</div>
-                  <div className="-mt-[2px] text-[11px] font-medium text-zinc-900">{savings}</div>
+                  <div className="-mt-[2px] text-[11px] font-medium text-zinc-900">
+                    {savings}
+                  </div>
                 </div>
 
+                {/* ✅ TAGS (3ª linha dentro do card, entre economia e estrelas) */}
+                <div className="mt-[6px]">
+                  <TagPill text={categoryLabel} />
+                </div>
+
+                {/* Avaliação + CTA */}
                 <div className="mt-1 flex items-end justify-between">
                   <div>
                     <StarsRow rating={rating} />
                     <div className="text-[11px] text-zinc-500">
-                      <span className="font-semibold text-zinc-700">{rating.toFixed(1)}</span> de{' '}
-                      <span className="font-semibold text-zinc-700">{reviews}</span>
+                      <span className="font-semibold text-zinc-700">
+                        {rating.toFixed(1)}
+                      </span>{' '}
+                      de{' '}
+                      <span className="font-semibold text-zinc-700">
+                        {reviews}
+                      </span>
                     </div>
                   </div>
 
-                  <span className="text-[13px] font-semibold text-green-600">Ver mais</span>
+                  <span className="text-[13px] font-semibold text-green-600">
+                    Ver mais
+                  </span>
                 </div>
               </div>
             </div>
           );
         })}
 
-        {/* CARD FINAL — aparece parcialmente (leve corte para a direita) */}
+        {/* CARD FINAL — aparece parcialmente */}
         <Link
           href={viewAllHref}
           className="min-w-[165px] max-w-[165px] flex-shrink-0 rounded-lg overflow-hidden translate-x-4"

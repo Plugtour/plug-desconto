@@ -2,70 +2,13 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { SponsoredOffer } from '../../../_data/sponsoredOffers';
+import SideDrawer from './SideDrawer';
 
 type Props = {
   items: SponsoredOffer[];
   className?: string;
   title?: string;
 };
-
-/* =========================
-   SCROLL LOCK GLOBAL (robusto)
-   - evita bug de scroll quando há mais de 1 modal no site
-========================= */
-declare global {
-  interface Window {
-    __PLUG_SCROLL_LOCK_COUNT__?: number;
-    __PLUG_SCROLL_LOCK_Y__?: number;
-  }
-}
-
-function useBodyScrollLock(active: boolean) {
-  useEffect(() => {
-    if (!active) return;
-
-    const w = window as any;
-    w.__PLUG_SCROLL_LOCK_COUNT__ = (w.__PLUG_SCROLL_LOCK_COUNT__ || 0) + 1;
-
-    // primeiro lock de verdade
-    if (w.__PLUG_SCROLL_LOCK_COUNT__ === 1) {
-      const y = window.scrollY || 0;
-      w.__PLUG_SCROLL_LOCK_Y__ = y;
-
-      document.body.style.position = 'fixed';
-      document.body.style.top = `-${y}px`;
-      document.body.style.left = '0';
-      document.body.style.right = '0';
-      document.body.style.width = '100%';
-      document.body.style.overflow = 'hidden';
-    }
-
-    return () => {
-      w.__PLUG_SCROLL_LOCK_COUNT__ = Math.max(
-        0,
-        (w.__PLUG_SCROLL_LOCK_COUNT__ || 1) - 1
-      );
-
-      // só destrava quando o último modal liberar
-      if (w.__PLUG_SCROLL_LOCK_COUNT__ === 0) {
-        const y = Number(w.__PLUG_SCROLL_LOCK_Y__ || 0);
-
-        document.body.style.position = '';
-        document.body.style.top = '';
-        document.body.style.left = '';
-        document.body.style.right = '';
-        document.body.style.width = '';
-        document.body.style.overflow = '';
-
-        requestAnimationFrame(() => {
-          window.scrollTo(0, y);
-        });
-
-        w.__PLUG_SCROLL_LOCK_Y__ = 0;
-      }
-    };
-  }, [active]);
-}
 
 /* =========================
    ESTRELAS (preenchimento proporcional, coladas)
@@ -174,133 +117,6 @@ function DoubleChevronOpen({
 }
 
 /* =========================
-   MODAL LATERAL (entra da direita)
-   + TRAVA SCROLL DO SITE ATRÁS (robusto)
-   + CLIQUE FORA FECHA (sem remover o botão Fechar)
-========================= */
-function SponsoredSideModal({
-  open,
-  closing,
-  onClose,
-}: {
-  open: boolean;
-  closing: boolean;
-  onClose: () => void;
-}) {
-  // ✅ trava scroll com contador global
-  useBodyScrollLock(open);
-
-  if (!open) return null;
-
-  return (
-    <div
-      className="fixed inset-0 z-[999]"
-      // ✅ clique fora fecha (mouse)
-      onMouseDown={onClose}
-      // ✅ clique fora fecha (touch)
-      onTouchStart={onClose}
-      role="presentation"
-    >
-      {/* backdrop visual */}
-      <div
-        className={[
-          'absolute inset-0 rounded-md bg-black/35 backdrop-blur-[6px] touch-manipulation',
-          closing ? 'backdrop-exit' : 'backdrop-enter',
-        ].join(' ')}
-      />
-
-      <div className="absolute inset-0">
-        <div
-          className={[
-            'absolute right-0',
-            'top-[50px] bottom-0',
-            'w-[calc(100%-12px)] max-w-md',
-            'touch-manipulation',
-            closing ? 'side-exit' : 'side-enter',
-          ].join(' ')}
-          // ✅ impede fechar quando clicar dentro
-          onMouseDown={(e) => e.stopPropagation()}
-          onTouchStart={(e) => e.stopPropagation()}
-        >
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onClose();
-            }}
-            className={[
-              'absolute left-0 -top-9',
-              'touch-manipulation rounded-md',
-              'bg-white/80 ring-1 ring-black/10',
-              'px-3 py-1.5 text-[13px] font-normal',
-              'text-red-500 hover:text-red-600 hover:bg-white',
-            ].join(' ')}
-          >
-            Fechar
-          </button>
-
-          <div className="h-full w-full rounded-tr-none rounded-br-none rounded-bl-none rounded-tl-md bg-zinc-100 ring-1 ring-black/10">
-            {/* conteúdo futuro */}
-          </div>
-        </div>
-      </div>
-
-      <style jsx global>{`
-        @keyframes backdropEnter {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
-        }
-        @keyframes backdropExit {
-          from {
-            opacity: 1;
-          }
-          to {
-            opacity: 0;
-          }
-        }
-        .backdrop-enter {
-          animation: backdropEnter 240ms ease-out both;
-        }
-        .backdrop-exit {
-          animation: backdropExit 240ms ease-in both;
-        }
-
-        @keyframes sideEnter {
-          from {
-            transform: translateX(28px);
-            opacity: 0.98;
-          }
-          to {
-            transform: translateX(0);
-            opacity: 1;
-          }
-        }
-        @keyframes sideExit {
-          from {
-            transform: translateX(0);
-            opacity: 1;
-          }
-          to {
-            transform: translateX(28px);
-            opacity: 0.98;
-          }
-        }
-        .side-enter {
-          animation: sideEnter 280ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
-        }
-        .side-exit {
-          animation: sideExit 240ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
-        }
-      `}</style>
-    </div>
-  );
-}
-
-/* =========================
    COMPONENTE PRINCIPAL
 ========================= */
 export default function SponsoredOffersRow({
@@ -326,20 +142,15 @@ export default function SponsoredOffersRow({
 
   const [animating, setAnimating] = useState(false);
 
+  // ✅ Modal (agora é o mesmo do carrossel)
   const [modalOpen, setModalOpen] = useState(false);
-  const [modalClosing, setModalClosing] = useState(false);
 
   function openModal() {
     setModalOpen(true);
-    setModalClosing(false);
   }
 
   function closeModal() {
-    setModalClosing(true);
-    window.setTimeout(() => {
-      setModalOpen(false);
-      setModalClosing(false);
-    }, 240);
+    setModalOpen(false);
   }
 
   function toggleFav(id: string) {
@@ -458,7 +269,8 @@ export default function SponsoredOffersRow({
 
   return (
     <section className={['w-full', className || ''].join(' ')}>
-      <SponsoredSideModal open={modalOpen} closing={modalClosing} onClose={closeModal} />
+      {/* ✅ Agora usa o modal do carrossel */}
+      <SideDrawer open={modalOpen} onClose={closeModal} />
 
       <div className="mb-1 px-4 text-[12px] font-medium text-zinc-500">{title}</div>
 
@@ -500,7 +312,6 @@ export default function SponsoredOffersRow({
 
               return (
                 <div key={item.id} className="relative">
-                  {/* ✅ NÃO usamos Link aqui para evitar nested interactive */}
                   <div
                     role="button"
                     tabIndex={0}
@@ -550,7 +361,6 @@ export default function SponsoredOffersRow({
                             </div>
                           </div>
 
-                          {/* ✅ NÃO é button (evita interativo aninhado) */}
                           <span
                             className="text-[14px] font-semibold text-green-600"
                             role="button"
