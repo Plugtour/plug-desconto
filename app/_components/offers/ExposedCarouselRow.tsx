@@ -292,7 +292,7 @@ export default function ExposedCarouselRow({
         {/* CARD FINAL — aparece parcialmente */}
         <Link
           href={viewAllHref}
-          className="min-w-[165px] max-w-[165px] flex-shrink-0 rounded-lg overflow-hidden translate-x-[6px]"
+          className="min-w-[165px] max-w-[165px] flex-shrink-0 rounded-lg overflow-hidden translate-x-[8px]"
         >
           <div className="bg-zinc-200 h-full grid place-items-center px-3 text-center">
             <div className="text-sm font-semibold text-zinc-900 leading-tight">
