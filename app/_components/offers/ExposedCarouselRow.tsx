@@ -269,3 +269,4 @@ export default function ExposedCarouselRow({
     </section>
   );
 }
+
