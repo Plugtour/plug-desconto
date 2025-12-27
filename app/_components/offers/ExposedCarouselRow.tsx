@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState, useEffect } from 'react';
 import Link from 'next/link';
 
 export type ExposedCarouselItem = {
@@ -128,6 +128,34 @@ export default function ExposedCarouselRow({
 
   const [fav, setFav] = useState<Record<string, boolean>>({});
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [isAtEnd, setIsAtEnd] = useState(false);
+
+  /* =========================
+     DETECTA FIM DO CARROSSEL
+     (corrigido: sem warning "possibly null")
+  ========================= */
+  useEffect(() => {
+    function onScroll() {
+      const el = scrollRef.current;
+      if (!el) return;
+
+      const tolerance = 8;
+      const reachedEnd =
+        el.scrollLeft + el.clientWidth >= el.scrollWidth - tolerance;
+
+      setIsAtEnd(reachedEnd);
+    }
+
+    const el = scrollRef.current;
+    if (!el) return;
+
+    onScroll();
+    el.addEventListener('scroll', onScroll, { passive: true });
+
+    return () => {
+      el.removeEventListener('scroll', onScroll);
+    };
+  }, []);
 
   return (
     <section className={className}>
@@ -142,9 +170,15 @@ export default function ExposedCarouselRow({
           </div>
         </div>
 
-        <Link href={viewAllHref} className="text-sm font-semibold text-emerald-700">
-          Ver Rank
-        </Link>
+        {/* SOME QUANDO CHEGA NO FIM */}
+        {!isAtEnd && (
+          <Link
+            href={viewAllHref}
+            className="text-sm font-semibold text-emerald-700"
+          >
+            Ver Rank
+          </Link>
+        )}
       </div>
 
       {/* Carrossel */}
@@ -194,14 +228,16 @@ export default function ExposedCarouselRow({
                 >
                   <HeartIcon
                     filled={isFav}
-                    className={isFav ? 'h-5 w-5 text-red-500' : 'h-5 w-5 text-white'}
+                    className={
+                      isFav ? 'h-5 w-5 text-red-500' : 'h-5 w-5 text-white'
+                    }
                   />
                 </button>
               </div>
 
-              {/* TEXTO — FUNDO CINZA AQUI */}
+              {/* TEXTO */}
               <div className="bg-zinc-200 px-2 py-2">
-                {/* ✅ Reserva SEMPRE 2 linhas (mesma altura, mesmo sem quebra) */}
+                {/* Mantém altura igual mesmo quando o título não quebra */}
                 <div className="text-[11px] font-extrabold leading-[1.15] text-zinc-900 line-clamp-2 min-h-[2.3em]">
                   {item.title}
                 </div>
@@ -221,7 +257,9 @@ export default function ExposedCarouselRow({
                         {rating.toFixed(1)}
                       </span>{' '}
                       de{' '}
-                      <span className="font-semibold text-zinc-700">{reviews}</span>
+                      <span className="font-semibold text-zinc-700">
+                        {reviews}
+                      </span>
                     </div>
                   </div>
 
@@ -234,13 +272,15 @@ export default function ExposedCarouselRow({
           );
         })}
 
-        {/* CARD FINAL */}
+        {/* CARD FINAL — Ver Rank completo */}
         <Link
           href={viewAllHref}
           className="min-w-[165px] max-w-[165px] flex-shrink-0 rounded-lg overflow-hidden"
         >
           <div className="bg-zinc-200 h-full grid place-items-center">
-            <div className="text-sm font-semibold text-zinc-900">Ver Rank</div>
+            <div className="text-sm font-semibold text-zinc-900">
+              Ver Rank completo
+            </div>
           </div>
         </Link>
       </div>
