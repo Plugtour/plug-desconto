@@ -194,25 +194,20 @@ export default function ExposedCarouselRow({
                 >
                   <HeartIcon
                     filled={isFav}
-                    className={
-                      isFav
-                        ? 'h-5 w-5 text-red-500'
-                        : 'h-5 w-5 text-white'
-                    }
+                    className={isFav ? 'h-5 w-5 text-red-500' : 'h-5 w-5 text-white'}
                   />
                 </button>
               </div>
 
               {/* TEXTO — FUNDO CINZA AQUI */}
               <div className="bg-zinc-200 px-2 py-2">
-                <div className="text-[11px] font-extrabold leading-[1.15] text-zinc-900 line-clamp-2">
+                {/* ✅ Reserva SEMPRE 2 linhas (mesma altura, mesmo sem quebra) */}
+                <div className="text-[11px] font-extrabold leading-[1.15] text-zinc-900 line-clamp-2 min-h-[2.3em]">
                   {item.title}
                 </div>
 
                 <div className="mt-[6px]">
-                  <div className="text-[11px] text-zinc-500">
-                    {categoryLabel}
-                  </div>
+                  <div className="text-[11px] text-zinc-500">{categoryLabel}</div>
                   <div className="-mt-[2px] text-[11px] font-medium text-zinc-900">
                     {savings}
                   </div>
@@ -226,9 +221,7 @@ export default function ExposedCarouselRow({
                         {rating.toFixed(1)}
                       </span>{' '}
                       de{' '}
-                      <span className="font-semibold text-zinc-700">
-                        {reviews}
-                      </span>
+                      <span className="font-semibold text-zinc-700">{reviews}</span>
                     </div>
                   </div>
 
@@ -247,9 +240,7 @@ export default function ExposedCarouselRow({
           className="min-w-[165px] max-w-[165px] flex-shrink-0 rounded-lg overflow-hidden"
         >
           <div className="bg-zinc-200 h-full grid place-items-center">
-            <div className="text-sm font-semibold text-zinc-900">
-              Ver Rank
-            </div>
+            <div className="text-sm font-semibold text-zinc-900">Ver Rank</div>
           </div>
         </Link>
       </div>
@@ -269,4 +260,3 @@ export default function ExposedCarouselRow({
     </section>
   );
 }
-

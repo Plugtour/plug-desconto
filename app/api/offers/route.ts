@@ -9,14 +9,24 @@ import {
   normalizeCat,
 } from '@/lib/offers';
 
+function normalizeCity(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
 
-    const cityParam = searchParams.get('city');
+    const cityParamRaw = searchParams.get('city');
     const categoryParam = searchParams.get('categoryId');
 
-    // ✅ evita erro de "2 args esperados" sem depender da assinatura do tenant.ts
+    const cityParam = cityParamRaw ? normalizeCity(cityParamRaw) : null;
+
+    // ✅ evita erro de assinatura do tenant.ts
     const tenant: any = (getTenantFromRequest as any)(request);
 
     let items: Offer[] = [];
@@ -26,9 +36,21 @@ export async function GET(request: Request) {
     // 2) city
     // 3) tenant (fallback)
     if (cityParam && categoryParam) {
+      // tenta por city+category
       items = getOffersByCityAndCategory(cityParam, categoryParam);
+
+      // ✅ fallback: se city não existir no dataset, tenta como tenantKey
+      if (!items.length) {
+        items = getOffersByTenant(cityParam);
+      }
     } else if (cityParam) {
+      // tenta por city
       items = getOffersByCity(cityParam);
+
+      // ✅ fallback: se city não existir no dataset, tenta como tenantKey
+      if (!items.length) {
+        items = getOffersByTenant(cityParam);
+      }
     } else {
       const tenantKey =
         typeof tenant === 'string'
