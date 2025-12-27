@@ -1,7 +1,10 @@
 'use client';
 
-import React, { useMemo, useRef, useState, useEffect } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+
+import SponsoredOfferDrawer from './SponsoredOfferDrawer';
+import type { SponsoredOffer } from '../../../_data/sponsoredOffers';
 
 export type ExposedCarouselItem = {
   id: string;
@@ -128,174 +131,189 @@ export default function ExposedCarouselRow({
 
   const [fav, setFav] = useState<Record<string, boolean>>({});
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const [isAtEnd, setIsAtEnd] = useState(false);
 
-  /* =========================
-     DETECTA FIM DO CARROSSEL
-     (corrigido: sem warning "possibly null")
-  ========================= */
-  useEffect(() => {
-    function onScroll() {
-      const el = scrollRef.current;
-      if (!el) return;
+  // ✅ modal (mesmo do patrocinado)
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
-      const tolerance = 8;
-      const reachedEnd =
-        el.scrollLeft + el.clientWidth >= el.scrollWidth - tolerance;
-
-      setIsAtEnd(reachedEnd);
-    }
-
-    const el = scrollRef.current;
-    if (!el) return;
-
-    onScroll();
-    el.addEventListener('scroll', onScroll, { passive: true });
-
-    return () => {
-      el.removeEventListener('scroll', onScroll);
-    };
-  }, []);
+  // dummy (o drawer pede offer, mas aqui a gente usa children)
+  const drawerOffer: SponsoredOffer | null = null;
 
   return (
-    <section className={className}>
-      {/* Cabeçalho */}
-      <div className="px-4 mb-2 flex items-center justify-between">
-        <div className="leading-[1.1]">
-          <h2 className="text-base font-semibold text-zinc-900 leading-[1.15]">
-            {title}
-          </h2>
-          <div className="-mt-[2px] text-sm font-medium text-zinc-600">
-            {categoryLabel}
+    <>
+      <section className={className}>
+        {/* Cabeçalho */}
+        <div className="px-4 mb-2 flex items-center justify-between">
+          <div className="leading-[1.1]">
+            <h2 className="text-base font-semibold text-zinc-900 leading-[1.15]">
+              {title}
+            </h2>
+            <div className="-mt-[2px] text-sm font-medium text-zinc-600">
+              {categoryLabel}
+            </div>
           </div>
-        </div>
 
-        {/* SOME QUANDO CHEGA NO FIM */}
-        {!isAtEnd && (
-          <Link
-            href={viewAllHref}
-            className="text-sm font-semibold text-emerald-700"
-          >
+          <Link href={viewAllHref} className="text-sm font-semibold text-emerald-700">
             Ver Rank
           </Link>
-        )}
-      </div>
+        </div>
 
-      {/* Carrossel */}
-      <div
-        ref={scrollRef}
-        className="no-scrollbar flex gap-3 px-4 overflow-x-auto scroll-smooth"
-      >
-        {list.map((item, idx) => {
-          const isFav = !!fav[item.id];
-          const rating = item.rating ?? 4.8;
-          const reviews = item.reviews ?? 275;
-          const savings = item.savingsText ?? 'Economia de R$30 a R$90';
+        {/* Carrossel */}
+        <div
+          ref={scrollRef}
+          className="no-scrollbar flex gap-3 px-4 overflow-x-auto scroll-smooth"
+        >
+          {list.map((item, idx) => {
+            const isFav = !!fav[item.id];
+            const rating = item.rating ?? 4.8;
+            const reviews = item.reviews ?? 275;
+            const savings = item.savingsText ?? 'Economia de R$30 a R$90';
 
-          return (
-            <div
-              key={item.id}
-              className="relative min-w-[165px] max-w-[165px] flex-shrink-0 rounded-lg overflow-hidden"
-            >
-              {/* FOTO */}
-              <div className="relative h-[105px] bg-zinc-200">
-                {item.imageUrl ? (
-                  <img
-                    src={item.imageUrl}
-                    alt={item.title}
-                    className="h-full w-full object-cover"
-                    loading="lazy"
-                  />
-                ) : (
-                  <div className="h-full w-full bg-zinc-300" />
-                )}
+            return (
+              <div
+                key={item.id}
+                className="relative min-w-[165px] max-w-[165px] flex-shrink-0 rounded-lg overflow-hidden"
+              >
+                {/* FOTO */}
+                <div className="relative h-[105px] bg-zinc-200">
+                  {item.imageUrl ? (
+                    <img
+                      src={item.imageUrl}
+                      alt={item.title}
+                      className="h-full w-full object-cover"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="h-full w-full bg-zinc-300" />
+                  )}
 
-                {/* RANK */}
-                <div className="absolute left-2 top-2 z-[6] inline-flex items-center gap-1 rounded-full bg-black/20 backdrop-blur px-2 py-[3px] ring-1 ring-white/15">
-                  <TrophyIcon className="h-3.5 w-3.5 -mt-[1px] text-yellow-400" />
-                  <span className="text-[11px] font-semibold text-white leading-none">
-                    Top {idx + 1}
-                  </span>
-                </div>
-
-                {/* FAVORITO */}
-                <button
-                  type="button"
-                  onClick={() =>
-                    setFav((p) => ({ ...p, [item.id]: !p[item.id] }))
-                  }
-                  className="absolute right-2 top-2 h-8 w-8 flex items-center justify-center rounded-full bg-black/20 backdrop-blur ring-1 ring-white/15"
-                >
-                  <HeartIcon
-                    filled={isFav}
-                    className={
-                      isFav ? 'h-5 w-5 text-red-500' : 'h-5 w-5 text-white'
-                    }
-                  />
-                </button>
-              </div>
-
-              {/* TEXTO */}
-              <div className="bg-zinc-200 px-2 py-2">
-                {/* Mantém altura igual mesmo quando o título não quebra */}
-                <div className="text-[11px] font-extrabold leading-[1.15] text-zinc-900 line-clamp-2 min-h-[2.3em]">
-                  {item.title}
-                </div>
-
-                <div className="mt-[6px]">
-                  <div className="text-[11px] text-zinc-500">{categoryLabel}</div>
-                  <div className="-mt-[2px] text-[11px] font-medium text-zinc-900">
-                    {savings}
+                  {/* RANK */}
+                  <div className="absolute left-2 top-2 z-[6] inline-flex items-center gap-1 rounded-full bg-black/20 backdrop-blur px-2 py-[3px] ring-1 ring-white/15">
+                    <TrophyIcon className="h-3.5 w-3.5 -mt-[1px] text-yellow-400" />
+                    <span className="text-[11px] font-semibold text-white leading-none">
+                      Top {idx + 1}
+                    </span>
                   </div>
+
+                  {/* FAVORITO */}
+                  <button
+                    type="button"
+                    onClick={() => setFav((p) => ({ ...p, [item.id]: !p[item.id] }))}
+                    className="absolute right-2 top-2 h-8 w-8 flex items-center justify-center rounded-full bg-black/20 backdrop-blur ring-1 ring-white/15"
+                  >
+                    <HeartIcon
+                      filled={isFav}
+                      className={isFav ? 'h-5 w-5 text-red-500' : 'h-5 w-5 text-white'}
+                    />
+                  </button>
                 </div>
 
-                <div className="mt-1 flex items-end justify-between">
-                  <div>
-                    <StarsRow rating={rating} />
-                    <div className="text-[11px] text-zinc-500">
-                      <span className="font-semibold text-zinc-700">
-                        {rating.toFixed(1)}
-                      </span>{' '}
-                      de{' '}
-                      <span className="font-semibold text-zinc-700">
-                        {reviews}
-                      </span>
+                {/* TEXTO — FUNDO CINZA AQUI */}
+                <div className="bg-zinc-200 px-2 py-2">
+                  <div className="text-[11px] font-extrabold leading-[1.15] text-zinc-900 line-clamp-2">
+                    {item.title}
+                  </div>
+
+                  <div className="mt-[6px]">
+                    <div className="text-[11px] text-zinc-500">{categoryLabel}</div>
+                    <div className="-mt-[2px] text-[11px] font-medium text-zinc-900">
+                      {savings}
                     </div>
                   </div>
 
-                  <span className="text-[13px] font-semibold text-green-600">
-                    Ver mais
-                  </span>
+                  <div className="mt-1 flex items-end justify-between">
+                    <div>
+                      <StarsRow rating={rating} />
+                      <div className="text-[11px] text-zinc-500">
+                        <span className="font-semibold text-zinc-700">
+                          {rating.toFixed(1)}
+                        </span>{' '}
+                        de{' '}
+                        <span className="font-semibold text-zinc-700">
+                          {reviews}
+                        </span>
+                      </div>
+                    </div>
+
+                    <span className="text-[13px] font-semibold text-green-600">
+                      Ver mais
+                    </span>
+                  </div>
                 </div>
               </div>
+            );
+          })}
+
+          {/* ✅ CARD FINAL — vira BUTTON e abre o modal */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setDrawerOpen(true);
+            }}
+            className="min-w-[165px] max-w-[165px] flex-shrink-0 rounded-lg overflow-hidden"
+          >
+            <div className="bg-zinc-200 h-full grid place-items-center">
+              <div className="text-sm font-semibold text-zinc-900 leading-[1.1] text-center">
+                <div>Ver Rank</div>
+                <div>Completo</div>
+              </div>
             </div>
-          );
-        })}
+          </button>
+        </div>
 
-        {/* CARD FINAL — Ver Rank completo */}
-        <Link
-          href={viewAllHref}
-          className="min-w-[165px] max-w-[165px] flex-shrink-0 rounded-lg overflow-hidden"
-        >
-          <div className="text-sm font-semibold text-zinc-900 text-center leading-tight">
-            <span className="block">Ver Rank</span>
-            <span className="block">Completo</span>
+        <style jsx global>{`
+          .no-scrollbar::-webkit-scrollbar {
+            width: 0;
+            height: 0;
+            display: none;
+          }
+          .no-scrollbar {
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            -webkit-overflow-scrolling: touch;
+          }
+        `}</style>
+      </section>
+
+      {/* ✅ Modal (mesmo do patrocinado) */}
+      <SponsoredOfferDrawer
+        open={drawerOpen}
+        offer={drawerOffer}
+        onClose={() => setDrawerOpen(false)}
+      >
+        <div className="pb-6">
+          <div className="text-lg font-semibold text-zinc-900">Ver Rank Completo</div>
+          <div className="mt-1 text-sm text-zinc-600">
+            {categoryLabel} • {categoryCount} itens
           </div>
-        </Link>
-      </div>
 
-      <style jsx global>{`
-        .no-scrollbar::-webkit-scrollbar {
-          width: 0;
-          height: 0;
-          display: none;
-        }
-        .no-scrollbar {
-          scrollbar-width: none;
-          -ms-overflow-style: none;
-          -webkit-overflow-scrolling: touch;
-        }
-      `}</style>
-    </section>
+          <div className="mt-4 space-y-3">
+            {list.map((it, i) => (
+              <Link
+                key={it.id}
+                href={it.href}
+                className="block rounded-md bg-white/70 ring-1 ring-black/5 px-3 py-3 hover:bg-white transition"
+                onClick={() => setDrawerOpen(false)}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-[12px] font-semibold text-zinc-900">
+                      #{i + 1} — {it.title}
+                    </div>
+                    <div className="mt-1 text-[11px] text-zinc-600">
+                      {it.savingsText ?? 'Economia'}
+                    </div>
+                  </div>
+                  <div className="shrink-0 text-[11px] font-semibold text-emerald-700">
+                    Abrir
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </SponsoredOfferDrawer>
+    </>
   );
 }

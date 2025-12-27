@@ -7,13 +7,12 @@ type Props = {
   open: boolean;
   offer: SponsoredOffer | null;
   onClose: () => void;
+
+  // ✅ novo: permite usar o mesmo modal com conteúdo custom (rank, etc)
+  children?: React.ReactNode;
 };
 
-export default function SponsoredOfferDrawer({
-  open,
-  offer,
-  onClose,
-}: Props) {
+export default function SponsoredOfferDrawer({ open, offer, onClose, children }: Props) {
   /* =========================
      ESC fecha
   ========================= */
@@ -40,16 +39,13 @@ export default function SponsoredOfferDrawer({
     };
   }, [open]);
 
-  const TOP_GAP_PX = 50;   // respiro superior
-  const SIDE_GAP_PX = 24;  // respiro lateral (borda esquerda do modal)
-  const BUTTON_ABOVE_PX = 36; // equivalente ao "-top-9" da busca rápida
+  const TOP_GAP_PX = 50; // respiro superior
+  const SIDE_GAP_PX = 24; // respiro lateral
+  const BUTTON_ABOVE_PX = 36;
 
   return (
     <div
-      className={[
-        'fixed inset-0 z-[999]',
-        open ? 'pointer-events-auto' : 'pointer-events-none',
-      ].join(' ')}
+      className={['fixed inset-0 z-[999]', open ? 'pointer-events-auto' : 'pointer-events-none'].join(' ')}
       aria-hidden={!open}
     >
       {/* Overlay */}
@@ -63,7 +59,7 @@ export default function SponsoredOfferDrawer({
         ].join(' ')}
       />
 
-      {/* Botão FECHAR — fora do modal, alinhado exatamente na borda esquerda */}
+      {/* Botão FECHAR */}
       <button
         type="button"
         aria-label="Fechar"
@@ -81,10 +77,7 @@ export default function SponsoredOfferDrawer({
           open ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-full',
         ].join(' ')}
         style={{
-          // EXATAMENTE a mesma linha da borda esquerda do modal
           left: SIDE_GAP_PX,
-
-          // Fora do modal, acima do topo
           top: TOP_GAP_PX - BUTTON_ABOVE_PX,
         }}
       >
@@ -108,16 +101,20 @@ export default function SponsoredOfferDrawer({
         role="dialog"
         aria-modal="true"
       >
-        {/* Conteúdo temporário */}
-        <div className="px-4 pt-4">
-          <div className="rounded-md border border-dashed border-zinc-300 p-4 text-[12px] text-zinc-500">
-            Modal lateral criado (sem conteúdo ainda).
-            {offer?.title ? (
-              <div className="mt-2 font-semibold text-zinc-700 line-clamp-2">
-                {offer.title}
+        {/* Conteúdo */}
+        <div className="h-full overflow-y-auto">
+          {children ? (
+            <div className="px-4 pt-4 pb-10">{children}</div>
+          ) : (
+            <div className="px-4 pt-4">
+              <div className="rounded-md border border-dashed border-zinc-300 p-4 text-[12px] text-zinc-500">
+                Modal lateral criado (sem conteúdo ainda).
+                {offer?.title ? (
+                  <div className="mt-2 font-semibold text-zinc-700 line-clamp-2">{offer.title}</div>
+                ) : null}
               </div>
-            ) : null}
-          </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
