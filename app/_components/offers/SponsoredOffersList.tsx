@@ -14,10 +14,8 @@ type Props = {
   items: SponsoredOffer[];
   className?: string;
   title?: string;
-  initialCount?: number;
-  step?: number;
-
-  /** Categorias já criadas na Home (para aparecer no filtro) */
+  initialCount?: number; // default 5
+  step?: number; // default 5
   categories?: FilterCategory[];
 };
 
@@ -135,6 +133,7 @@ function TempImagePlaceholder() {
 
 /* =========================
    CHIP
+   - selecionado em outra cor (pedido #3)
 ========================= */
 function FilterChip({
   isActive,
@@ -151,14 +150,30 @@ function FilterChip({
       onClick={onClick}
       className={[
         'shrink-0 rounded-full px-3 py-1 text-[12px] font-semibold',
-        'border',
+        'border transition-colors',
         isActive
-          ? 'border-emerald-600 bg-emerald-600 text-white'
+          ? 'border-indigo-600 bg-indigo-600 text-white'
           : 'border-zinc-300 bg-zinc-100 text-zinc-700 hover:bg-zinc-200',
       ].join(' ')}
     >
       {children}
     </button>
+  );
+}
+
+/* =========================
+   LOADING (pedido #4)
+========================= */
+function LoadingRow({ text = 'Carregando...' }: { text?: string }) {
+  return (
+    <div className="px-3 py-3">
+      <div className="flex items-center gap-2 text-[12px] font-medium text-zinc-500">
+        <span className="inline-flex h-4 w-4 items-center justify-center">
+          <span className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-500" />
+        </span>
+        {text}
+      </div>
+    </div>
   );
 }
 
@@ -184,6 +199,9 @@ export default function SponsoredOffersList({
 
   const [active, setActive] = useState<FilterKey>('melhores');
 
+  // ✅ loading de paginação (pedido #4)
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+
   function openModal() {
     setModalOpen(true);
   }
@@ -194,6 +212,7 @@ export default function SponsoredOffersList({
     setFavIds((prev) => ({ ...prev, [id]: !prev[id] }));
   }
 
+  // ✅ evita duplicar categorias por título
   const uniqueCats = useMemo(() => {
     const seen = new Set<string>();
     const out: FilterCategory[] = [];
@@ -210,10 +229,8 @@ export default function SponsoredOffersList({
   const filteredItems = useMemo(() => {
     const list = Array.isArray(items) ? [...items] : [];
 
-    // Categoria (mock): filtra por tags[1] = "Categoria"
     if (isCatFilter(active)) {
-      const wantedTitle =
-        uniqueCats.find((c) => c.id === active.id)?.title?.toLowerCase() ?? '';
+      const wantedTitle = uniqueCats.find((c) => c.id === active.id)?.title?.toLowerCase() ?? '';
       if (!wantedTitle) return list;
 
       return list.filter((it: any) => {
@@ -222,7 +239,6 @@ export default function SponsoredOffersList({
       });
     }
 
-    // Maiores descontos (mock): ordena desc pelo número em priceText/savingsText
     if (active === 'descontos') {
       const parsePct = (v: any) => {
         const m = String(v ?? '').match(/(\d+([.,]\d+)?)/);
@@ -239,12 +255,11 @@ export default function SponsoredOffersList({
       return list;
     }
 
-    // Melhores avaliados (mock)
+    // melhores
     list.sort((a: any, b: any) => {
       const ar = Number(a?.rating ?? 0);
       const br = Number(b?.rating ?? 0);
       if (br !== ar) return br - ar;
-
       const av = Number(a?.reviews ?? 0);
       const bv = Number(b?.reviews ?? 0);
       return bv - av;
@@ -256,20 +271,25 @@ export default function SponsoredOffersList({
 
   const [visibleCount, setVisibleCount] = useState(() => Math.min(initialCount, total));
 
+  // reseta paginação quando troca filtro
   useEffect(() => {
     setVisibleCount(Math.min(initialCount, total));
   }, [active, initialCount, total]);
 
   const visibleItems = useMemo(
     () => filteredItems.slice(0, visibleCount),
-    [filteredItems, visibleCount],
+    [filteredItems, visibleCount]
   );
 
-  const sentinelRef = useRef<HTMLDivElement | null>(null);
-  const loadingRef = useRef(false);
+  // sentinel para expandir + sentinelTop para recolher (pedido #5)
+  const sentinelBottomRef = useRef<HTMLDivElement | null>(null);
+  const sentinelTopRef = useRef<HTMLDivElement | null>(null);
 
+  const lockRef = useRef(false);
+
+  // ✅ carregar +5 quando chega no fim
   useEffect(() => {
-    const el = sentinelRef.current;
+    const el = sentinelBottomRef.current;
     if (!el) return;
 
     const io = new IntersectionObserver(
@@ -277,23 +297,51 @@ export default function SponsoredOffersList({
         const entry = entries[0];
         if (!entry?.isIntersecting) return;
         if (visibleCount >= total) return;
-        if (loadingRef.current) return;
+        if (lockRef.current) return;
 
-        loadingRef.current = true;
+        lockRef.current = true;
+        setIsLoadingMore(true);
 
         window.setTimeout(() => {
           setVisibleCount((prev) => Math.min(prev + step, total));
-          loadingRef.current = false;
-        }, 60);
+          setIsLoadingMore(false);
+          lockRef.current = false;
+        }, 420);
       },
-      { root: null, rootMargin: '220px 0px 220px 0px', threshold: 0.01 },
+      { root: null, rootMargin: '240px 0px 240px 0px', threshold: 0.01 }
     );
 
     io.observe(el);
     return () => io.disconnect();
   }, [step, total, visibleCount]);
 
-  if (!total) return null;
+  // ✅ recolher -5 quando volta pra cima
+  useEffect(() => {
+    const el = sentinelTopRef.current;
+    if (!el) return;
+
+    const io = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        // quando topo da lista encostar de novo (usuário subiu)
+        if (!entry?.isIntersecting) return;
+        if (visibleCount <= initialCount) return;
+        if (isLoadingMore) return;
+
+        // recolhe em passos de 5, mas sem “pular” demais
+        setVisibleCount((prev) => Math.max(initialCount, prev - step));
+      },
+      { root: null, rootMargin: '-10px 0px 0px 0px', threshold: 1 }
+    );
+
+    io.observe(el);
+    return () => io.disconnect();
+  }, [initialCount, isLoadingMore, step, visibleCount]);
+
+  if (!total) {
+    // pedido #2: se filtro não retorna itens, não ocultar o filtro
+    // => não retornamos null; mostramos filtro e um estado vazio.
+  }
 
   const showTitle = !!title && title.trim().length > 0;
 
@@ -305,7 +353,7 @@ export default function SponsoredOffersList({
         <div className="mb-1 px-4 text-[12px] font-medium text-zinc-500">{title}</div>
       ) : null}
 
-      {/* FILTRO */}
+      {/* ✅ FILTRO — nunca some, mesmo sem resultados (pedido #2) */}
       <div className="px-3">
         <div className="no-scrollbar flex gap-2 overflow-x-auto pb-2 pt-1">
           <FilterChip isActive={active === 'melhores'} onClick={() => setActive('melhores')}>
@@ -318,7 +366,6 @@ export default function SponsoredOffersList({
 
           {uniqueCats.map((c) => {
             const isActive = isCatFilter(active) && active.id === c.id;
-
             return (
               <FilterChip
                 key={c.id}
@@ -347,126 +394,139 @@ export default function SponsoredOffersList({
 
       {/* LISTA (sem fundo branco) */}
       <div className="px-3">
-        <div>
-          {visibleItems.map((item, idx) => {
-            const isFav = !!favIds[item.id];
-            const tagsLine = buildTags(item);
-            const rating = (item as any).rating ?? 4.8;
-            const reviews = (item as any).reviews ?? 0;
-            const priceText = (item as any).priceText ?? (item as any).savingsText ?? null;
-            const imageUrl = (item as any).imageUrl ?? null;
+        {/* sentinel topo (para recolher ao subir) */}
+        <div ref={sentinelTopRef} className="h-[1px]" />
 
-            const handleCardClick = () => openModal();
+        {total === 0 ? (
+          <div className="px-1 py-4 text-[12px] font-medium text-zinc-500">
+            Nenhum item encontrado para este filtro.
+          </div>
+        ) : (
+          <>
+            {visibleItems.map((item, idx) => {
+              const isFav = !!favIds[item.id];
+              const tagsLine = buildTags(item);
+              const rating = (item as any).rating ?? 4.8;
+              const reviews = (item as any).reviews ?? 0;
+              const priceText = (item as any).priceText ?? (item as any).savingsText ?? null;
+              const imageUrl = (item as any).imageUrl ?? null;
 
-            return (
-              <div key={item.id} className="relative">
-                <div
-                  role="button"
-                  tabIndex={0}
-                  onClick={handleCardClick}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') handleCardClick();
-                  }}
-                  className="block py-3 cursor-pointer"
-                >
-                  <div className="flex gap-3">
-                    <div className="h-24 w-24 flex-none overflow-hidden rounded-md bg-zinc-200">
-                      {imageUrl ? (
-                        <img
-                          src={imageUrl}
-                          alt={(item as any).title}
-                          className="h-full w-full object-cover"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <TempImagePlaceholder />
-                      )}
-                    </div>
+              const handleCardClick = () => openModal();
 
-                    <div className="min-w-0 flex-1">
-                      <div className="pr-14 text-[11px] font-extrabold leading-snug text-zinc-900 line-clamp-2">
-                        {(item as any).title}
+              return (
+                <div key={item.id} className="relative">
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={handleCardClick}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') handleCardClick();
+                    }}
+                    className="block py-3 cursor-pointer"
+                  >
+                    <div className="flex gap-3">
+                      <div className="h-24 w-24 flex-none overflow-hidden rounded-md bg-zinc-200">
+                        {imageUrl ? (
+                          <img
+                            src={imageUrl}
+                            alt={(item as any).title}
+                            className="h-full w-full object-cover"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <TempImagePlaceholder />
+                        )}
                       </div>
 
-                      <div className="mt-[4px]">
-                        <div className="text-[11px] text-zinc-500 line-clamp-1">{tagsLine}</div>
-
-                        {priceText ? (
-                          <div className="-mt-[2px] text-[11px] font-medium text-zinc-900">
-                            Economia de {priceText}
-                          </div>
-                        ) : null}
-                      </div>
-
-                      <div className="mt-1.5 flex items-end justify-between">
-                        <div>
-                          <StarsRow rating={Number(rating)} />
-                          <div className="-mt-0.5 text-[11px] text-zinc-500">
-                            <span className="font-semibold text-zinc-700">
-                              {Number(rating).toFixed(1)}
-                            </span>{' '}
-                            de{' '}
-                            <span className="font-semibold text-zinc-700">{reviews}</span>{' '}
-                            avaliações
-                          </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="pr-14 text-[11px] font-extrabold leading-snug text-zinc-900 line-clamp-2">
+                          {(item as any).title}
                         </div>
 
-                        <span
-                          className="text-[14px] font-semibold text-green-600"
-                          role="button"
-                          tabIndex={0}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleCardClick();
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
+                        <div className="mt-[4px]">
+                          <div className="text-[11px] text-zinc-500 line-clamp-1">{tagsLine}</div>
+
+                          {priceText ? (
+                            <div className="-mt-[2px] text-[11px] font-medium text-zinc-900">
+                              Economia de {priceText}
+                            </div>
+                          ) : null}
+                        </div>
+
+                        <div className="mt-1.5 flex items-end justify-between">
+                          <div>
+                            <StarsRow rating={Number(rating)} />
+                            <div className="-mt-0.5 text-[11px] text-zinc-500">
+                              <span className="font-semibold text-zinc-700">
+                                {Number(rating).toFixed(1)}
+                              </span>{' '}
+                              de{' '}
+                              <span className="font-semibold text-zinc-700">{reviews}</span>{' '}
+                              avaliações
+                            </div>
+                          </div>
+
+                          <span
+                            className="text-[14px] font-semibold text-green-600"
+                            role="button"
+                            tabIndex={0}
+                            onClick={(e) => {
                               e.stopPropagation();
                               handleCardClick();
-                            }
-                          }}
-                        >
-                          Ver mais
-                        </span>
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.stopPropagation();
+                                handleCardClick();
+                              }
+                            }}
+                          >
+                            Ver mais
+                          </span>
+                        </div>
                       </div>
                     </div>
+
+                    <button
+                      type="button"
+                      aria-label={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        toggleFav(item.id);
+                      }}
+                      className="absolute right-2 top-2 inline-flex h-10 w-10 items-center justify-center"
+                    >
+                      <HeartIcon
+                        filled={isFav}
+                        className={[
+                          'h-9 w-9 transition',
+                          isFav ? 'text-red-500' : 'text-zinc-300 hover:text-zinc-400',
+                        ].join(' ')}
+                      />
+                    </button>
                   </div>
 
-                  <button
-                    type="button"
-                    aria-label={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      toggleFav(item.id);
-                    }}
-                    className="absolute right-2 top-2 inline-flex h-10 w-10 items-center justify-center"
-                  >
-                    <HeartIcon
-                      filled={isFav}
-                      className={[
-                        'h-9 w-9 transition',
-                        isFav ? 'text-red-500' : 'text-zinc-300 hover:text-zinc-400',
-                      ].join(' ')}
-                    />
-                  </button>
+                  {idx < visibleItems.length - 1 ? (
+                    <div className="mx-2 border-b border-dotted border-zinc-300" />
+                  ) : null}
                 </div>
+              );
+            })}
 
-                {idx < visibleItems.length - 1 ? (
-                  <div className="mx-2 border-b border-dotted border-zinc-300" />
-                ) : null}
+            {/* loading visível ao carregar +5 */}
+            {isLoadingMore ? <LoadingRow /> : null}
+
+            {/* sentinel fim */}
+            {visibleCount < total ? (
+              <div ref={sentinelBottomRef} className="py-3">
+                <div className="mx-2 h-[1px] bg-transparent" />
               </div>
-            );
-          })}
-
-          {visibleCount < total ? (
-            <div ref={sentinelRef} className="py-4">
-              <div className="mx-2 h-[1px] bg-transparent" />
-            </div>
-          ) : (
-            <div className="py-2" />
-          )}
-        </div>
+            ) : (
+              <div className="py-2" />
+            )}
+          </>
+        )}
       </div>
     </section>
   );

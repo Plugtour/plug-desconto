@@ -199,7 +199,7 @@ function Icon({
           />
           <path d="M6 11h12v6H6v-6z" stroke="#06B6D4" strokeWidth="2" strokeLinejoin="round" />
           <path
-            d="M8 17.2a1.2 1.2 0 1 0 0-2.4 1.2 1.2 0 0 0 0 2.4zM16 17.2a1.2 1.2 0 1 0 0-2.4 1.2 1.2 0 0 0 0 1.2Z"
+            d="M8 17.2a1.2 1.2 0 1 0 0-2.4 1.2 1.2 0 0 0 0 2.4zM16 17.2a1.2 1.2 0 1 0 0-2.4 1.2 1.2 0 0 0 0 2.4z"
             stroke="#06B6D4"
             strokeWidth="2"
           />
@@ -255,19 +255,16 @@ export default function HomeScreenClient({
 
   const top10Items = useMemo(() => {
     const base = Array.isArray(EXPOSED_GASTRONOMY) ? [...EXPOSED_GASTRONOMY] : [];
-
     base.sort((a: any, b: any) => {
       const ar = Number(a?.rating ?? 0);
       const br = Number(b?.rating ?? 0);
       if (br !== ar) return br - ar;
-
       const av = Number(a?.reviews ?? 0);
       const bv = Number(b?.reviews ?? 0);
       return bv - av;
     });
 
     const list = base.slice(0, 10);
-
     while (list.length < 10) {
       const idx = list.length + 1;
       list.push({
@@ -280,7 +277,6 @@ export default function HomeScreenClient({
         reviews: idx === 9 ? 1280 : 980,
       } as any);
     }
-
     return list.slice(0, 10);
   }, []);
 
@@ -636,7 +632,6 @@ export default function HomeScreenClient({
 
       <SponsoredOffersRow items={SPONSORED_OFFERS} className="mt-4" />
 
-      {/* CARROSSEL */}
       <ExposedCarouselRow
         className="mt-6"
         title="Top 10 mais bem avaliados"
@@ -646,17 +641,15 @@ export default function HomeScreenClient({
         items={top10Items}
       />
 
-      {/* ✅ MAIS ESPAÇO ENTRE CARROSSEL E FILTRO/LISTA */}
+      {/* ✅ pedido #1: +5px entre carrossel e filtro/lista => mt-7 (28px) */}
       <SponsoredOffersList
-        className="mt-6"
+        className="mt-7"
         title=""
         items={top10ListItems}
         initialCount={5}
         step={5}
         categories={categories.map((c) => ({ id: c.id, title: c.title }))}
       />
-
-      {/* resto da Home depois */}
     </div>
   );
 }
