@@ -277,10 +277,9 @@ export default function ExposedCarouselRow({
           href={viewAllHref}
           className="min-w-[165px] max-w-[165px] flex-shrink-0 rounded-lg overflow-hidden"
         >
-          <div className="bg-zinc-200 h-full grid place-items-center">
-            <div className="text-sm font-semibold text-zinc-900">
-              Ver Rank completo
-            </div>
+          <div className="text-sm font-semibold text-zinc-900 text-center leading-tight">
+            <span className="block">Ver Rank</span>
+            <span className="block">Completo</span>
           </div>
         </Link>
       </div>
