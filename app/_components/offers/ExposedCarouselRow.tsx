@@ -1,4 +1,3 @@
-// app/_components/offers/ExposedCarouselRow.tsx
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -117,27 +116,6 @@ function TrophyIcon({ className }: { className?: string }) {
 }
 
 /* =========================
-   TAG (estilo “Patrocinado” – compacto)
-========================= */
-function TagPill({ text }: { text: string }) {
-  return (
-    <span
-      className={[
-        'inline-flex items-center',
-        'rounded-full',
-        'bg-white/70',
-        'ring-1 ring-black/10',
-        'px-2 py-[2px]',
-        'text-[10px] font-semibold text-zinc-700',
-        'leading-none',
-      ].join(' ')}
-    >
-      {text}
-    </span>
-  );
-}
-
-/* =========================
    COMPONENTE PRINCIPAL
 ========================= */
 export default function ExposedCarouselRow({
@@ -154,10 +132,10 @@ export default function ExposedCarouselRow({
   const [fav, setFav] = useState<Record<string, boolean>>({});
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
-  // ✅ ocultar "Ver Rank" quando o último card (Ver Rank Completo) ficar visível (mesmo parcial)
+  // ocultar "Ver Rank" quando o último card ficar visível (mesmo parcial)
   const [hideViewRank, setHideViewRank] = useState(false);
 
-  // ✅ modal (AGORA usando o SideDrawer — mesmo efeito do carrossel)
+  // modal
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   useEffect(() => {
@@ -165,28 +143,23 @@ export default function ExposedCarouselRow({
     if (!scroller) return;
 
     const onScroll = () => {
-      const children = scroller.children;
-      if (!children.length) return;
+      const last = scroller.lastElementChild as HTMLElement | null;
+      if (!last) return;
 
-      const lastCard = children[children.length - 1] as HTMLElement;
-      const scrollerRect = scroller.getBoundingClientRect();
-      const lastRect = lastCard.getBoundingClientRect();
+      const sr = scroller.getBoundingClientRect();
+      const lr = last.getBoundingClientRect();
 
-      const partiallyVisible =
-        lastRect.left < scrollerRect.right && lastRect.right > scrollerRect.left;
-
-      setHideViewRank(partiallyVisible);
+      const visible = lr.left < sr.right && lr.right > sr.left;
+      setHideViewRank(visible);
     };
 
     scroller.addEventListener('scroll', onScroll, { passive: true });
     onScroll();
-
     return () => scroller.removeEventListener('scroll', onScroll);
   }, []);
 
   return (
     <section className={className}>
-      {/* ✅ Modal com o efeito correto */}
       <SideDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
 
       {/* Cabeçalho */}
@@ -211,7 +184,7 @@ export default function ExposedCarouselRow({
         )}
       </div>
 
-      {/* Carrossel (com degradê/scrollbar oculto como antes) */}
+      {/* Carrossel */}
       <div
         ref={scrollRef}
         className="no-scrollbar flex gap-3 px-4 overflow-x-auto scroll-smooth"
@@ -219,7 +192,7 @@ export default function ExposedCarouselRow({
         {list.map((item, idx) => {
           const isFav = !!fav[item.id];
           const rating = item.rating ?? 4.8;
-          const reviews = item.reviews ?? 275;
+          const reviews = item.reviews ?? 812;
           const savings = item.savingsText ?? 'Economia de R$30 a R$90';
 
           return (
@@ -272,27 +245,28 @@ export default function ExposedCarouselRow({
                 </button>
               </div>
 
-              {/* TEXTO — fundo cinza só aqui (como você pediu) */}
+              {/* TEXTO — fundo cinza só aqui */}
               <div className="bg-zinc-200 px-2 py-2">
-                {/* ✅ altura fixa do título (2 linhas) */}
+                {/* altura fixa do título (2 linhas) */}
                 <div className="min-h-[26px] text-[11px] font-extrabold leading-[1.15] text-zinc-900 line-clamp-2">
                   {item.title}
                 </div>
 
-                {/* Economia */}
-                <div className="mt-[6px]">
-                  <div className="-mt-[2px] text-[11px] font-medium text-zinc-900">
+                {/* ✅ BLOCO (igual imagem): mais afastado do título e linhas bem próximas */}
+                <div className="mt-[10px]">
+                  {/* 1) sem fundo branco | 2) cor e peso diferente */}
+                  <div className="text-[11px] font-normal text-zinc-600 leading-[1.05]">
+                    {categoryLabel}
+                  </div>
+
+                  {/* 3) próximo da economia */}
+                  <div className="mt-[2px] text-[11px] font-medium text-zinc-900 leading-[1.05]">
                     {savings}
                   </div>
                 </div>
 
-                {/* ✅ TAGS (3ª linha dentro do card, entre economia e estrelas) */}
-                <div className="mt-[6px]">
-                  <TagPill text={categoryLabel} />
-                </div>
-
                 {/* Avaliação + CTA */}
-                <div className="mt-1 flex items-end justify-between">
+                <div className="mt-2 flex items-end justify-between">
                   <div>
                     <StarsRow rating={rating} />
                     <div className="text-[11px] text-zinc-500">
