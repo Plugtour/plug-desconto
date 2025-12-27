@@ -9,6 +9,7 @@ import type { SearchCategory, SearchOffer } from './search/types';
 
 import SponsoredOffersRow from './offers/SponsoredOffersRow';
 import ExposedCarouselRow from './offers/ExposedCarouselRow';
+import SponsoredOffersList from './offers/SponsoredOffersList';
 
 import { SPONSORED_OFFERS } from '../../_data/sponsoredOffers';
 import { EXPOSED_GASTRONOMY } from '../../_data/exposedOffers';
@@ -198,7 +199,7 @@ function Icon({
           />
           <path d="M6 11h12v6H6v-6z" stroke="#06B6D4" strokeWidth="2" strokeLinejoin="round" />
           <path
-            d="M8 17.2a1.2 1.2 0 1 0 0-2.4 1.2 1.2 0 0 0 0 2.4zM16 17.2a1.2 1.2 0 1 0 0-2.4 1.2 1.2 0 0 0 0 2.4z"
+            d="M8 17.2a1.2 1.2 0 1 0 0-2.4 1.2 1.2 0 0 0 0 2.4zM16 17.2a1.2 1.2 0 1 0 0-2.4 1.2 1.2 0 0 0 0 1.2Z"
             stroke="#06B6D4"
             strokeWidth="2"
           />
@@ -252,13 +253,9 @@ export default function HomeScreenClient({
     []
   );
 
-  // ✅ Carrossel único agora é "Top 10 mais bem avaliados"
-  // Mantém o layout do ExposedCarouselRow sem mexer em nada nele.
-  // Apenas garante 10 itens adicionando 2 cards extras (novos).
   const top10Items = useMemo(() => {
     const base = Array.isArray(EXPOSED_GASTRONOMY) ? [...EXPOSED_GASTRONOMY] : [];
 
-    // (Opcional) tenta ordenar por rating/reviews se existir no item
     base.sort((a: any, b: any) => {
       const ar = Number(a?.rating ?? 0);
       const br = Number(b?.rating ?? 0);
@@ -271,7 +268,6 @@ export default function HomeScreenClient({
 
     const list = base.slice(0, 10);
 
-    // Se vier com menos de 10, completa com 2 novos cards (mantendo o mesmo shape)
     while (list.length < 10) {
       const idx = list.length + 1;
       list.push({
@@ -289,6 +285,37 @@ export default function HomeScreenClient({
   }, []);
 
   const top10Count = 10;
+
+  const top10ListItems = useMemo(() => {
+    const mk = (n: number, title: string, priceText: string, rating: number, reviews: number) =>
+      ({
+        id: `top10list-${n}`,
+        title,
+        imageUrl: null,
+        tags: ['Gramado', 'Gastronomia', 'Top 10'],
+        priceText,
+        rating,
+        reviews,
+      } as any);
+
+    return [
+      mk(1, 'Sequência de Fondue da Serra', '35%', 4.9, 2140),
+      mk(2, 'Café Colonial da Vila', '30%', 4.8, 1875),
+      mk(3, 'Parmegiana Gigante Artesanal', '25%', 4.8, 1422),
+      mk(4, 'Pizza Napoletana Premium', '20%', 4.7, 1650),
+      mk(5, 'Churrasco na Parrilla', '28%', 4.9, 980),
+      mk(6, 'Hambúrguer Smash + Refri', '22%', 4.7, 1210),
+      mk(7, 'Massas Italianas da Casa', '26%', 4.8, 1334),
+      mk(8, 'Bistrô Francês no Centro', '18%', 4.6, 905),
+      mk(9, 'Tábua de Frios Especial', '24%', 4.7, 776),
+      mk(10, 'Sobremesas & Cafés Gourmet', '15%', 4.6, 690),
+      mk(11, 'Menu Executivo do Chef', '19%', 4.7, 812),
+      mk(12, 'Rodízio de Sushi Selecionado', '27%', 4.8, 1540),
+      mk(13, 'Brunch Completo de Domingo', '21%', 4.6, 508),
+      mk(14, 'Cervejaria Artesanal + Tour', '17%', 4.7, 932),
+      mk(15, 'Noite de Vinhos e Tábuas', '20%', 4.8, 1104),
+    ];
+  }, []);
 
   const searchCategories: SearchCategory[] = useMemo(() => {
     return categories.map((c) => ({ id: c.id, title: c.title, count: c.count }));
@@ -506,12 +533,10 @@ export default function HomeScreenClient({
                 'grid auto-cols-[100%] grid-flow-col',
                 'overflow-x-auto',
                 'px-1',
-                // ✅ permite rolar a página pra baixo mesmo tocando no menu
                 'touch-manipulation',
                 'overscroll-x-contain',
                 'scroll-smooth',
               ].join(' ')}
-              // ✅ essencial: não travar o pan-y no mobile
               style={{ touchAction: 'pan-x pan-y' }}
             >
               {Array.from({ length: pagesCount }).map((_, pageIndex) => (
@@ -611,7 +636,7 @@ export default function HomeScreenClient({
 
       <SponsoredOffersRow items={SPONSORED_OFFERS} className="mt-4" />
 
-      {/* CARROSSEL ÚNICO — Top 10 mais bem avaliados (mesmo layout) */}
+      {/* CARROSSEL */}
       <ExposedCarouselRow
         className="mt-6"
         title="Top 10 mais bem avaliados"
@@ -619,6 +644,16 @@ export default function HomeScreenClient({
         categoryCount={top10Count}
         viewAllHref="/top-10"
         items={top10Items}
+      />
+
+      {/* ✅ MAIS ESPAÇO ENTRE CARROSSEL E FILTRO/LISTA */}
+      <SponsoredOffersList
+        className="mt-6"
+        title=""
+        items={top10ListItems}
+        initialCount={5}
+        step={5}
+        categories={categories.map((c) => ({ id: c.id, title: c.title }))}
       />
 
       {/* resto da Home depois */}
