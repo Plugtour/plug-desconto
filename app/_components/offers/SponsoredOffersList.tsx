@@ -16,6 +16,8 @@ type Props = {
   title?: string;
   initialCount?: number; // default 5
   step?: number; // default 5
+
+  /** Categorias já criadas na Home (para aparecer no filtro) */
   categories?: FilterCategory[];
 };
 
@@ -132,8 +134,7 @@ function TempImagePlaceholder() {
 }
 
 /* =========================
-   CHIP
-   - selecionado em outra cor (pedido #3)
+   CHIP (ativo volta pro verde anterior)
 ========================= */
 function FilterChip({
   isActive,
@@ -152,7 +153,7 @@ function FilterChip({
         'shrink-0 rounded-full px-3 py-1 text-[12px] font-semibold',
         'border transition-colors',
         isActive
-          ? 'border-indigo-600 bg-indigo-600 text-white'
+          ? 'border-emerald-700 bg-emerald-700 text-white'
           : 'border-zinc-300 bg-zinc-100 text-zinc-700 hover:bg-zinc-200',
       ].join(' ')}
     >
@@ -162,7 +163,7 @@ function FilterChip({
 }
 
 /* =========================
-   LOADING (pedido #4)
+   LOADING (leve, sem travar)
 ========================= */
 function LoadingRow({ text = 'Carregando...' }: { text?: string }) {
   return (
@@ -199,7 +200,7 @@ export default function SponsoredOffersList({
 
   const [active, setActive] = useState<FilterKey>('melhores');
 
-  // ✅ loading de paginação (pedido #4)
+  // ✅ volta pro carregamento simples (sem recolher ao subir)
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   function openModal() {
@@ -212,7 +213,6 @@ export default function SponsoredOffersList({
     setFavIds((prev) => ({ ...prev, [id]: !prev[id] }));
   }
 
-  // ✅ evita duplicar categorias por título
   const uniqueCats = useMemo(() => {
     const seen = new Set<string>();
     const out: FilterCategory[] = [];
@@ -230,7 +230,8 @@ export default function SponsoredOffersList({
     const list = Array.isArray(items) ? [...items] : [];
 
     if (isCatFilter(active)) {
-      const wantedTitle = uniqueCats.find((c) => c.id === active.id)?.title?.toLowerCase() ?? '';
+      const wantedTitle =
+        uniqueCats.find((c) => c.id === active.id)?.title?.toLowerCase() ?? '';
       if (!wantedTitle) return list;
 
       return list.filter((it: any) => {
@@ -260,6 +261,7 @@ export default function SponsoredOffersList({
       const ar = Number(a?.rating ?? 0);
       const br = Number(b?.rating ?? 0);
       if (br !== ar) return br - ar;
+
       const av = Number(a?.reviews ?? 0);
       const bv = Number(b?.reviews ?? 0);
       return bv - av;
@@ -271,7 +273,6 @@ export default function SponsoredOffersList({
 
   const [visibleCount, setVisibleCount] = useState(() => Math.min(initialCount, total));
 
-  // reseta paginação quando troca filtro
   useEffect(() => {
     setVisibleCount(Math.min(initialCount, total));
   }, [active, initialCount, total]);
@@ -281,15 +282,12 @@ export default function SponsoredOffersList({
     [filteredItems, visibleCount]
   );
 
-  // sentinel para expandir + sentinelTop para recolher (pedido #5)
-  const sentinelBottomRef = useRef<HTMLDivElement | null>(null);
-  const sentinelTopRef = useRef<HTMLDivElement | null>(null);
-
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
   const lockRef = useRef(false);
+  const loadingTimerRef = useRef<number | null>(null);
 
-  // ✅ carregar +5 quando chega no fim
   useEffect(() => {
-    const el = sentinelBottomRef.current;
+    const el = sentinelRef.current;
     if (!el) return;
 
     const io = new IntersectionObserver(
@@ -300,48 +298,29 @@ export default function SponsoredOffersList({
         if (lockRef.current) return;
 
         lockRef.current = true;
-        setIsLoadingMore(true);
 
-        window.setTimeout(() => {
+        // loading curto (não trava)
+        setIsLoadingMore(true);
+        if (loadingTimerRef.current) window.clearTimeout(loadingTimerRef.current);
+
+        loadingTimerRef.current = window.setTimeout(() => {
           setVisibleCount((prev) => Math.min(prev + step, total));
           setIsLoadingMore(false);
           lockRef.current = false;
-        }, 420);
+        }, 120);
       },
-      { root: null, rootMargin: '240px 0px 240px 0px', threshold: 0.01 }
+      { root: null, rootMargin: '220px 0px 220px 0px', threshold: 0.01 }
     );
 
     io.observe(el);
-    return () => io.disconnect();
+
+    return () => {
+      io.disconnect();
+      if (loadingTimerRef.current) window.clearTimeout(loadingTimerRef.current);
+      loadingTimerRef.current = null;
+      lockRef.current = false;
+    };
   }, [step, total, visibleCount]);
-
-  // ✅ recolher -5 quando volta pra cima
-  useEffect(() => {
-    const el = sentinelTopRef.current;
-    if (!el) return;
-
-    const io = new IntersectionObserver(
-      (entries) => {
-        const entry = entries[0];
-        // quando topo da lista encostar de novo (usuário subiu)
-        if (!entry?.isIntersecting) return;
-        if (visibleCount <= initialCount) return;
-        if (isLoadingMore) return;
-
-        // recolhe em passos de 5, mas sem “pular” demais
-        setVisibleCount((prev) => Math.max(initialCount, prev - step));
-      },
-      { root: null, rootMargin: '-10px 0px 0px 0px', threshold: 1 }
-    );
-
-    io.observe(el);
-    return () => io.disconnect();
-  }, [initialCount, isLoadingMore, step, visibleCount]);
-
-  if (!total) {
-    // pedido #2: se filtro não retorna itens, não ocultar o filtro
-    // => não retornamos null; mostramos filtro e um estado vazio.
-  }
 
   const showTitle = !!title && title.trim().length > 0;
 
@@ -353,11 +332,11 @@ export default function SponsoredOffersList({
         <div className="mb-1 px-4 text-[12px] font-medium text-zinc-500">{title}</div>
       ) : null}
 
-      {/* ✅ FILTRO — nunca some, mesmo sem resultados (pedido #2) */}
+      {/* FILTRO — nunca some */}
       <div className="px-3">
         <div className="no-scrollbar flex gap-2 overflow-x-auto pb-2 pt-1">
           <FilterChip isActive={active === 'melhores'} onClick={() => setActive('melhores')}>
-            melhores avaliados
+            Melhores Avaliados
           </FilterChip>
 
           <FilterChip isActive={active === 'descontos'} onClick={() => setActive('descontos')}>
@@ -392,11 +371,8 @@ export default function SponsoredOffersList({
         `}</style>
       </div>
 
-      {/* LISTA (sem fundo branco) */}
+      {/* LISTA */}
       <div className="px-3">
-        {/* sentinel topo (para recolher ao subir) */}
-        <div ref={sentinelTopRef} className="h-[1px]" />
-
         {total === 0 ? (
           <div className="px-1 py-4 text-[12px] font-medium text-zinc-500">
             Nenhum item encontrado para este filtro.
@@ -514,12 +490,10 @@ export default function SponsoredOffersList({
               );
             })}
 
-            {/* loading visível ao carregar +5 */}
             {isLoadingMore ? <LoadingRow /> : null}
 
-            {/* sentinel fim */}
             {visibleCount < total ? (
-              <div ref={sentinelBottomRef} className="py-3">
+              <div ref={sentinelRef} className="py-4">
                 <div className="mx-2 h-[1px] bg-transparent" />
               </div>
             ) : (
