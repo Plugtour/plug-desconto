@@ -11,7 +11,7 @@ import SponsoredOffersRow from './offers/SponsoredOffersRow';
 import ExposedCarouselRow from './offers/ExposedCarouselRow';
 
 import { SPONSORED_OFFERS } from '../../_data/sponsoredOffers';
-import { EXPOSED_GASTRONOMY, EXPOSED_TOURS_TRANSFERS } from '../../_data/exposedOffers';
+import { EXPOSED_GASTRONOMY } from '../../_data/exposedOffers';
 
 /* =========================
    TIPOS
@@ -252,7 +252,43 @@ export default function HomeScreenClient({
     []
   );
 
-  const gastronomyCount = useMemo(() => EXPOSED_GASTRONOMY.length, []);
+  // ✅ Carrossel único agora é "Top 10 mais bem avaliados"
+  // Mantém o layout do ExposedCarouselRow sem mexer em nada nele.
+  // Apenas garante 10 itens adicionando 2 cards extras (novos).
+  const top10Items = useMemo(() => {
+    const base = Array.isArray(EXPOSED_GASTRONOMY) ? [...EXPOSED_GASTRONOMY] : [];
+
+    // (Opcional) tenta ordenar por rating/reviews se existir no item
+    base.sort((a: any, b: any) => {
+      const ar = Number(a?.rating ?? 0);
+      const br = Number(b?.rating ?? 0);
+      if (br !== ar) return br - ar;
+
+      const av = Number(a?.reviews ?? 0);
+      const bv = Number(b?.reviews ?? 0);
+      return bv - av;
+    });
+
+    const list = base.slice(0, 10);
+
+    // Se vier com menos de 10, completa com 2 novos cards (mantendo o mesmo shape)
+    while (list.length < 10) {
+      const idx = list.length + 1;
+      list.push({
+        id: `top10-extra-${idx}`,
+        title: idx === 9 ? 'Café Colonial Premium' : 'Rodízio Especial da Casa',
+        imageUrl: null,
+        href: '/oferta/top10',
+        savingsText: 'Economize até 40%',
+        rating: 5,
+        reviews: idx === 9 ? 1280 : 980,
+      } as any);
+    }
+
+    return list.slice(0, 10);
+  }, []);
+
+  const top10Count = 10;
 
   const searchCategories: SearchCategory[] = useMemo(() => {
     return categories.map((c) => ({ id: c.id, title: c.title, count: c.count }));
@@ -470,7 +506,7 @@ export default function HomeScreenClient({
                 'grid auto-cols-[100%] grid-flow-col',
                 'overflow-x-auto',
                 'px-1',
-                // ✅ troca: permite rolar a página pra baixo mesmo tocando no menu
+                // ✅ permite rolar a página pra baixo mesmo tocando no menu
                 'touch-manipulation',
                 'overscroll-x-contain',
                 'scroll-smooth',
@@ -575,29 +611,17 @@ export default function HomeScreenClient({
 
       <SponsoredOffersRow items={SPONSORED_OFFERS} className="mt-4" />
 
-      {/* CARROSSEL 1 — Gastronomia (padrão) */}
+      {/* CARROSSEL ÚNICO — Top 10 mais bem avaliados (mesmo layout) */}
       <ExposedCarouselRow
         className="mt-6"
-        title="Você também pode gostar"
-        categoryLabel="Gastronomia"
-        categoryCount={gastronomyCount}
-        viewAllHref="/gastronomia"
-        items={EXPOSED_GASTRONOMY}
-      />
-
-      {/* CARROSSEL 2 — Passeios e Transfers (mt-6 + 20px => 44px) */}
-      <ExposedCarouselRow
-        className="mt-[44px]"
-        title="Planeje seu dia"
-        categoryLabel="Passeios e Transfers"
-        categoryCount={EXPOSED_TOURS_TRANSFERS.length}
-        viewAllHref="/passeios-transfers"
-        items={EXPOSED_TOURS_TRANSFERS}
-        variant="tours"
+        title="Top 10 mais bem avaliados"
+        categoryLabel="Mais bem avaliados"
+        categoryCount={top10Count}
+        viewAllHref="/top-10"
+        items={top10Items}
       />
 
       {/* resto da Home depois */}
     </div>
   );
 }
- 
