@@ -16,8 +16,6 @@ type Props = {
   title?: string;
   initialCount?: number; // default 5
   step?: number; // default 5
-
-  /** Categorias já criadas na Home (para aparecer no filtro) */
   categories?: FilterCategory[];
 };
 
@@ -134,7 +132,7 @@ function TempImagePlaceholder() {
 }
 
 /* =========================
-   CHIP (ativo volta pro verde anterior)
+   CHIP (ativo em verde)
 ========================= */
 function FilterChip({
   isActive,
@@ -163,7 +161,7 @@ function FilterChip({
 }
 
 /* =========================
-   LOADING (leve, sem travar)
+   LOADING (leve)
 ========================= */
 function LoadingRow({ text = 'Carregando...' }: { text?: string }) {
   return (
@@ -199,8 +197,6 @@ export default function SponsoredOffersList({
   const [modalOpen, setModalOpen] = useState(false);
 
   const [active, setActive] = useState<FilterKey>('melhores');
-
-  // ✅ volta pro carregamento simples (sem recolher ao subir)
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   function openModal() {
@@ -299,7 +295,6 @@ export default function SponsoredOffersList({
 
         lockRef.current = true;
 
-        // loading curto (não trava)
         setIsLoadingMore(true);
         if (loadingTimerRef.current) window.clearTimeout(loadingTimerRef.current);
 
@@ -332,30 +327,36 @@ export default function SponsoredOffersList({
         <div className="mb-1 px-4 text-[12px] font-medium text-zinc-500">{title}</div>
       ) : null}
 
-      {/* FILTRO — nunca some */}
-      <div className="px-3">
-        <div className="no-scrollbar flex gap-2 overflow-x-auto pb-2 pt-1">
-          <FilterChip isActive={active === 'melhores'} onClick={() => setActive('melhores')}>
-            Melhores Avaliados
-          </FilterChip>
+      {/* ✅ FILTRO FIXO NO TOPO (sticky) */}
+      <div className="sticky top-0 z-[60] bg-zinc-100">
+        {/* leve separador pra não “colar” no conteúdo */}
+        <div className="px-3 pt-2">
+          <div className="no-scrollbar flex gap-2 overflow-x-auto pb-2 pt-1">
+            <FilterChip isActive={active === 'melhores'} onClick={() => setActive('melhores')}>
+              melhores avaliados
+            </FilterChip>
 
-          <FilterChip isActive={active === 'descontos'} onClick={() => setActive('descontos')}>
-            Maiores descontos
-          </FilterChip>
+            <FilterChip isActive={active === 'descontos'} onClick={() => setActive('descontos')}>
+              Maiores descontos
+            </FilterChip>
 
-          {uniqueCats.map((c) => {
-            const isActive = isCatFilter(active) && active.id === c.id;
-            return (
-              <FilterChip
-                key={c.id}
-                isActive={isActive}
-                onClick={() => setActive({ kind: 'cat', id: c.id })}
-              >
-                {c.title}
-              </FilterChip>
-            );
-          })}
+            {uniqueCats.map((c) => {
+              const isActive = isCatFilter(active) && active.id === c.id;
+              return (
+                <FilterChip
+                  key={c.id}
+                  isActive={isActive}
+                  onClick={() => setActive({ kind: 'cat', id: c.id })}
+                >
+                  {c.title}
+                </FilterChip>
+              );
+            })}
+          </div>
         </div>
+
+        {/* borda inferior sutil pra destacar o sticky */}
+        <div className="h-[1px] bg-zinc-200" />
 
         <style jsx global>{`
           .no-scrollbar::-webkit-scrollbar {
