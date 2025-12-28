@@ -321,37 +321,39 @@ export default function SponsoredOffersList({
 
   const showTitle = !!title && title.trim().length > 0;
 
-  // Ajuste único do "respiro" para garantir sticky mesmo com lista curta
-  const STICKY_SPACER_VH = 77;
+  // ✅ mantém a altura quando tem pouco/0 cards (você testou 77vh)
   const needsStickySpacer = total <= 6;
+  const STICKY_SPACER_VH = 77;
 
-  // FIX do "pulinho": quando trocar filtro, reancora o scroll na posição do sticky (só se já estiver grudado)
-  const stickyRef = useRef<HTMLDivElement | null>(null);
+  // ✅ âncora fixa (antes do sticky) para reancorar o scroll ao trocar filtro
   const STICKY_TOP = 67;
+  const stickyAnchorRef = useRef<HTMLDivElement | null>(null);
 
   const setActiveKeepingSticky = (next: FilterKey) => {
-    const el = stickyRef.current;
-    if (!el) {
+    const anchor = stickyAnchorRef.current;
+    if (!anchor) {
       setActive(next);
       return;
     }
 
-    const rect = el.getBoundingClientRect();
-    const isStuck = rect.top <= STICKY_TOP + 1; // tolerância
+    const anchorTop = anchor.getBoundingClientRect().top + window.scrollY;
+    const desiredScrollTop = Math.max(0, anchorTop - STICKY_TOP);
 
-    // guarda o scroll alvo antes de mudar o conteúdo
-    const targetScrollTop = rect.top + window.scrollY - STICKY_TOP;
+    // só força se o usuário já está na região do sticky
+    const alreadyAtStickyRegion = window.scrollY >= desiredScrollTop - 2;
 
     setActive(next);
 
-    if (!isStuck) return;
+    if (!alreadyAtStickyRegion) return;
 
-    // reancora após o React renderizar a lista nova (encolhe/expande)
+    // reancora após render/relayout (cresce/encolhe lista)
     requestAnimationFrame(() => {
-      window.scrollTo({ top: Math.max(0, targetScrollTop), behavior: 'auto' });
+      window.scrollTo({ top: desiredScrollTop, behavior: 'auto' });
       requestAnimationFrame(() => {
-        window.scrollTo({ top: Math.max(0, targetScrollTop), behavior: 'auto' });
+        window.scrollTo({ top: desiredScrollTop, behavior: 'auto' });
       });
+      window.setTimeout(() => window.scrollTo({ top: desiredScrollTop, behavior: 'auto' }), 30);
+      window.setTimeout(() => window.scrollTo({ top: desiredScrollTop, behavior: 'auto' }), 90);
     });
   };
 
@@ -363,11 +365,17 @@ export default function SponsoredOffersList({
         <div className="mb-1 px-4 text-[12px] font-medium text-zinc-500">{title}</div>
       ) : null}
 
+      {/* ✅ ÂNCORA DO STICKY (não muda layout) */}
+      <div ref={stickyAnchorRef} className="h-0" />
+
       {/* ✅ FILTRO FIXO ABAIXO DO QUICKSEARCH */}
-      <div ref={stickyRef} className="sticky top-[67px] z-[60] bg-zinc-100">
+      <div className="sticky top-[67px] z-[60] bg-zinc-100">
         <div className="px-3 pt-3">
           <div className="no-scrollbar flex gap-2 overflow-x-auto pb-4 pt-1">
-            <FilterChip isActive={active === 'descontos'} onClick={() => setActiveKeepingSticky('descontos')}>
+            <FilterChip
+              isActive={active === 'descontos'}
+              onClick={() => setActiveKeepingSticky('descontos')}
+            >
               Maiores descontos
             </FilterChip>
 
@@ -384,7 +392,10 @@ export default function SponsoredOffersList({
               );
             })}
 
-            <FilterChip isActive={active === 'melhores'} onClick={() => setActiveKeepingSticky('melhores')}>
+            <FilterChip
+              isActive={active === 'melhores'}
+              onClick={() => setActiveKeepingSticky('melhores')}
+            >
               melhores avaliados
             </FilterChip>
           </div>
@@ -414,7 +425,9 @@ export default function SponsoredOffersList({
               Nenhum item encontrado para este filtro.
             </div>
 
-            {needsStickySpacer ? <div aria-hidden style={{ height: `${STICKY_SPACER_VH}vh` }} /> : null}
+            {needsStickySpacer ? (
+              <div aria-hidden style={{ height: `${STICKY_SPACER_VH}vh` }} />
+            ) : null}
           </>
         ) : (
           <>
@@ -539,7 +552,9 @@ export default function SponsoredOffersList({
               <div className="py-2" />
             )}
 
-            {needsStickySpacer ? <div aria-hidden style={{ height: `${STICKY_SPACER_VH}vh` }} /> : null}
+            {needsStickySpacer ? (
+              <div aria-hidden style={{ height: `${STICKY_SPACER_VH}vh` }} />
+            ) : null}
           </>
         )}
       </div>
