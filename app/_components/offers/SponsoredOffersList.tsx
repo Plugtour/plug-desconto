@@ -325,7 +325,7 @@ export default function SponsoredOffersList({
   const needsStickySpacer = total <= 6;
 
   // sua altura (mantive como você testou)
-  const spacerHeight = `80svh`;
+  const spacerHeight = `90svh`;
 
   // ✅ âncora do topo da lista (logo abaixo do filtro)
   const listTopRef = useRef<HTMLDivElement | null>(null);
