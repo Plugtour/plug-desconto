@@ -186,8 +186,13 @@ export default function HomeScreenClient({
 
       <HomeBanner className="mt-4" />
 
-      <div className="px-4 mt-3 pb-2">
-        <QuickSearch offers={searchData} categories={searchCategories} />
+      {/* ✅ QuickSearch fixo com respiro e fundo sólido */}
+      <div className="sticky top-[0px] z-[90] bg-zinc-100">
+        <div className="pt-2">
+          <div className="px-4 mt-3 pb-2">
+            <QuickSearch offers={searchData} categories={searchCategories} />
+          </div>
+        </div>
       </div>
 
       <SponsoredOffersRow items={SPONSORED_OFFERS} className="mt-4" />

@@ -1,4 +1,3 @@
-// Caminho: app/_components/HomeBanner.tsx
 'use client';
 
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -807,4 +806,3 @@ export default function HomeBanner({ className }: Props) {
     </section>
   );
 }
- 

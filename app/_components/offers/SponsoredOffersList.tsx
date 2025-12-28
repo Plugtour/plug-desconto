@@ -1,7 +1,7 @@
 // app/_components/offers/SponsoredOffersList.tsx
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { SponsoredOffer } from '../../../_data/sponsoredOffers';
 import SideDrawer from './SideDrawer';
 
@@ -252,7 +252,6 @@ export default function SponsoredOffersList({
       return list;
     }
 
-    // melhores
     list.sort((a: any, b: any) => {
       const ar = Number(a?.rating ?? 0);
       const br = Number(b?.rating ?? 0);
@@ -319,6 +318,47 @@ export default function SponsoredOffersList({
 
   const showTitle = !!title && title.trim().length > 0;
 
+  /* =========================
+     FIX: filtro deve ficar no topo mesmo com poucos/0 cards
+     Estratégia: “encaixar” a barra sticky no topo sempre que trocar filtro
+     e repetir em múltiplos frames (pois a página encolhe depois do clique).
+  ========================= */
+  const stickyRef = useRef<HTMLDivElement | null>(null);
+  const didMountRef = useRef(false);
+
+  const snapStickyToTop = () => {
+    const el = stickyRef.current;
+    if (!el) return;
+
+    // precisa bater com o sticky: top-[67px]
+    const STICKY_TOP = 71;
+
+    const doSnap = () => {
+      const rect = el.getBoundingClientRect();
+      const target = rect.top + window.scrollY - STICKY_TOP;
+      window.scrollTo({ top: Math.max(0, target), behavior: 'auto' });
+    };
+
+    // 1) agora
+    doSnap();
+    // 2) próximo frame
+    requestAnimationFrame(doSnap);
+    // 3) mais um frame (quando a lista encolhe)
+    requestAnimationFrame(() => requestAnimationFrame(doSnap));
+    // 4) reforço curtinho (alguns browsers recalculam depois)
+    window.setTimeout(doSnap, 30);
+    window.setTimeout(doSnap, 90);
+  };
+
+  useLayoutEffect(() => {
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      return;
+    }
+    snapStickyToTop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, total]);
+
   return (
     <section className={['w-full', className || ''].join(' ')}>
       <SideDrawer open={modalOpen} onClose={closeModal} />
@@ -327,35 +367,34 @@ export default function SponsoredOffersList({
         <div className="mb-1 px-4 text-[12px] font-medium text-zinc-500">{title}</div>
       ) : null}
 
-      {/* ✅ FILTRO FIXO NO TOPO (sticky) */}
-      <div className="sticky top-0 z-[60] bg-zinc-100">
-        {/* leve separador pra não “colar” no conteúdo */}
-        <div className="px-3 pt-2">
-          <div className="no-scrollbar flex gap-2 overflow-x-auto pb-2 pt-1">
-            <FilterChip isActive={active === 'melhores'} onClick={() => setActive('melhores')}>
-              melhores avaliados
-            </FilterChip>
-
+      {/* ✅ FILTRO FIXO ABAIXO DO QUICKSEARCH */}
+      <div ref={stickyRef} className="sticky top-[67px] z-[60] bg-zinc-100">
+        <div className="px-3 pt-3">
+          <div className="no-scrollbar flex gap-2 overflow-x-auto pb-4 pt-1">
             <FilterChip isActive={active === 'descontos'} onClick={() => setActive('descontos')}>
               Maiores descontos
             </FilterChip>
 
             {uniqueCats.map((c) => {
-              const isActive = isCatFilter(active) && active.id === c.id;
+              const isActiveNow = isCatFilter(active) && active.id === c.id;
               return (
                 <FilterChip
                   key={c.id}
-                  isActive={isActive}
+                  isActive={isActiveNow}
                   onClick={() => setActive({ kind: 'cat', id: c.id })}
                 >
                   {c.title}
                 </FilterChip>
               );
             })}
+
+            {/* ✅ melhores avaliados no fim do carrossel */}
+            <FilterChip isActive={active === 'melhores'} onClick={() => setActive('melhores')}>
+              melhores avaliados
+            </FilterChip>
           </div>
         </div>
 
-        {/* borda inferior sutil pra destacar o sticky */}
         <div className="h-[1px] bg-zinc-200" />
 
         <style jsx global>{`
@@ -381,7 +420,7 @@ export default function SponsoredOffersList({
         ) : (
           <>
             {visibleItems.map((item, idx) => {
-              const isFav = !!favIds[item.id];
+              const isFav = !!favIds[(item as any).id];
               const tagsLine = buildTags(item);
               const rating = (item as any).rating ?? 4.8;
               const reviews = (item as any).reviews ?? 0;
@@ -391,7 +430,7 @@ export default function SponsoredOffersList({
               const handleCardClick = () => openModal();
 
               return (
-                <div key={item.id} className="relative">
+                <div key={(item as any).id} className="relative">
                   <div
                     role="button"
                     tabIndex={0}
@@ -404,6 +443,7 @@ export default function SponsoredOffersList({
                     <div className="flex gap-3">
                       <div className="h-24 w-24 flex-none overflow-hidden rounded-md bg-zinc-200">
                         {imageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
                           <img
                             src={imageUrl}
                             alt={(item as any).title}
@@ -470,7 +510,7 @@ export default function SponsoredOffersList({
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        toggleFav(item.id);
+                        toggleFav((item as any).id);
                       }}
                       className="absolute right-2 top-2 inline-flex h-10 w-10 items-center justify-center"
                     >

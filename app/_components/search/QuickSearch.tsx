@@ -1,4 +1,3 @@
-// app/_components/search/QuickSearch.tsx
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -29,12 +28,7 @@ function useDebouncedValue<T>(value: T, delayMs: number) {
 
 function SadFaceIcon({ className }: { className?: string }) {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      className={className ?? 'h-4 w-4'}
-      fill="none"
-      aria-hidden="true"
-    >
+    <svg viewBox="0 0 24 24" className={className ?? 'h-4 w-4'} fill="none" aria-hidden="true">
       <path
         d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z"
         stroke="currentColor"
@@ -91,11 +85,7 @@ function CategoryIcon({ id, className }: { id: string; className?: string }) {
             strokeWidth="2"
             strokeLinejoin="round"
           />
-          <path
-            d="M12 11.2a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4z"
-            stroke={stroke}
-            strokeWidth="2"
-          />
+          <path d="M12 11.2a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4z" stroke={stroke} strokeWidth="2" />
         </svg>
       );
 
@@ -136,18 +126,8 @@ function CategoryIcon({ id, className }: { id: string; className?: string }) {
     case 'gastronomia2':
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none" aria-hidden="true">
-          <path
-            d="M7 3v7M10 3v7M8.5 10v11"
-            stroke={stroke}
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
-          <path
-            d="M17 3c2 2.4 2 4.8 0 7v11"
-            stroke={stroke}
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
+          <path d="M7 3v7M10 3v7M8.5 10v11" stroke={stroke} strokeWidth="2" strokeLinecap="round" />
+          <path d="M17 3c2 2.4 2 4.8 0 7v11" stroke={stroke} strokeWidth="2" strokeLinecap="round" />
         </svg>
       );
 
@@ -167,12 +147,7 @@ function CategoryIcon({ id, className }: { id: string; className?: string }) {
             strokeWidth="2"
             strokeLinejoin="round"
           />
-          <path
-            d="M8 12v-1.6M16 12v-1.6"
-            stroke={stroke}
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
+          <path d="M8 12v-1.6M16 12v-1.6" stroke={stroke} strokeWidth="2" strokeLinecap="round" />
         </svg>
       );
 
@@ -180,12 +155,7 @@ function CategoryIcon({ id, className }: { id: string; className?: string }) {
     case 'compras2':
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none" aria-hidden="true">
-          <path
-            d="M7.5 9h9l-.7 10H8.2L7.5 9z"
-            stroke={stroke}
-            strokeWidth="2"
-            strokeLinejoin="round"
-          />
+          <path d="M7.5 9h9l-.7 10H8.2L7.5 9z" stroke={stroke} strokeWidth="2" strokeLinejoin="round" />
           <path
             d="M9.2 9c0-2 1.2-3.2 2.8-3.2S14.8 7 14.8 9"
             stroke={stroke}
@@ -205,12 +175,7 @@ function CategoryIcon({ id, className }: { id: string; className?: string }) {
             strokeWidth="2"
             strokeLinejoin="round"
           />
-          <path
-            d="M6 11h12v6H6v-6z"
-            stroke={stroke}
-            strokeWidth="2"
-            strokeLinejoin="round"
-          />
+          <path d="M6 11h12v6H6v-6z" stroke={stroke} strokeWidth="2" strokeLinejoin="round" />
           <path
             d="M8 17.2a1.2 1.2 0 1 0 0-2.4 1.2 1.2 0 0 0 0 2.4zM16 17.2a1.2 1.2 0 1 0 0-2.4 1.2 1.2 0 0 0 0 2.4z"
             stroke={stroke}
@@ -340,7 +305,6 @@ export default function QuickSearch({
   }
 
   function openSheet() {
-    // ao abrir: restaura se ainda estiver dentro de 1 hora
     const saved = safeReadStoredQuery();
     if (saved) {
       setValue(saved);
@@ -357,7 +321,6 @@ export default function QuickSearch({
   function closeSheet() {
     if (closing) return;
 
-    // ao fechar: guarda a busca e inicia contagem de 1 hora
     if (hasQuery) {
       safeStoreQuery(value.trim());
       scheduleAutoClear();
@@ -403,295 +366,294 @@ export default function QuickSearch({
   }
 
   return (
-    <div className={className}>
-      <div className="flex items-stretch gap-2">
-        <button
-          type="button"
-          onClick={openSheet}
-          className="flex-1 touch-manipulation"
-          aria-label="Abrir busca"
-        >
-          <div className="h-10 flex items-center rounded-md bg-white/95 shadow-sm ring-1 ring-black/10 px-3 py-0">
-            <div className="flex-1 text-left text-[14px] leading-none text-black/45">
-              {placeholder}
-            </div>
-          </div>
-        </button>
-
-        <button
-          type="button"
-          onClick={openSheet}
-          className="h-10 touch-manipulation flex items-center justify-center rounded-md bg-emerald-600 px-3 py-0 text-[13px] font-semibold text-white shadow-sm hover:bg-emerald-700"
-          aria-label="Buscar"
-        >
-          Buscar
-        </button>
-      </div>
-
-      {sheetOpen && (
-        <div className="fixed inset-0 z-[999]">
+    // ✅ SOMENTE: wrapper sticky (não mexe em padding/margens internas do layout)
+    <div className="sticky top-0 z-[80]">
+      {/* ✅ preserva exatamente o layout original (className continua aqui) */}
+      <div className={className}>
+        <div className="flex items-stretch gap-2">
           <button
             type="button"
-            aria-label="Fechar"
-            onClick={closeSheet}
-            className={[
-              'absolute inset-0 rounded-md bg-black/35 backdrop-blur-[6px] touch-manipulation',
-              closing ? 'backdrop-exit' : 'backdrop-enter',
-            ].join(' ')}
-          />
+            onClick={openSheet}
+            className="flex-1 touch-manipulation"
+            aria-label="Abrir busca"
+          >
+            <div className="h-10 flex items-center rounded-md bg-white/95 shadow-sm ring-1 ring-black/10 px-3 py-0">
+              <div className="flex-1 text-left text-[14px] leading-none text-black/45">
+                {placeholder}
+              </div>
+            </div>
+          </button>
 
-          <div className="absolute inset-x-0 bottom-0">
-            <div
+          <button
+            type="button"
+            onClick={openSheet}
+            className="h-10 touch-manipulation flex items-center justify-center rounded-md bg-emerald-600 px-3 py-0 text-[13px] font-semibold text-white shadow-sm hover:bg-emerald-700"
+            aria-label="Buscar"
+          >
+            Buscar
+          </button>
+        </div>
+
+        {sheetOpen && (
+          <div className="fixed inset-0 z-[999]">
+            <button
+              type="button"
+              aria-label="Fechar"
+              onClick={closeSheet}
               className={[
-                'mx-auto w-full max-w-md px-[5px] pb-[5px] relative touch-manipulation',
-                closing ? 'sheet-exit' : 'sheet-enter',
+                'absolute inset-0 rounded-md bg-black/35 backdrop-blur-[6px] touch-manipulation',
+                closing ? 'backdrop-exit' : 'backdrop-enter',
               ].join(' ')}
-            >
-              <button
-                type="button"
-                onClick={closeSheet}
-                className="absolute right-[5px] -top-9 touch-manipulation rounded-md bg-white/80 ring-1 ring-black/10 px-3 py-1.5 text-[13px] font-normal text-red-600 hover:text-red-700 hover:bg-white"
+            />
+
+            <div className="absolute inset-x-0 bottom-0">
+              <div
+                className={[
+                  'mx-auto w-full max-w-md px-[5px] pb-[5px] relative touch-manipulation',
+                  closing ? 'sheet-exit' : 'sheet-enter',
+                ].join(' ')}
               >
-                Fechar
-              </button>
+                <button
+                  type="button"
+                  onClick={closeSheet}
+                  className="absolute right-[5px] -top-9 touch-manipulation rounded-md bg-white/80 ring-1 ring-black/10 px-3 py-1.5 text-[13px] font-normal text-red-600 hover:text-red-700 hover:bg-white"
+                >
+                  Fechar
+                </button>
 
-              <div className="rounded-t-md bg-zinc-100/92 shadow-2xl ring-1 ring-black/10 overflow-hidden">
-                <div className="px-4 pt-3 pb-2">
-                  <div className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-black/15" />
+                <div className="rounded-t-md bg-zinc-100/92 shadow-2xl ring-1 ring-black/10 overflow-hidden">
+                  <div className="px-4 pt-3 pb-2">
+                    <div className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-black/15" />
 
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-2 rounded-md bg-white/90 shadow-sm ring-1 ring-black/10 px-3 py-2 flex-1">
-                      <span className="shrink-0 opacity-60" aria-hidden="true">
-                        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none">
-                          <path
-                            d="M10.5 18.5a8 8 0 1 1 0-16 8 8 0 0 1 0 16Z"
-                            stroke="currentColor"
-                            strokeWidth="1.8"
-                          />
-                          <path
-                            d="M16.6 16.6 21 21"
-                            stroke="currentColor"
-                            strokeWidth="1.8"
-                            strokeLinecap="round"
-                          />
-                        </svg>
-                      </span>
-
-                      <input
-                        ref={inputRef}
-                        value={value}
-                        onChange={(e) => {
-                          const next = e.target.value;
-                          setValue(next);
-                          setActive(0);
-
-                          // opcional: se ele apagar tudo, já limpa o "lembrar"
-                          if (next.trim().length === 0) {
-                            safeClearStoredQuery();
-                            if (clearTimerRef.current) window.clearTimeout(clearTimerRef.current);
-                            clearTimerRef.current = null;
-                          }
-                        }}
-                        onKeyDown={onKeyDown}
-                        placeholder={placeholder}
-                        className="w-full bg-transparent outline-none text-[16px] placeholder:text-black/45"
-                        inputMode="search"
-                        autoComplete="off"
-                        spellCheck={false}
-                      />
-
-                      {hasQuery && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setValue('');
-                            setActive(0);
-                            safeClearStoredQuery();
-                            if (clearTimerRef.current) window.clearTimeout(clearTimerRef.current);
-                            clearTimerRef.current = null;
-                            inputRef.current?.focus();
-                          }}
-                          aria-label="Limpar pesquisa"
-                          className="shrink-0 touch-manipulation rounded-md px-2 py-1 text-black/55 hover:text-black"
-                        >
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 rounded-md bg-white/90 shadow-sm ring-1 ring-black/10 px-3 py-2 flex-1">
+                        <span className="shrink-0 opacity-60" aria-hidden="true">
                           <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none">
                             <path
-                              d="M7 7l10 10M17 7 7 17"
+                              d="M10.5 18.5a8 8 0 1 1 0-16 8 8 0 0 1 0 16Z"
                               stroke="currentColor"
-                              strokeWidth="2"
+                              strokeWidth="1.8"
+                            />
+                            <path
+                              d="M16.6 16.6 21 21"
+                              stroke="currentColor"
+                              strokeWidth="1.8"
                               strokeLinecap="round"
                             />
                           </svg>
-                        </button>
-                      )}
-                    </div>
+                        </span>
 
-                    <button
-                      type="button"
-                      className="touch-manipulation rounded-md bg-emerald-600 px-3 py-2 text-[13px] font-semibold text-white shadow-sm hover:bg-emerald-700"
-                      aria-label="Buscar"
-                      onClick={() => inputRef.current?.focus()}
-                    >
-                      Buscar
-                    </button>
-                  </div>
-                </div>
+                        <input
+                          ref={inputRef}
+                          value={value}
+                          onChange={(e) => {
+                            const next = e.target.value;
+                            setValue(next);
+                            setActive(0);
 
-                <div className="h-[72vh] px-4 pb-5 overflow-hidden">
-                  <div className="h-full overflow-auto">
-                    {hasQuery && (
-                      <div className="pt-2">
-                        <div className="text-[12px] font-semibold text-black/60">
-                          Resultados
-                        </div>
+                            if (next.trim().length === 0) {
+                              safeClearStoredQuery();
+                              if (clearTimerRef.current) window.clearTimeout(clearTimerRef.current);
+                              clearTimerRef.current = null;
+                            }
+                          }}
+                          onKeyDown={onKeyDown}
+                          placeholder={placeholder}
+                          className="w-full bg-transparent outline-none text-[16px] placeholder:text-black/45"
+                          inputMode="search"
+                          autoComplete="off"
+                          spellCheck={false}
+                        />
 
-                        {results.length === 0 ? (
-                          <div className="mt-2 px-1 py-2 text-[13px] text-black/55 flex items-center gap-2">
-                            <span>Nenhum resultado encontrado.</span>
-                            <SadFaceIcon className="h-4 w-4 text-black/50" />
-                          </div>
-                        ) : (
-                          <div className="mt-2 overflow-hidden rounded-xl bg-white/90 ring-1 ring-black/10">
-                            {results.map((o, idx) => {
-                              const isActive = idx === active;
-                              const href = buildOfferHref(o);
-
-                              return (
-                                <Link
-                                  key={`${o.id}-${o.slug ?? ''}`}
-                                  href={href}
-                                  className={[
-                                    'flex items-center gap-3 px-3 py-2.5 transition-colors',
-                                    isActive ? 'bg-black/5' : 'hover:bg-black/5',
-                                  ].join(' ')}
-                                  onMouseEnter={() => setActive(idx)}
-                                  onClick={closeSheet}
-                                >
-                                  <div className="h-10 w-10 overflow-hidden rounded-lg bg-black/5 shrink-0">
-                                    {o.imageUrl ? (
-                                      // eslint-disable-next-line @next/next/no-img-element
-                                      <img
-                                        src={o.imageUrl}
-                                        alt=""
-                                        className="h-full w-full object-cover"
-                                        loading="lazy"
-                                      />
-                                    ) : null}
-                                  </div>
-
-                                  <div className="min-w-0 flex-1">
-                                    <div className="truncate text-[14px] font-semibold text-black">
-                                      {o.title}
-                                    </div>
-                                    <div className="truncate text-[12px] text-black/60">
-                                      {o.subtitle || o.city || ''}
-                                    </div>
-                                  </div>
-
-                                  {o.priceText ? (
-                                    <div className="shrink-0 text-[12px] font-semibold text-black/70">
-                                      {o.priceText}
-                                    </div>
-                                  ) : null}
-                                </Link>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    <div className={hasQuery ? 'pt-4' : 'pt-3'}>
-                      <div className="text-[12px] font-semibold text-black/60">
-                        Categorias
-                      </div>
-
-                      <div className="mt-2 grid grid-cols-3 gap-2">
-                        {filteredCats.map((c) => (
+                        {hasQuery && (
                           <button
-                            key={c.id}
                             type="button"
-                            className="touch-manipulation rounded-md bg-white/90 border border-neutral-200/60 px-2 py-2 flex flex-col items-center gap-0 hover:bg-black/5 transition-colors"
                             onClick={() => {
-                              setValue(c.title);
+                              setValue('');
                               setActive(0);
+                              safeClearStoredQuery();
+                              if (clearTimerRef.current) window.clearTimeout(clearTimerRef.current);
+                              clearTimerRef.current = null;
                               inputRef.current?.focus();
                             }}
+                            aria-label="Limpar pesquisa"
+                            className="shrink-0 touch-manipulation rounded-md px-2 py-1 text-black/55 hover:text-black"
                           >
-                            <CategoryIcon id={c.id} className="h-5 w-5" />
-                            <span className="w-full px-1 text-center text-[11px] font-semibold leading-[1.15] text-neutral-800 line-clamp-2">
-                              {c.title}
-                            </span>
-                            <span className="text-[11px] text-neutral-500">
-                              {typeof c.count === 'number' ? c.count : ''}
-                            </span>
+                            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none">
+                              <path
+                                d="M7 7l10 10M17 7 7 17"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                              />
+                            </svg>
                           </button>
-                        ))}
+                        )}
+                      </div>
+
+                      <button
+                        type="button"
+                        className="touch-manipulation rounded-md bg-emerald-600 px-3 py-2 text-[13px] font-semibold text-white shadow-sm hover:bg-emerald-700"
+                        aria-label="Buscar"
+                        onClick={() => inputRef.current?.focus()}
+                      >
+                        Buscar
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="h-[72vh] px-4 pb-5 overflow-hidden">
+                    <div className="h-full overflow-auto">
+                      {hasQuery && (
+                        <div className="pt-2">
+                          <div className="text-[12px] font-semibold text-black/60">Resultados</div>
+
+                          {results.length === 0 ? (
+                            <div className="mt-2 px-1 py-2 text-[13px] text-black/55 flex items-center gap-2">
+                              <span>Nenhum resultado encontrado.</span>
+                              <SadFaceIcon className="h-4 w-4 text-black/50" />
+                            </div>
+                          ) : (
+                            <div className="mt-2 overflow-hidden rounded-xl bg-white/90 ring-1 ring-black/10">
+                              {results.map((o, idx) => {
+                                const isActive = idx === active;
+                                const href = buildOfferHref(o);
+
+                                return (
+                                  <Link
+                                    key={`${o.id}-${o.slug ?? ''}`}
+                                    href={href}
+                                    className={[
+                                      'flex items-center gap-3 px-3 py-2.5 transition-colors',
+                                      isActive ? 'bg-black/5' : 'hover:bg-black/5',
+                                    ].join(' ')}
+                                    onMouseEnter={() => setActive(idx)}
+                                    onClick={closeSheet}
+                                  >
+                                    <div className="h-10 w-10 overflow-hidden rounded-lg bg-black/5 shrink-0">
+                                      {o.imageUrl ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img
+                                          src={o.imageUrl}
+                                          alt=""
+                                          className="h-full w-full object-cover"
+                                          loading="lazy"
+                                        />
+                                      ) : null}
+                                    </div>
+
+                                    <div className="min-w-0 flex-1">
+                                      <div className="truncate text-[14px] font-semibold text-black">
+                                        {o.title}
+                                      </div>
+                                      <div className="truncate text-[12px] text-black/60">
+                                        {o.subtitle || o.city || ''}
+                                      </div>
+                                    </div>
+
+                                    {o.priceText ? (
+                                      <div className="shrink-0 text-[12px] font-semibold text-black/70">
+                                        {o.priceText}
+                                      </div>
+                                    ) : null}
+                                  </Link>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      <div className={hasQuery ? 'pt-4' : 'pt-3'}>
+                        <div className="text-[12px] font-semibold text-black/60">Categorias</div>
+
+                        <div className="mt-2 grid grid-cols-3 gap-2">
+                          {filteredCats.map((c) => (
+                            <button
+                              key={c.id}
+                              type="button"
+                              className="touch-manipulation rounded-md bg-white/90 border border-neutral-200/60 px-2 py-2 flex flex-col items-center gap-0 hover:bg-black/5 transition-colors"
+                              onClick={() => {
+                                setValue(c.title);
+                                setActive(0);
+                                inputRef.current?.focus();
+                              }}
+                            >
+                              <CategoryIcon id={c.id} className="h-5 w-5" />
+                              <span className="w-full px-1 text-center text-[11px] font-semibold leading-[1.15] text-neutral-800 line-clamp-2">
+                                {c.title}
+                              </span>
+                              <span className="text-[11px] text-neutral-500">
+                                {typeof c.count === 'number' ? c.count : ''}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
+
+              <style jsx global>{`
+                html {
+                  -webkit-text-size-adjust: 100%;
+                }
+
+                @keyframes sheetEnter {
+                  from {
+                    transform: translateY(34px);
+                    opacity: 0;
+                  }
+                  to {
+                    transform: translateY(0);
+                    opacity: 1;
+                  }
+                }
+                @keyframes sheetExit {
+                  from {
+                    transform: translateY(0);
+                    opacity: 1;
+                  }
+                  to {
+                    transform: translateY(34px);
+                    opacity: 0;
+                  }
+                }
+                .sheet-enter {
+                  animation: sheetEnter 320ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
+                }
+                .sheet-exit {
+                  animation: sheetExit 280ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
+                }
+
+                @keyframes backdropEnter {
+                  from {
+                    opacity: 0;
+                  }
+                  to {
+                    opacity: 1;
+                  }
+                }
+                @keyframes backdropExit {
+                  from {
+                    opacity: 1;
+                  }
+                  to {
+                    opacity: 0;
+                  }
+                }
+                .backdrop-enter {
+                  animation: backdropEnter 220ms ease-out both;
+                }
+                .backdrop-exit {
+                  animation: backdropExit 220ms ease-in both;
+                }
+              `}</style>
             </div>
-
-            <style jsx global>{`
-              html {
-                -webkit-text-size-adjust: 100%;
-              }
-
-              @keyframes sheetEnter {
-                from {
-                  transform: translateY(34px);
-                  opacity: 0;
-                }
-                to {
-                  transform: translateY(0);
-                  opacity: 1;
-                }
-              }
-              @keyframes sheetExit {
-                from {
-                  transform: translateY(0);
-                  opacity: 1;
-                }
-                to {
-                  transform: translateY(34px);
-                  opacity: 0;
-                }
-              }
-              .sheet-enter {
-                animation: sheetEnter 320ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
-              }
-              .sheet-exit {
-                animation: sheetExit 280ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
-              }
-
-              @keyframes backdropEnter {
-                from {
-                  opacity: 0;
-                }
-                to {
-                  opacity: 1;
-                }
-              }
-              @keyframes backdropExit {
-                from {
-                  opacity: 1;
-                }
-                to {
-                  opacity: 0;
-                }
-              }
-              .backdrop-enter {
-                animation: backdropEnter 220ms ease-out both;
-              }
-              .backdrop-exit {
-                animation: backdropExit 220ms ease-in both;
-              }
-            `}</style>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
