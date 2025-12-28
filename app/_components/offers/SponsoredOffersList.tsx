@@ -1,7 +1,7 @@
 // app/_components/offers/SponsoredOffersList.tsx
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { SponsoredOffer } from '../../../_data/sponsoredOffers';
 import SideDrawer from './SideDrawer';
 
@@ -328,37 +328,48 @@ export default function SponsoredOffersList({
   const spacerHeight = `90svh`;
 
   /* =========================
-     FIX DEFINITIVO DO "PULO":
-     ao clicar no filtro, sempre levar o scroll para o ponto onde o sticky começa a grudar.
-     Isso impede o sticky de “desgrudar” por 1 frame quando troca de vazio ↔ com conteúdo.
+     FIX: snap pós-render (mata o pulinho no mobile)
   ========================= */
   const stickyRef = useRef<HTMLDivElement | null>(null);
+  const pendingSnapRef = useRef(false);
 
-  const scrollToStickyStart = () => {
+  const snapStickyToTop = () => {
     const sticky = stickyRef.current;
     if (!sticky) return;
 
-    const DESIRED_TOP = 57; // mesmo "67px" do seu layout (QuickSearch)
-
-    const doSnap = () => {
-      const rect = sticky.getBoundingClientRect();
-      // scrollY que coloca o sticky exatamente no topo desejado (ponto de "grudar")
-      const stickyStartY = window.scrollY + rect.top - DESIRED_TOP;
-      window.scrollTo({ top: Math.max(0, stickyStartY), behavior: 'auto' });
+    const getDesiredTop = () => {
+      const topStr = window.getComputedStyle(sticky).top || '0';
+      const n = Number.parseFloat(topStr);
+      return Number.isFinite(n) ? n : 0;
     };
 
-    // reforço em frames diferentes (mobile precisa disso)
+    const doSnap = () => {
+      const desiredTop = getDesiredTop();
+      const rect = sticky.getBoundingClientRect();
+      const y = window.scrollY + rect.top - desiredTop;
+      window.scrollTo({ top: Math.max(0, y), behavior: 'auto' });
+    };
+
+    // reforço (mobile)
     doSnap();
     requestAnimationFrame(doSnap);
     requestAnimationFrame(() => requestAnimationFrame(doSnap));
     window.setTimeout(doSnap, 30);
     window.setTimeout(doSnap, 90);
+    window.setTimeout(doSnap, 160);
   };
 
   const setActiveAndSnap = (next: FilterKey) => {
+    pendingSnapRef.current = true;
     setActive(next);
-    scrollToStickyStart();
   };
+
+  useLayoutEffect(() => {
+    if (!pendingSnapRef.current) return;
+    pendingSnapRef.current = false;
+    snapStickyToTop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, total]);
 
   return (
     <section className={['w-full', className || ''].join(' ')}>
@@ -419,7 +430,7 @@ export default function SponsoredOffersList({
             -webkit-overflow-scrolling: touch;
           }
 
-          /* ✅ evita o browser “ancorar” o scroll quando a lista muda de tamanho */
+          /* evita o browser “ancorar” o scroll quando a lista muda de tamanho */
           .no-anchor {
             overflow-anchor: none;
           }
