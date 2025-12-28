@@ -133,6 +133,7 @@ function TempImagePlaceholder() {
 
 /* =========================
    CHIP (ativo em verde)
+   FIX: evitar "pulo" ao clicar (focus scroll)
 ========================= */
 function FilterChip({
   isActive,
@@ -146,6 +147,9 @@ function FilterChip({
   return (
     <button
       type="button"
+      // impede o browser de "puxar" o scroll para focar o botão (mas Tab continua funcionando)
+      onMouseDown={(e) => e.preventDefault()}
+      onTouchStart={(e) => e.preventDefault()}
       onClick={onClick}
       className={[
         'shrink-0 rounded-full px-3 py-1 text-[12px] font-semibold',
@@ -318,7 +322,7 @@ export default function SponsoredOffersList({
 
   const showTitle = !!title && title.trim().length > 0;
 
-  // ✅ ajuste: aplicar spacer em mais casos e com mais altura
+  // ✅ você confirmou que 75vh resolveu
   const needsStickySpacer = total <= 6;
 
   return (
@@ -380,8 +384,7 @@ export default function SponsoredOffersList({
               Nenhum item encontrado para este filtro.
             </div>
 
-            {/* ✅ spacer reforçado */}
-            {needsStickySpacer ? <div aria-hidden className="h-[75vh]" /> : null}
+            {needsStickySpacer ? <div aria-hidden className="h-[77vh]" /> : null}
           </>
         ) : (
           <>
@@ -506,8 +509,7 @@ export default function SponsoredOffersList({
               <div className="py-2" />
             )}
 
-            {/* ✅ spacer reforçado */}
-            {needsStickySpacer ? <div aria-hidden className="h-[70vh]" /> : null}
+            {needsStickySpacer ? <div aria-hidden className="h-[77vh]" /> : null}
           </>
         )}
       </div>
