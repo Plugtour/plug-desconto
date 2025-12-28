@@ -321,24 +321,16 @@ export default function SponsoredOffersList({
 
   const showTitle = !!title && title.trim().length > 0;
 
-  // ✅ mantém altura quando tem pouco/0 cards
+  // mantém altura quando tem pouco/0 cards
   const needsStickySpacer = total <= 6;
 
-  // ✅ sua altura
-  const STICKY_SPACER = 77;
+  // sua altura (mantive como você testou)
+  const spacerHeight = `77svh`;
 
-  // ✅ REGULAGEM AQUI:
-  const STICKY_TOP = 0; // precisa bater com top-[67px]
-  const EXTRA_GAP = -0; // aumente/diminua: 2, 4, -2 etc.
-
-  // ✅ svh evita variação no mobile
-  const spacerHeight = `${STICKY_SPACER}svh`;
-
-  // ✅ marcador do topo da lista (logo abaixo do filtro)
+  // ✅ âncora do topo da lista (logo abaixo do filtro)
   const listTopRef = useRef<HTMLDivElement | null>(null);
 
-  // ✅ troca filtro SEM deixar a página “cair”:
-  // sempre rola pra mostrar o topo da lista, com o filtro fixo em cima
+  // ✅ troca filtro + volta para o topo da lista (mobile-friendly)
   const setActiveAndSnap = (next: FilterKey) => {
     setActive(next);
 
@@ -346,13 +338,11 @@ export default function SponsoredOffersList({
       const el = listTopRef.current;
       if (!el) return;
 
-      const rect = el.getBoundingClientRect();
-      const y = rect.top + window.scrollY - STICKY_TOP - EXTRA_GAP;
-
-      window.scrollTo({ top: Math.max(0, y), behavior: 'auto' });
+      // scroll-margin-top faz o offset do sticky + safe area automaticamente
+      el.scrollIntoView({ block: 'start', behavior: 'auto' });
     };
 
-    // reforço em frames diferentes (pois o conteúdo muda depois do clique)
+    // reforço em frames diferentes (conteúdo muda após clique)
     requestAnimationFrame(snap);
     requestAnimationFrame(() => requestAnimationFrame(snap));
     window.setTimeout(snap, 30);
@@ -368,7 +358,10 @@ export default function SponsoredOffersList({
       ) : null}
 
       {/* ✅ FILTRO FIXO ABAIXO DO QUICKSEARCH */}
-      <div className="sticky top-[67px] z-[60] bg-zinc-100">
+      <div
+        className="sticky z-[60] bg-zinc-100"
+        style={{ top: 'calc(67px + env(safe-area-inset-top))' }}
+      >
         <div className="px-3 pt-3">
           <div className="no-scrollbar flex gap-2 overflow-x-auto pb-4 pt-1">
             <FilterChip
@@ -413,14 +406,23 @@ export default function SponsoredOffersList({
             -ms-overflow-style: none;
             -webkit-overflow-scrolling: touch;
           }
+
+          /* ✅ evita o browser “ancorar” o scroll quando a lista muda de tamanho */
+          .no-anchor {
+            overflow-anchor: none;
+          }
         `}</style>
       </div>
 
-      {/* ✅ âncora: topo da lista (usada para “snap”) */}
-      <div ref={listTopRef} />
+      {/* ✅ âncora do topo da lista (usa scroll-margin-top com safe-area) */}
+      <div
+        ref={listTopRef}
+        className="no-anchor"
+        style={{ scrollMarginTop: 'calc(67px + env(safe-area-inset-top))' }}
+      />
 
       {/* LISTA */}
-      <div className="px-3">
+      <div className="px-3 no-anchor">
         {total === 0 ? (
           <>
             <div className="px-1 py-4 text-[12px] font-medium text-zinc-500">
