@@ -220,7 +220,7 @@ export default function SponsoredOffersList({
   const [favIds, setFavIds] = useState<Record<string, boolean>>({});
   const [modalOpen, setModalOpen] = useState(false);
 
-  // ✅ "Todos" já vem selecionado
+  // ✅ agora começa em "todos"
   const [active, setActive] = useState<FilterKey>('todos');
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
@@ -250,12 +250,11 @@ export default function SponsoredOffersList({
   const filteredItems = useMemo(() => {
     const list = Array.isArray(items) ? [...items] : [];
 
-    // ✅ Todos = sem filtro (mantém a lista como está)
+    // ✅ "Todos" não filtra nem reordena
     if (active === 'todos') return list;
 
     if (isCatFilter(active)) {
-      const wantedTitle =
-        uniqueCats.find((c) => c.id === active.id)?.title?.toLowerCase() ?? '';
+      const wantedTitle = uniqueCats.find((c) => c.id === active.id)?.title?.toLowerCase() ?? '';
       if (!wantedTitle) return list;
 
       return list.filter((it: any) => {
@@ -300,10 +299,7 @@ export default function SponsoredOffersList({
     setVisibleCount(Math.min(initialCount, total));
   }, [active, initialCount, total]);
 
-  const visibleItems = useMemo(
-    () => filteredItems.slice(0, visibleCount),
-    [filteredItems, visibleCount]
-  );
+  const visibleItems = useMemo(() => filteredItems.slice(0, visibleCount), [filteredItems, visibleCount]);
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const lockRef = useRef(false);
@@ -360,7 +356,9 @@ export default function SponsoredOffersList({
   // mantém seu estilo original no sticky
   const FILTER_TOP = 'calc(67px + env(safe-area-inset-top))';
 
-  // ✅ detecção compatível: compara o top do sentinela com o offset real (67 + safe-area em px)
+  // ✅ trava para evitar “piscar”/“pulinho” quando muda conteúdo
+  const userScrolledUpRef = useRef(false);
+
   useEffect(() => {
     let raf = 0;
     let safeTopPx = 0;
@@ -377,12 +375,19 @@ export default function SponsoredOffersList({
 
       const stuck = top <= thresholdTop + 0.5;
 
-      setFilterIsStuck((prev) => (prev === stuck ? prev : stuck));
+      setFilterIsStuck((prev) => {
+        // ✅ se já estava colado, não deixa “descolar” por reflow interno (troca de filtro com conteúdo)
+        if (prev && !stuck && !userScrolledUpRef.current) return true;
+        return stuck;
+      });
     };
 
     const onScroll = () => {
       if (raf) return;
       raf = window.requestAnimationFrame(compute);
+
+      // ✅ somente quando o usuário volta realmente para o topo, liberamos para descolar
+      if (window.scrollY < 10) userScrolledUpRef.current = true;
     };
 
     const onResize = () => {
@@ -422,9 +427,7 @@ export default function SponsoredOffersList({
     <section className={['w-full', className || ''].join(' ')}>
       <SideDrawer open={modalOpen} onClose={closeModal} />
 
-      {showTitle ? (
-        <div className="mb-1 px-4 text-[12px] font-medium text-zinc-500">{title}</div>
-      ) : null}
+      {showTitle ? <div className="mb-1 px-4 text-[12px] font-medium text-zinc-500">{title}</div> : null}
 
       {/* ✅ sentinela 1px: base para detectar quando o sticky colou */}
       <div ref={filterSentinelRef} aria-hidden className="h-px w-full" />
@@ -433,21 +436,19 @@ export default function SponsoredOffersList({
       <div
         className={[
           'sticky z-[60] transition-colors',
+          // 👇 cinza mais escuro quando colado
           filterIsStuck ? 'bg-zinc-200/95 backdrop-blur-[2px]' : 'bg-zinc-100',
         ].join(' ')}
         style={{ top: FILTER_TOP }}
       >
         <div className="px-3 pt-3">
           <div className="no-scrollbar flex gap-2 overflow-x-auto pb-4 pt-1">
-            {/* ✅ NOVO: Todos (primeiro e já selecionado) */}
+            {/* ✅ NOVO: Todos (primeiro e selecionado) */}
             <FilterChip isActive={active === 'todos'} onClick={() => setActiveAndSnap('todos')}>
               Todos
             </FilterChip>
 
-            <FilterChip
-              isActive={active === 'descontos'}
-              onClick={() => setActiveAndSnap('descontos')}
-            >
+            <FilterChip isActive={active === 'descontos'} onClick={() => setActiveAndSnap('descontos')}>
               Maiores descontos
             </FilterChip>
 
@@ -464,10 +465,7 @@ export default function SponsoredOffersList({
               );
             })}
 
-            <FilterChip
-              isActive={active === 'melhores'}
-              onClick={() => setActiveAndSnap('melhores')}
-            >
+            <FilterChip isActive={active === 'melhores'} onClick={() => setActiveAndSnap('melhores')}>
               melhores avaliados
             </FilterChip>
           </div>
@@ -500,9 +498,7 @@ export default function SponsoredOffersList({
       {/* LISTA */}
       <div className="px-3 no-anchor" style={needsStickySpacer ? { minHeight: spacerHeight } : {}}>
         {total === 0 ? (
-          <div className="px-1 py-4 text-[12px] font-medium text-zinc-500">
-            Nenhum item encontrado para este filtro.
-          </div>
+          <div className="px-1 py-4 text-[12px] font-medium text-zinc-500">Nenhum item encontrado para este filtro.</div>
         ) : (
           <>
             {visibleItems.map((item, idx) => {
@@ -560,11 +556,8 @@ export default function SponsoredOffersList({
                           <div>
                             <StarsRow rating={Number(rating)} />
                             <div className="-mt-0.5 text-[11px] text-zinc-500">
-                              <span className="font-semibold text-zinc-700">
-                                {Number(rating).toFixed(1)}
-                              </span>{' '}
-                              de <span className="font-semibold text-zinc-700">{reviews}</span>{' '}
-                              avaliações
+                              <span className="font-semibold text-zinc-700">{Number(rating).toFixed(1)}</span>{' '}
+                              de <span className="font-semibold text-zinc-700">{reviews}</span> avaliações
                             </div>
                           </div>
 
@@ -601,17 +594,14 @@ export default function SponsoredOffersList({
                     >
                       <HeartIcon
                         filled={isFav}
-                        className={[
-                          'h-9 w-9 transition',
-                          isFav ? 'text-red-500' : 'text-zinc-300 hover:text-zinc-400',
-                        ].join(' ')}
+                        className={['h-9 w-9 transition', isFav ? 'text-red-500' : 'text-zinc-300 hover:text-zinc-400'].join(
+                          ' '
+                        )}
                       />
                     </button>
                   </div>
 
-                  {idx < visibleItems.length - 1 ? (
-                    <div className="mx-2 border-b border-dotted border-zinc-300" />
-                  ) : null}
+                  {idx < visibleItems.length - 1 ? <div className="mx-2 border-b border-dotted border-zinc-300" /> : null}
                 </div>
               );
             })}
