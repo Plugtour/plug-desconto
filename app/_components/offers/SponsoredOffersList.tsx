@@ -1,7 +1,7 @@
 // app/_components/offers/SponsoredOffersList.tsx
 'use client';
 
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { SponsoredOffer } from '../../../_data/sponsoredOffers';
 import SideDrawer from './SideDrawer';
 
@@ -324,38 +324,39 @@ export default function SponsoredOffersList({
   // mantém altura quando tem pouco/0 cards
   const needsStickySpacer = total <= 6;
 
-  // sua altura
+  // sua altura (mantive como você testou)
   const spacerHeight = `90svh`;
 
-  /* =========================
-     FIX: “pulinho” no mobile (scroll anchoring)
-     - snap pós-render
-     - segurar o scroll por ~180ms no mesmo Y
-  ========================= */
+  // refs do sticky e do topo da lista
   const stickyRef = useRef<HTMLDivElement | null>(null);
-  const pendingSnapRef = useRef(false);
-  const lockUntilRef = useRef<number>(0);
-  const lockYRef = useRef<number>(0);
-  const rafLockRef = useRef<number | null>(null);
+  const listTopRef = useRef<HTMLDivElement | null>(null);
 
-  const startScrollLock = (y: number, ms = 180) => {
+  // ✅ “trava” curtinha pra evitar o browser mexer no scroll depois do clique (mobile)
+  const lockUntilRef = useRef(0);
+  const lockYRef = useRef<number | null>(null);
+
+  const startScrollLock = (y: number, ms: number) => {
     lockYRef.current = y;
-    lockUntilRef.current = performance.now() + ms;
+    lockUntilRef.current = Date.now() + ms;
+  };
 
-    const tick = () => {
-      if (performance.now() >= lockUntilRef.current) {
-        if (rafLockRef.current) cancelAnimationFrame(rafLockRef.current);
-        rafLockRef.current = null;
+  useEffect(() => {
+    const onScroll = () => {
+      const y = lockYRef.current;
+      if (y == null) return;
+      if (Date.now() > lockUntilRef.current) {
+        lockYRef.current = null;
         return;
       }
-      // segura exatamente no mesmo Y (mata o “cai e volta”)
-      window.scrollTo({ top: lockYRef.current, behavior: 'auto' });
-      rafLockRef.current = requestAnimationFrame(tick);
+      const diff = Math.abs(window.scrollY - y);
+      if (diff > 1) {
+        window.scrollTo({ top: y, behavior: 'auto' });
+      }
     };
 
-    if (rafLockRef.current) cancelAnimationFrame(rafLockRef.current);
-    rafLockRef.current = requestAnimationFrame(tick);
-  };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   const snapStickyToTop = () => {
     const sticky = stickyRef.current;
@@ -365,37 +366,42 @@ export default function SponsoredOffersList({
     const desiredTop = Number.isFinite(Number.parseFloat(topStr)) ? Number.parseFloat(topStr) : 0;
 
     const rect = sticky.getBoundingClientRect();
-    const targetY = Math.max(0, window.scrollY + rect.top - desiredTop);
 
-    // 1) aplica
+    // ✅ ajuste fino do “pulinho” (~20px no mobile)
+    const EXTRA_FIX_PX = 20;
+
+    const targetY = Math.max(0, window.scrollY + rect.top - desiredTop - EXTRA_FIX_PX);
+
     window.scrollTo({ top: targetY, behavior: 'auto' });
-    // 2) segura por um curto período
-    startScrollLock(targetY, 180);
 
-    // reforços (mobile)
+    // ✅ segura um pouco mais no mobile
+    startScrollLock(targetY, 260);
+
     requestAnimationFrame(() => window.scrollTo({ top: targetY, behavior: 'auto' }));
     window.setTimeout(() => window.scrollTo({ top: targetY, behavior: 'auto' }), 30);
     window.setTimeout(() => window.scrollTo({ top: targetY, behavior: 'auto' }), 90);
   };
 
-  const setActiveAndSnap = (next: FilterKey) => {
-    pendingSnapRef.current = true;
-    setActive(next);
+  const snapListTop = () => {
+    const el = listTopRef.current;
+    if (!el) return;
+    el.scrollIntoView({ block: 'start', behavior: 'auto' });
   };
 
-  useLayoutEffect(() => {
-    if (!pendingSnapRef.current) return;
-    pendingSnapRef.current = false;
-    snapStickyToTop();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, total]);
+  // ✅ troca filtro + volta para o topo da lista + corrige o “pulinho”
+  const setActiveAndSnap = (next: FilterKey) => {
+    setActive(next);
 
-  useEffect(() => {
-    return () => {
-      if (rafLockRef.current) cancelAnimationFrame(rafLockRef.current);
-      rafLockRef.current = null;
+    const after = () => {
+      snapListTop();
+      snapStickyToTop();
     };
-  }, []);
+
+    requestAnimationFrame(after);
+    requestAnimationFrame(() => requestAnimationFrame(after));
+    window.setTimeout(after, 30);
+    window.setTimeout(after, 90);
+  };
 
   return (
     <section className={['w-full', className || ''].join(' ')}>
@@ -456,14 +462,19 @@ export default function SponsoredOffersList({
             -webkit-overflow-scrolling: touch;
           }
 
-          /* reduz scroll anchoring */
-          html,
-          body,
+          /* ✅ evita o browser “ancorar” o scroll quando a lista muda de tamanho */
           .no-anchor {
             overflow-anchor: none;
           }
         `}</style>
       </div>
+
+      {/* ✅ âncora do topo da lista (usa scroll-margin-top com safe-area) */}
+      <div
+        ref={listTopRef}
+        className="no-anchor"
+        style={{ scrollMarginTop: 'calc(67px + env(safe-area-inset-top))' }}
+      />
 
       {/* LISTA */}
       <div className="px-3 no-anchor">
