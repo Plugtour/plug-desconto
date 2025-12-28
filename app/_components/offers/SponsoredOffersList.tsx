@@ -338,7 +338,7 @@ export default function SponsoredOffersList({
     const sticky = stickyRef.current;
     if (!sticky) return;
 
-    const DESIRED_TOP = 67; // mesmo "67px" do seu layout (QuickSearch)
+    const DESIRED_TOP = 67; // mesmo "57px" do seu layout (QuickSearch)
 
     const doSnap = () => {
       const rect = sticky.getBoundingClientRect();
