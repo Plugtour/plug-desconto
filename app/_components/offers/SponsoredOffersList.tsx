@@ -424,7 +424,7 @@ export default function SponsoredOffersList({
             </div>
 
             {needsStickySpacer ? (
-              <div aria-hidden style={{ height: `${STICKY_SPACER_VH}vh` }} />
+              <div aria-hidden style={{ height: `${STICKY_SPACER_VH}svh` }} />
             ) : null}
           </>
         ) : (
@@ -551,7 +551,7 @@ export default function SponsoredOffersList({
             )}
 
             {needsStickySpacer ? (
-              <div aria-hidden style={{ height: `${STICKY_SPACER_VH}vh` }} />
+              <div aria-hidden style={{ height: `${STICKY_SPACER_VH}svh` }} />
             ) : null}
           </>
         )}
