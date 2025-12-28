@@ -324,39 +324,58 @@ export default function SponsoredOffersList({
   // mantém altura quando tem pouco/0 cards
   const needsStickySpacer = total <= 6;
 
-  // sua altura (mantive como você testou)
+  // sua altura
   const spacerHeight = `90svh`;
 
   /* =========================
-     FIX: snap pós-render (mata o pulinho no mobile)
+     FIX: “pulinho” no mobile (scroll anchoring)
+     - snap pós-render
+     - segurar o scroll por ~180ms no mesmo Y
   ========================= */
   const stickyRef = useRef<HTMLDivElement | null>(null);
   const pendingSnapRef = useRef(false);
+  const lockUntilRef = useRef<number>(0);
+  const lockYRef = useRef<number>(0);
+  const rafLockRef = useRef<number | null>(null);
+
+  const startScrollLock = (y: number, ms = 180) => {
+    lockYRef.current = y;
+    lockUntilRef.current = performance.now() + ms;
+
+    const tick = () => {
+      if (performance.now() >= lockUntilRef.current) {
+        if (rafLockRef.current) cancelAnimationFrame(rafLockRef.current);
+        rafLockRef.current = null;
+        return;
+      }
+      // segura exatamente no mesmo Y (mata o “cai e volta”)
+      window.scrollTo({ top: lockYRef.current, behavior: 'auto' });
+      rafLockRef.current = requestAnimationFrame(tick);
+    };
+
+    if (rafLockRef.current) cancelAnimationFrame(rafLockRef.current);
+    rafLockRef.current = requestAnimationFrame(tick);
+  };
 
   const snapStickyToTop = () => {
     const sticky = stickyRef.current;
     if (!sticky) return;
 
-    const getDesiredTop = () => {
-      const topStr = window.getComputedStyle(sticky).top || '0';
-      const n = Number.parseFloat(topStr);
-      return Number.isFinite(n) ? n : 0;
-    };
+    const topStr = window.getComputedStyle(sticky).top || '0';
+    const desiredTop = Number.isFinite(Number.parseFloat(topStr)) ? Number.parseFloat(topStr) : 0;
 
-    const doSnap = () => {
-      const desiredTop = getDesiredTop();
-      const rect = sticky.getBoundingClientRect();
-      const y = window.scrollY + rect.top - desiredTop;
-      window.scrollTo({ top: Math.max(0, y), behavior: 'auto' });
-    };
+    const rect = sticky.getBoundingClientRect();
+    const targetY = Math.max(0, window.scrollY + rect.top - desiredTop);
 
-    // reforço (mobile)
-    doSnap();
-    requestAnimationFrame(doSnap);
-    requestAnimationFrame(() => requestAnimationFrame(doSnap));
-    window.setTimeout(doSnap, 30);
-    window.setTimeout(doSnap, 90);
-    window.setTimeout(doSnap, 160);
+    // 1) aplica
+    window.scrollTo({ top: targetY, behavior: 'auto' });
+    // 2) segura por um curto período
+    startScrollLock(targetY, 180);
+
+    // reforços (mobile)
+    requestAnimationFrame(() => window.scrollTo({ top: targetY, behavior: 'auto' }));
+    window.setTimeout(() => window.scrollTo({ top: targetY, behavior: 'auto' }), 30);
+    window.setTimeout(() => window.scrollTo({ top: targetY, behavior: 'auto' }), 90);
   };
 
   const setActiveAndSnap = (next: FilterKey) => {
@@ -370,6 +389,13 @@ export default function SponsoredOffersList({
     snapStickyToTop();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, total]);
+
+  useEffect(() => {
+    return () => {
+      if (rafLockRef.current) cancelAnimationFrame(rafLockRef.current);
+      rafLockRef.current = null;
+    };
+  }, []);
 
   return (
     <section className={['w-full', className || ''].join(' ')}>
@@ -430,7 +456,9 @@ export default function SponsoredOffersList({
             -webkit-overflow-scrolling: touch;
           }
 
-          /* evita o browser “ancorar” o scroll quando a lista muda de tamanho */
+          /* reduz scroll anchoring */
+          html,
+          body,
           .no-anchor {
             overflow-anchor: none;
           }
