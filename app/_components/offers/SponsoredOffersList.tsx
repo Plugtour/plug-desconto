@@ -327,26 +327,37 @@ export default function SponsoredOffersList({
   // sua altura (mantive como você testou)
   const spacerHeight = `90svh`;
 
-  // ✅ âncora do topo da lista (logo abaixo do filtro)
-  const listTopRef = useRef<HTMLDivElement | null>(null);
+  /* =========================
+     FIX DEFINITIVO DO "PULO":
+     ao clicar no filtro, sempre levar o scroll para o ponto onde o sticky começa a grudar.
+     Isso impede o sticky de “desgrudar” por 1 frame quando troca de vazio ↔ com conteúdo.
+  ========================= */
+  const stickyRef = useRef<HTMLDivElement | null>(null);
 
-  // ✅ troca filtro + volta para o topo da lista (mobile-friendly)
-  const setActiveAndSnap = (next: FilterKey) => {
-    setActive(next);
+  const scrollToStickyStart = () => {
+    const sticky = stickyRef.current;
+    if (!sticky) return;
 
-    const snap = () => {
-      const el = listTopRef.current;
-      if (!el) return;
+    const DESIRED_TOP = 67; // mesmo "67px" do seu layout (QuickSearch)
 
-      // scroll-margin-top faz o offset do sticky + safe area automaticamente
-      el.scrollIntoView({ block: 'start', behavior: 'auto' });
+    const doSnap = () => {
+      const rect = sticky.getBoundingClientRect();
+      // scrollY que coloca o sticky exatamente no topo desejado (ponto de "grudar")
+      const stickyStartY = window.scrollY + rect.top - DESIRED_TOP;
+      window.scrollTo({ top: Math.max(0, stickyStartY), behavior: 'auto' });
     };
 
-    // reforço em frames diferentes (conteúdo muda após clique)
-    requestAnimationFrame(snap);
-    requestAnimationFrame(() => requestAnimationFrame(snap));
-    window.setTimeout(snap, 30);
-    window.setTimeout(snap, 90);
+    // reforço em frames diferentes (mobile precisa disso)
+    doSnap();
+    requestAnimationFrame(doSnap);
+    requestAnimationFrame(() => requestAnimationFrame(doSnap));
+    window.setTimeout(doSnap, 30);
+    window.setTimeout(doSnap, 90);
+  };
+
+  const setActiveAndSnap = (next: FilterKey) => {
+    setActive(next);
+    scrollToStickyStart();
   };
 
   return (
@@ -359,6 +370,7 @@ export default function SponsoredOffersList({
 
       {/* ✅ FILTRO FIXO ABAIXO DO QUICKSEARCH */}
       <div
+        ref={stickyRef}
         className="sticky z-[60] bg-zinc-100"
         style={{ top: 'calc(67px + env(safe-area-inset-top))' }}
       >
@@ -413,13 +425,6 @@ export default function SponsoredOffersList({
           }
         `}</style>
       </div>
-
-      {/* ✅ âncora do topo da lista (usa scroll-margin-top com safe-area) */}
-      <div
-        ref={listTopRef}
-        className="no-anchor"
-        style={{ scrollMarginTop: 'calc(67px + env(safe-area-inset-top))' }}
-      />
 
       {/* LISTA */}
       <div className="px-3 no-anchor">
