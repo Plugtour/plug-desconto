@@ -319,22 +319,31 @@ export default function SponsoredOffersList({
   const showTitle = !!title && title.trim().length > 0;
 
   /* =========================
-     ✅ FIX REAL: garantir altura suficiente para o sticky nunca “descolar”
-     quando a lista ficar curta e o navegador puxar o scroll pra cima.
+     ✅ FIX: manter sticky preso mesmo quando a lista “encolhe”
   ========================= */
   const stickyRef = useRef<HTMLDivElement | null>(null);
   const STICKY_TOP_PX = 67;
+
   const [bottomSpacerPx, setBottomSpacerPx] = useState(0);
+  const prevScrollYRef = useRef<number | null>(null);
+
+  function setActivePreservingSticky(next: FilterKey) {
+    // guarda scroll atual antes de trocar (isso evita “descer” ao encurtar a lista)
+    prevScrollYRef.current = window.scrollY;
+    setActive(next);
+  }
 
   useEffect(() => {
     const el = stickyRef.current;
     if (!el) return;
 
-    let raf1 = 0;
-    let raf2 = 0;
+    // Espera o DOM atualizar (lista pode ter encolhido) e então:
+    // 1) cria spacer suficiente para permitir manter o scroll
+    // 2) se o browser puxou o scroll, restaura o scroll anterior
+    let r1 = 0;
+    let r2 = 0;
 
     const run = () => {
-      // mede depois do DOM atualizar
       const rect = el.getBoundingClientRect();
       const stickyDocTop = window.scrollY + rect.top;
 
@@ -344,26 +353,33 @@ export default function SponsoredOffersList({
       const doc = document.documentElement;
       const maxScroll = Math.max(0, doc.scrollHeight - window.innerHeight);
 
-      // se o conteúdo ficou curto e maxScroll < neededScroll, o browser “puxa” o scroll,
-      // então adicionamos um spacer invisível no fim para permitir manter a posição.
+      // se conteúdo ficou curto, adiciona altura no fim
       const missing = Math.max(0, neededScroll - maxScroll + 2);
-
       setBottomSpacerPx(missing);
 
-      // se o scroll atual foi “puxado” para antes do ponto, reposiciona sem animação
-      // (agora vai existir altura suficiente por causa do spacer).
-      if (window.scrollY < neededScroll) {
-        window.scrollTo({ top: neededScroll, left: 0, behavior: 'auto' });
+      // se houve clique no filtro, tenta preservar a posição anterior
+      const prev = prevScrollYRef.current;
+      if (typeof prev === 'number') {
+        prevScrollYRef.current = null;
+
+        // após ajustar o spacer, o maxScroll muda — então só agora dá pra restaurar
+        const doc2 = document.documentElement;
+        const maxScroll2 = Math.max(0, doc2.scrollHeight - window.innerHeight);
+
+        const target = Math.min(prev, maxScroll2);
+        if (Math.abs(window.scrollY - target) > 1) {
+          window.scrollTo({ top: target, left: 0, behavior: 'auto' });
+        }
       }
     };
 
-    raf1 = requestAnimationFrame(() => {
-      raf2 = requestAnimationFrame(run);
+    r1 = requestAnimationFrame(() => {
+      r2 = requestAnimationFrame(run);
     });
 
     return () => {
-      cancelAnimationFrame(raf1);
-      cancelAnimationFrame(raf2);
+      cancelAnimationFrame(r1);
+      cancelAnimationFrame(r2);
     };
   }, [active, total, visibleCount]);
 
@@ -379,11 +395,17 @@ export default function SponsoredOffersList({
       <div ref={stickyRef} className="sticky top-[67px] z-[60] bg-zinc-100">
         <div className="px-3 pt-3">
           <div className="no-scrollbar flex gap-2 overflow-x-auto pb-4 pt-1">
-            <FilterChip isActive={active === 'melhores'} onClick={() => setActive('melhores')}>
+            <FilterChip
+              isActive={active === 'melhores'}
+              onClick={() => setActivePreservingSticky('melhores')}
+            >
               melhores avaliados
             </FilterChip>
 
-            <FilterChip isActive={active === 'descontos'} onClick={() => setActive('descontos')}>
+            <FilterChip
+              isActive={active === 'descontos'}
+              onClick={() => setActivePreservingSticky('descontos')}
+            >
               Maiores descontos
             </FilterChip>
 
@@ -393,7 +415,7 @@ export default function SponsoredOffersList({
                 <FilterChip
                   key={c.id}
                   isActive={isActiveNow}
-                  onClick={() => setActive({ kind: 'cat', id: c.id })}
+                  onClick={() => setActivePreservingSticky({ kind: 'cat', id: c.id })}
                 >
                   {c.title}
                 </FilterChip>
@@ -421,7 +443,8 @@ export default function SponsoredOffersList({
       {/* LISTA */}
       <div className="px-3">
         {total === 0 ? (
-          <div className="px-1 py-4 text-[12px] font-medium text-zinc-500">
+          // ✅ garante área mínima para não “encolher” e forçar o scroll a mudar
+          <div className="px-1 py-4 text-[12px] font-medium text-zinc-500 min-h-[220px]">
             Nenhum item encontrado para este filtro.
           </div>
         ) : (
@@ -484,8 +507,7 @@ export default function SponsoredOffersList({
                               <span className="font-semibold text-zinc-700">
                                 {Number(rating).toFixed(1)}
                               </span>{' '}
-                              de{' '}
-                              <span className="font-semibold text-zinc-700">{reviews}</span>{' '}
+                              de <span className="font-semibold text-zinc-700">{reviews}</span>{' '}
                               avaliações
                             </div>
                           </div>
@@ -550,7 +572,7 @@ export default function SponsoredOffersList({
           </>
         )}
 
-        {/* ✅ Spacer invisível: só aparece quando necessário para evitar o sticky “descolar” */}
+        {/* ✅ Spacer invisível para evitar o sticky “descolar” quando a lista fica curta */}
         {bottomSpacerPx > 0 ? <div aria-hidden="true" style={{ height: bottomSpacerPx }} /> : null}
       </div>
     </section>
