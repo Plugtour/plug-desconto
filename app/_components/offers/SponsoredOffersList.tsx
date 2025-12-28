@@ -1,7 +1,7 @@
 // app/_components/offers/SponsoredOffersList.tsx
 'use client';
 
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { SponsoredOffer } from '../../../_data/sponsoredOffers';
 import SideDrawer from './SideDrawer';
 
@@ -319,45 +319,53 @@ export default function SponsoredOffersList({
   const showTitle = !!title && title.trim().length > 0;
 
   /* =========================
-     FIX: filtro deve ficar no topo mesmo com poucos/0 cards
-     Estratégia: “encaixar” a barra sticky no topo sempre que trocar filtro
-     e repetir em múltiplos frames (pois a página encolhe depois do clique).
+     ✅ FIX REAL: garantir altura suficiente para o sticky nunca “descolar”
+     quando a lista ficar curta e o navegador puxar o scroll pra cima.
   ========================= */
   const stickyRef = useRef<HTMLDivElement | null>(null);
-  const didMountRef = useRef(false);
+  const STICKY_TOP_PX = 67;
+  const [bottomSpacerPx, setBottomSpacerPx] = useState(0);
 
-  const snapStickyToTop = () => {
+  useEffect(() => {
     const el = stickyRef.current;
     if (!el) return;
 
-    // precisa bater com o sticky: top-[67px]
-    const STICKY_TOP = 71;
+    let raf1 = 0;
+    let raf2 = 0;
 
-    const doSnap = () => {
+    const run = () => {
+      // mede depois do DOM atualizar
       const rect = el.getBoundingClientRect();
-      const target = rect.top + window.scrollY - STICKY_TOP;
-      window.scrollTo({ top: Math.max(0, target), behavior: 'auto' });
+      const stickyDocTop = window.scrollY + rect.top;
+
+      // scroll mínimo para o sticky estar grudado em top=67
+      const neededScroll = Math.max(0, Math.ceil(stickyDocTop - STICKY_TOP_PX));
+
+      const doc = document.documentElement;
+      const maxScroll = Math.max(0, doc.scrollHeight - window.innerHeight);
+
+      // se o conteúdo ficou curto e maxScroll < neededScroll, o browser “puxa” o scroll,
+      // então adicionamos um spacer invisível no fim para permitir manter a posição.
+      const missing = Math.max(0, neededScroll - maxScroll + 2);
+
+      setBottomSpacerPx(missing);
+
+      // se o scroll atual foi “puxado” para antes do ponto, reposiciona sem animação
+      // (agora vai existir altura suficiente por causa do spacer).
+      if (window.scrollY < neededScroll) {
+        window.scrollTo({ top: neededScroll, left: 0, behavior: 'auto' });
+      }
     };
 
-    // 1) agora
-    doSnap();
-    // 2) próximo frame
-    requestAnimationFrame(doSnap);
-    // 3) mais um frame (quando a lista encolhe)
-    requestAnimationFrame(() => requestAnimationFrame(doSnap));
-    // 4) reforço curtinho (alguns browsers recalculam depois)
-    window.setTimeout(doSnap, 30);
-    window.setTimeout(doSnap, 90);
-  };
+    raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(run);
+    });
 
-  useLayoutEffect(() => {
-    if (!didMountRef.current) {
-      didMountRef.current = true;
-      return;
-    }
-    snapStickyToTop();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, total]);
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+    };
+  }, [active, total, visibleCount]);
 
   return (
     <section className={['w-full', className || ''].join(' ')}>
@@ -371,6 +379,10 @@ export default function SponsoredOffersList({
       <div ref={stickyRef} className="sticky top-[67px] z-[60] bg-zinc-100">
         <div className="px-3 pt-3">
           <div className="no-scrollbar flex gap-2 overflow-x-auto pb-4 pt-1">
+            <FilterChip isActive={active === 'melhores'} onClick={() => setActive('melhores')}>
+              melhores avaliados
+            </FilterChip>
+
             <FilterChip isActive={active === 'descontos'} onClick={() => setActive('descontos')}>
               Maiores descontos
             </FilterChip>
@@ -387,11 +399,6 @@ export default function SponsoredOffersList({
                 </FilterChip>
               );
             })}
-
-            {/* ✅ melhores avaliados no fim do carrossel */}
-            <FilterChip isActive={active === 'melhores'} onClick={() => setActive('melhores')}>
-              melhores avaliados
-            </FilterChip>
           </div>
         </div>
 
@@ -542,6 +549,9 @@ export default function SponsoredOffersList({
             )}
           </>
         )}
+
+        {/* ✅ Spacer invisível: só aparece quando necessário para evitar o sticky “descolar” */}
+        {bottomSpacerPx > 0 ? <div aria-hidden="true" style={{ height: bottomSpacerPx }} /> : null}
       </div>
     </section>
   );
