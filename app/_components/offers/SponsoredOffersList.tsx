@@ -147,7 +147,6 @@ function FilterChip({
   return (
     <button
       type="button"
-      // impede o browser de "puxar" o scroll para focar o botão (mas Tab continua funcionando)
       onMouseDown={(e) => e.preventDefault()}
       onTouchStart={(e) => e.preventDefault()}
       onClick={onClick}
@@ -322,8 +321,39 @@ export default function SponsoredOffersList({
 
   const showTitle = !!title && title.trim().length > 0;
 
-  // ✅ você confirmou que 75vh resolveu
+  // Ajuste único do "respiro" para garantir sticky mesmo com lista curta
+  const STICKY_SPACER_VH = 77;
   const needsStickySpacer = total <= 6;
+
+  // FIX do "pulinho": quando trocar filtro, reancora o scroll na posição do sticky (só se já estiver grudado)
+  const stickyRef = useRef<HTMLDivElement | null>(null);
+  const STICKY_TOP = 67;
+
+  const setActiveKeepingSticky = (next: FilterKey) => {
+    const el = stickyRef.current;
+    if (!el) {
+      setActive(next);
+      return;
+    }
+
+    const rect = el.getBoundingClientRect();
+    const isStuck = rect.top <= STICKY_TOP + 1; // tolerância
+
+    // guarda o scroll alvo antes de mudar o conteúdo
+    const targetScrollTop = rect.top + window.scrollY - STICKY_TOP;
+
+    setActive(next);
+
+    if (!isStuck) return;
+
+    // reancora após o React renderizar a lista nova (encolhe/expande)
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: Math.max(0, targetScrollTop), behavior: 'auto' });
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: Math.max(0, targetScrollTop), behavior: 'auto' });
+      });
+    });
+  };
 
   return (
     <section className={['w-full', className || ''].join(' ')}>
@@ -334,10 +364,10 @@ export default function SponsoredOffersList({
       ) : null}
 
       {/* ✅ FILTRO FIXO ABAIXO DO QUICKSEARCH */}
-      <div className="sticky top-[67px] z-[60] bg-zinc-100">
+      <div ref={stickyRef} className="sticky top-[67px] z-[60] bg-zinc-100">
         <div className="px-3 pt-3">
           <div className="no-scrollbar flex gap-2 overflow-x-auto pb-4 pt-1">
-            <FilterChip isActive={active === 'descontos'} onClick={() => setActive('descontos')}>
+            <FilterChip isActive={active === 'descontos'} onClick={() => setActiveKeepingSticky('descontos')}>
               Maiores descontos
             </FilterChip>
 
@@ -347,14 +377,14 @@ export default function SponsoredOffersList({
                 <FilterChip
                   key={c.id}
                   isActive={isActiveNow}
-                  onClick={() => setActive({ kind: 'cat', id: c.id })}
+                  onClick={() => setActiveKeepingSticky({ kind: 'cat', id: c.id })}
                 >
                   {c.title}
                 </FilterChip>
               );
             })}
 
-            <FilterChip isActive={active === 'melhores'} onClick={() => setActive('melhores')}>
+            <FilterChip isActive={active === 'melhores'} onClick={() => setActiveKeepingSticky('melhores')}>
               melhores avaliados
             </FilterChip>
           </div>
@@ -384,7 +414,7 @@ export default function SponsoredOffersList({
               Nenhum item encontrado para este filtro.
             </div>
 
-            {needsStickySpacer ? <div aria-hidden className="h-[77vh]" /> : null}
+            {needsStickySpacer ? <div aria-hidden style={{ height: `${STICKY_SPACER_VH}vh` }} /> : null}
           </>
         ) : (
           <>
@@ -509,7 +539,7 @@ export default function SponsoredOffersList({
               <div className="py-2" />
             )}
 
-            {needsStickySpacer ? <div aria-hidden className="h-[77vh]" /> : null}
+            {needsStickySpacer ? <div aria-hidden style={{ height: `${STICKY_SPACER_VH}vh` }} /> : null}
           </>
         )}
       </div>
