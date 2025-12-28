@@ -321,39 +321,37 @@ export default function SponsoredOffersList({
 
   const showTitle = !!title && title.trim().length > 0;
 
-  // ✅ mantém a altura quando tem pouco/0 cards (você testou 77vh)
+  // mantém altura quando tem pouco/0 cards (seu ajuste)
   const needsStickySpacer = total <= 6;
   const STICKY_SPACER_VH = 77;
 
-  // ✅ âncora fixa (antes do sticky) para reancorar o scroll ao trocar filtro
+  // ✅ âncora para sempre voltar o scroll para o topo da lista (primeiro item)
+  const listTopAnchorRef = useRef<HTMLDivElement | null>(null);
   const STICKY_TOP = 67;
-  const stickyAnchorRef = useRef<HTMLDivElement | null>(null);
 
-  const setActiveKeepingSticky = (next: FilterKey) => {
-    const anchor = stickyAnchorRef.current;
-    if (!anchor) {
-      setActive(next);
-      return;
-    }
+  const scrollListToTopUnderSticky = () => {
+    const anchor = listTopAnchorRef.current;
+    if (!anchor) return;
 
-    const anchorTop = anchor.getBoundingClientRect().top + window.scrollY;
-    const desiredScrollTop = Math.max(0, anchorTop - STICKY_TOP);
+    const doSnap = () => {
+      const y = anchor.getBoundingClientRect().top + window.scrollY - STICKY_TOP;
+      window.scrollTo({ top: Math.max(0, y), behavior: 'auto' });
+    };
 
-    // só força se o usuário já está na região do sticky
-    const alreadyAtStickyRegion = window.scrollY >= desiredScrollTop - 2;
+    // reforços para pegar o encolhe/expande após trocar filtro
+    doSnap();
+    requestAnimationFrame(doSnap);
+    requestAnimationFrame(() => requestAnimationFrame(doSnap));
+    window.setTimeout(doSnap, 30);
+    window.setTimeout(doSnap, 90);
+  };
 
+  // ✅ troca filtro sempre voltando pro topo da lista (resolvendo o "caiu lá pra baixo")
+  const setActiveAndResetToTop = (next: FilterKey) => {
     setActive(next);
-
-    if (!alreadyAtStickyRegion) return;
-
-    // reancora após render/relayout (cresce/encolhe lista)
+    // volta sempre para o topo da lista (primeiro item) após a mudança
     requestAnimationFrame(() => {
-      window.scrollTo({ top: desiredScrollTop, behavior: 'auto' });
-      requestAnimationFrame(() => {
-        window.scrollTo({ top: desiredScrollTop, behavior: 'auto' });
-      });
-      window.setTimeout(() => window.scrollTo({ top: desiredScrollTop, behavior: 'auto' }), 30);
-      window.setTimeout(() => window.scrollTo({ top: desiredScrollTop, behavior: 'auto' }), 90);
+      scrollListToTopUnderSticky();
     });
   };
 
@@ -365,16 +363,13 @@ export default function SponsoredOffersList({
         <div className="mb-1 px-4 text-[12px] font-medium text-zinc-500">{title}</div>
       ) : null}
 
-      {/* ✅ ÂNCORA DO STICKY (não muda layout) */}
-      <div ref={stickyAnchorRef} className="h-0" />
-
       {/* ✅ FILTRO FIXO ABAIXO DO QUICKSEARCH */}
       <div className="sticky top-[67px] z-[60] bg-zinc-100">
         <div className="px-3 pt-3">
           <div className="no-scrollbar flex gap-2 overflow-x-auto pb-4 pt-1">
             <FilterChip
               isActive={active === 'descontos'}
-              onClick={() => setActiveKeepingSticky('descontos')}
+              onClick={() => setActiveAndResetToTop('descontos')}
             >
               Maiores descontos
             </FilterChip>
@@ -385,7 +380,7 @@ export default function SponsoredOffersList({
                 <FilterChip
                   key={c.id}
                   isActive={isActiveNow}
-                  onClick={() => setActiveKeepingSticky({ kind: 'cat', id: c.id })}
+                  onClick={() => setActiveAndResetToTop({ kind: 'cat', id: c.id })}
                 >
                   {c.title}
                 </FilterChip>
@@ -394,7 +389,7 @@ export default function SponsoredOffersList({
 
             <FilterChip
               isActive={active === 'melhores'}
-              onClick={() => setActiveKeepingSticky('melhores')}
+              onClick={() => setActiveAndResetToTop('melhores')}
             >
               melhores avaliados
             </FilterChip>
@@ -416,6 +411,9 @@ export default function SponsoredOffersList({
           }
         `}</style>
       </div>
+
+      {/* ✅ ÂNCORA: topo da lista (primeiro item) */}
+      <div ref={listTopAnchorRef} className="h-0" />
 
       {/* LISTA */}
       <div className="px-3">
