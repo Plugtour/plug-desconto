@@ -321,86 +321,26 @@ export default function SponsoredOffersList({
 
   const showTitle = !!title && title.trim().length > 0;
 
-  // mantém altura quando tem pouco/0 cards
+  // ✅ mantém altura quando tem pouco/0 cards (você disse que vh funcionava melhor)
   const needsStickySpacer = total <= 6;
+  const spacerHeight = `100vh`;
 
-  // sua altura (mantive como você testou)
-  const spacerHeight = `90svh`;
-
-  // refs do sticky e do topo da lista
-  const stickyRef = useRef<HTMLDivElement | null>(null);
+  // ✅ âncora do topo da lista (logo abaixo do filtro)
   const listTopRef = useRef<HTMLDivElement | null>(null);
 
-  // ✅ “trava” curtinha pra evitar o browser mexer no scroll depois do clique (mobile)
-  const lockUntilRef = useRef(0);
-  const lockYRef = useRef<number | null>(null);
-
-  const startScrollLock = (y: number, ms: number) => {
-    lockYRef.current = y;
-    lockUntilRef.current = Date.now() + ms;
-  };
-
-  useEffect(() => {
-    const onScroll = () => {
-      const y = lockYRef.current;
-      if (y == null) return;
-      if (Date.now() > lockUntilRef.current) {
-        lockYRef.current = null;
-        return;
-      }
-      const diff = Math.abs(window.scrollY - y);
-      if (diff > 1) {
-        window.scrollTo({ top: y, behavior: 'auto' });
-      }
-    };
-
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
-
-  const snapStickyToTop = () => {
-    const sticky = stickyRef.current;
-    if (!sticky) return;
-
-    const topStr = window.getComputedStyle(sticky).top || '0';
-    const desiredTop = Number.isFinite(Number.parseFloat(topStr)) ? Number.parseFloat(topStr) : 0;
-
-    const rect = sticky.getBoundingClientRect();
-
-    // ✅ ajuste fino do “pulinho” (~20px no mobile)
-    const EXTRA_FIX_PX = 20;
-
-    const targetY = Math.max(0, window.scrollY + rect.top - desiredTop - EXTRA_FIX_PX);
-
-    window.scrollTo({ top: targetY, behavior: 'auto' });
-
-    // ✅ segura um pouco mais no mobile
-    startScrollLock(targetY, 260);
-
-    requestAnimationFrame(() => window.scrollTo({ top: targetY, behavior: 'auto' }));
-    window.setTimeout(() => window.scrollTo({ top: targetY, behavior: 'auto' }), 30);
-    window.setTimeout(() => window.scrollTo({ top: targetY, behavior: 'auto' }), 90);
-  };
-
-  const snapListTop = () => {
-    const el = listTopRef.current;
-    if (!el) return;
-    el.scrollIntoView({ block: 'start', behavior: 'auto' });
-  };
-
-  // ✅ troca filtro + volta para o topo da lista + corrige o “pulinho”
+  // ✅ ao trocar filtro, sempre volta para o topo da lista (sem forçar sticky/scrollTo)
   const setActiveAndSnap = (next: FilterKey) => {
     setActive(next);
 
-    const after = () => {
-      snapListTop();
-      snapStickyToTop();
+    const snap = () => {
+      const el = listTopRef.current;
+      if (!el) return;
+      el.scrollIntoView({ block: 'start', behavior: 'auto' });
     };
 
-    requestAnimationFrame(after);
-    requestAnimationFrame(() => requestAnimationFrame(after));
-    window.setTimeout(after, 30);
-    window.setTimeout(after, 90);
+    requestAnimationFrame(snap);
+    requestAnimationFrame(() => requestAnimationFrame(snap));
+    window.setTimeout(snap, 30);
   };
 
   return (
@@ -413,7 +353,6 @@ export default function SponsoredOffersList({
 
       {/* ✅ FILTRO FIXO ABAIXO DO QUICKSEARCH */}
       <div
-        ref={stickyRef}
         className="sticky z-[60] bg-zinc-100"
         style={{ top: 'calc(67px + env(safe-area-inset-top))' }}
       >
@@ -462,14 +401,14 @@ export default function SponsoredOffersList({
             -webkit-overflow-scrolling: touch;
           }
 
-          /* ✅ evita o browser “ancorar” o scroll quando a lista muda de tamanho */
+          /* evita “ancoragem” do scroll quando o conteúdo muda de tamanho */
           .no-anchor {
             overflow-anchor: none;
           }
         `}</style>
       </div>
 
-      {/* ✅ âncora do topo da lista (usa scroll-margin-top com safe-area) */}
+      {/* ✅ âncora do topo da lista (com offset do sticky/safe-area) */}
       <div
         ref={listTopRef}
         className="no-anchor"
@@ -477,15 +416,11 @@ export default function SponsoredOffersList({
       />
 
       {/* LISTA */}
-      <div className="px-3 no-anchor">
+      <div className="px-3 no-anchor" style={needsStickySpacer ? { minHeight: spacerHeight } : {}}>
         {total === 0 ? (
-          <>
-            <div className="px-1 py-4 text-[12px] font-medium text-zinc-500">
-              Nenhum item encontrado para este filtro.
-            </div>
-
-            {needsStickySpacer ? <div aria-hidden style={{ height: spacerHeight }} /> : null}
-          </>
+          <div className="px-1 py-4 text-[12px] font-medium text-zinc-500">
+            Nenhum item encontrado para este filtro.
+          </div>
         ) : (
           <>
             {visibleItems.map((item, idx) => {
@@ -608,8 +543,6 @@ export default function SponsoredOffersList({
             ) : (
               <div className="py-2" />
             )}
-
-            {needsStickySpacer ? <div aria-hidden style={{ height: spacerHeight }} /> : null}
           </>
         )}
       </div>
