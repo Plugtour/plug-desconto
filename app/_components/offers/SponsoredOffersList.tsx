@@ -331,7 +331,7 @@ export default function SponsoredOffersList({
   const STICKY_SPACER = 77;
 
   // ✅ REGULAGEM AQUI:
-  const STICKY_TOP = 77; // precisa bater com top-[67px]
+  const STICKY_TOP = 57; // precisa bater com top-[67px]
   const EXTRA_GAP = 0; // aumente/diminua: 2, 4, -2 etc.
 
   // ✅ âncora do topo da lista (logo abaixo do filtro)
