@@ -133,7 +133,7 @@ function TempImagePlaceholder() {
 
 /* =========================
    CHIP (ativo em verde)
-   FIX: evitar "pulo" ao clicar (focus scroll)
+   FIX: evitar "pulo" por foco/scroll
 ========================= */
 function FilterChip({
   isActive,
@@ -321,38 +321,42 @@ export default function SponsoredOffersList({
 
   const showTitle = !!title && title.trim().length > 0;
 
-  // mantém altura quando tem pouco/0 cards (seu ajuste)
+  // ✅ mantém altura quando tem pouco/0 cards
   const needsStickySpacer = total <= 6;
-  const STICKY_SPACER_VH = 77;
 
-  // ✅ âncora para sempre voltar o scroll para o topo da lista (primeiro item)
-  const listTopAnchorRef = useRef<HTMLDivElement | null>(null);
-  const STICKY_TOP = 67;
+  // ✅ sua altura
+  const STICKY_SPACER = 77;
 
-  const scrollListToTopUnderSticky = () => {
-    const anchor = listTopAnchorRef.current;
-    if (!anchor) return;
+  // ✅ REGULAGEM AQUI:
+  const STICKY_TOP = 67; // precisa bater com top-[67px]
+  const EXTRA_GAP = 0; // aumente/diminua: 2, 4, -2 etc.
 
-    const doSnap = () => {
-      const y = anchor.getBoundingClientRect().top + window.scrollY - STICKY_TOP;
+  // ✅ svh evita variação no mobile
+  const spacerHeight = `${STICKY_SPACER}svh`;
+
+  // ✅ marcador do topo da lista (logo abaixo do filtro)
+  const listTopRef = useRef<HTMLDivElement | null>(null);
+
+  // ✅ troca filtro SEM deixar a página “cair”:
+  // sempre rola pra mostrar o topo da lista, com o filtro fixo em cima
+  const setActiveAndSnap = (next: FilterKey) => {
+    setActive(next);
+
+    const snap = () => {
+      const el = listTopRef.current;
+      if (!el) return;
+
+      const rect = el.getBoundingClientRect();
+      const y = rect.top + window.scrollY - STICKY_TOP - EXTRA_GAP;
+
       window.scrollTo({ top: Math.max(0, y), behavior: 'auto' });
     };
 
-    // reforços para pegar o encolhe/expande após trocar filtro
-    doSnap();
-    requestAnimationFrame(doSnap);
-    requestAnimationFrame(() => requestAnimationFrame(doSnap));
-    window.setTimeout(doSnap, 30);
-    window.setTimeout(doSnap, 90);
-  };
-
-  // ✅ troca filtro sempre voltando pro topo da lista (resolvendo o "caiu lá pra baixo")
-  const setActiveAndResetToTop = (next: FilterKey) => {
-    setActive(next);
-    // volta sempre para o topo da lista (primeiro item) após a mudança
-    requestAnimationFrame(() => {
-      scrollListToTopUnderSticky();
-    });
+    // reforço em frames diferentes (pois o conteúdo muda depois do clique)
+    requestAnimationFrame(snap);
+    requestAnimationFrame(() => requestAnimationFrame(snap));
+    window.setTimeout(snap, 30);
+    window.setTimeout(snap, 90);
   };
 
   return (
@@ -369,7 +373,7 @@ export default function SponsoredOffersList({
           <div className="no-scrollbar flex gap-2 overflow-x-auto pb-4 pt-1">
             <FilterChip
               isActive={active === 'descontos'}
-              onClick={() => setActiveAndResetToTop('descontos')}
+              onClick={() => setActiveAndSnap('descontos')}
             >
               Maiores descontos
             </FilterChip>
@@ -380,7 +384,7 @@ export default function SponsoredOffersList({
                 <FilterChip
                   key={c.id}
                   isActive={isActiveNow}
-                  onClick={() => setActiveAndResetToTop({ kind: 'cat', id: c.id })}
+                  onClick={() => setActiveAndSnap({ kind: 'cat', id: c.id })}
                 >
                   {c.title}
                 </FilterChip>
@@ -389,7 +393,7 @@ export default function SponsoredOffersList({
 
             <FilterChip
               isActive={active === 'melhores'}
-              onClick={() => setActiveAndResetToTop('melhores')}
+              onClick={() => setActiveAndSnap('melhores')}
             >
               melhores avaliados
             </FilterChip>
@@ -412,8 +416,8 @@ export default function SponsoredOffersList({
         `}</style>
       </div>
 
-      {/* ✅ ÂNCORA: topo da lista (primeiro item) */}
-      <div ref={listTopAnchorRef} className="h-0" />
+      {/* ✅ âncora: topo da lista (usada para “snap”) */}
+      <div ref={listTopRef} />
 
       {/* LISTA */}
       <div className="px-3">
@@ -423,9 +427,7 @@ export default function SponsoredOffersList({
               Nenhum item encontrado para este filtro.
             </div>
 
-            {needsStickySpacer ? (
-              <div aria-hidden style={{ height: `${STICKY_SPACER_VH}svh` }} />
-            ) : null}
+            {needsStickySpacer ? <div aria-hidden style={{ height: spacerHeight }} /> : null}
           </>
         ) : (
           <>
@@ -550,9 +552,7 @@ export default function SponsoredOffersList({
               <div className="py-2" />
             )}
 
-            {needsStickySpacer ? (
-              <div aria-hidden style={{ height: `${STICKY_SPACER_VH}svh` }} />
-            ) : null}
+            {needsStickySpacer ? <div aria-hidden style={{ height: spacerHeight }} /> : null}
           </>
         )}
       </div>
