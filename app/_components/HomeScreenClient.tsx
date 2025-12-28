@@ -1,7 +1,7 @@
 // app/_components/HomeScreenClient.tsx
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import HomeBanner from './HomeBanner';
 
 import QuickSearch from './search/QuickSearch';
@@ -168,6 +168,32 @@ export default function HomeScreenClient({
       .filter(Boolean) as SearchOffer[];
   }, [offers]);
 
+  /* =========================
+     Sticky: muda cor só quando gruda no topo
+  ========================= */
+  const stickySentinelRef = useRef<HTMLDivElement | null>(null);
+  const [qsStuck, setQsStuck] = useState(false);
+
+  useEffect(() => {
+    const el = stickySentinelRef.current;
+    if (!el) return;
+
+    const io = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        // quando o sentinel sai da tela, significa que o sticky grudou
+        setQsStuck(!entry.isIntersecting);
+      },
+      {
+        root: null,
+        threshold: 0,
+      }
+    );
+
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
   return (
     <div className="mx-auto w-full max-w-md bg-zinc-100">
       <div className="px-4 pt-4">
@@ -186,8 +212,16 @@ export default function HomeScreenClient({
 
       <HomeBanner className="mt-4" />
 
-      {/* ✅ QuickSearch fixo com respiro e fundo sólido */}
-      <div className="sticky top-[0px] z-[90] bg-zinc-100">
+      {/* sentinel: quando ele some, o sticky grudou */}
+      <div ref={stickySentinelRef} className="h-px w-full" />
+
+      {/* ✅ QuickSearch sticky: só ganha fundo quando gruda */}
+      <div
+        className={[
+          'sticky top-[0px] z-[90] transition-colors',
+          qsStuck ? 'bg-zinc-200' : 'bg-transparent',
+        ].join(' ')}
+      >
         <div className="pt-2">
           <div className="px-4 mt-3 pb-2">
             <QuickSearch offers={searchData} categories={searchCategories} />

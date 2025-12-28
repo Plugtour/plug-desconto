@@ -182,10 +182,31 @@ function LoadingRow({ text = 'Carregando...' }: { text?: string }) {
 /* =========================
    COMPONENTE PRINCIPAL
 ========================= */
-type FilterKey = 'melhores' | 'descontos' | { kind: 'cat'; id: string };
+type FilterKey = 'todos' | 'melhores' | 'descontos' | { kind: 'cat'; id: string };
 
 function isCatFilter(v: FilterKey): v is { kind: 'cat'; id: string } {
   return typeof v === 'object' && v !== null && (v as any).kind === 'cat';
+}
+
+// ✅ lê safe-area-top em px (quando existir). 100% compatível.
+function readSafeAreaTopPx(): number {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return 0;
+  try {
+    const el = document.createElement('div');
+    el.style.position = 'fixed';
+    el.style.top = '0';
+    el.style.left = '0';
+    el.style.width = '0';
+    el.style.height = '0';
+    el.style.paddingTop = 'env(safe-area-inset-top)';
+    document.body.appendChild(el);
+    const pt = window.getComputedStyle(el).paddingTop;
+    document.body.removeChild(el);
+    const n = Number.parseFloat(pt || '0');
+    return Number.isFinite(n) ? n : 0;
+  } catch {
+    return 0;
+  }
 }
 
 export default function SponsoredOffersList({
@@ -199,7 +220,8 @@ export default function SponsoredOffersList({
   const [favIds, setFavIds] = useState<Record<string, boolean>>({});
   const [modalOpen, setModalOpen] = useState(false);
 
-  const [active, setActive] = useState<FilterKey>('melhores');
+  // ✅ "Todos" já vem selecionado
+  const [active, setActive] = useState<FilterKey>('todos');
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   function openModal() {
@@ -227,6 +249,9 @@ export default function SponsoredOffersList({
 
   const filteredItems = useMemo(() => {
     const list = Array.isArray(items) ? [...items] : [];
+
+    // ✅ Todos = sem filtro (mantém a lista como está)
+    if (active === 'todos') return list;
 
     if (isCatFilter(active)) {
       const wantedTitle =
@@ -321,14 +346,64 @@ export default function SponsoredOffersList({
 
   const showTitle = !!title && title.trim().length > 0;
 
-  // ✅ mantém altura quando tem pouco/0 cards (você disse que vh funcionava melhor)
+  // ✅ mantém altura quando tem pouco/0 cards
   const needsStickySpacer = total <= 6;
   const spacerHeight = `90vh`;
 
   // ✅ âncora do topo da lista (logo abaixo do filtro)
   const listTopRef = useRef<HTMLDivElement | null>(null);
 
-  // ✅ ao trocar filtro, sempre volta para o topo da lista (sem forçar sticky/scrollTo)
+  // ✅ sentinela para detectar quando o filtro "colou"
+  const filterSentinelRef = useRef<HTMLDivElement | null>(null);
+  const [filterIsStuck, setFilterIsStuck] = useState(false);
+
+  // mantém seu estilo original no sticky
+  const FILTER_TOP = 'calc(67px + env(safe-area-inset-top))';
+
+  // ✅ detecção compatível: compara o top do sentinela com o offset real (67 + safe-area em px)
+  useEffect(() => {
+    let raf = 0;
+    let safeTopPx = 0;
+
+    const compute = () => {
+      raf = 0;
+      const s = filterSentinelRef.current;
+      if (!s) return;
+
+      if (!safeTopPx) safeTopPx = readSafeAreaTopPx();
+
+      const thresholdTop = 67 + safeTopPx;
+      const top = s.getBoundingClientRect().top;
+
+      const stuck = top <= thresholdTop + 0.5;
+
+      setFilterIsStuck((prev) => (prev === stuck ? prev : stuck));
+    };
+
+    const onScroll = () => {
+      if (raf) return;
+      raf = window.requestAnimationFrame(compute);
+    };
+
+    const onResize = () => {
+      safeTopPx = 0;
+      onScroll();
+    };
+
+    compute();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', onResize);
+
+    return () => {
+      if (raf) window.cancelAnimationFrame(raf);
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('orientationchange', onResize);
+    };
+  }, []);
+
+  // ✅ ao trocar filtro, sempre volta para o topo da lista
   const setActiveAndSnap = (next: FilterKey) => {
     setActive(next);
 
@@ -351,13 +426,24 @@ export default function SponsoredOffersList({
         <div className="mb-1 px-4 text-[12px] font-medium text-zinc-500">{title}</div>
       ) : null}
 
+      {/* ✅ sentinela 1px: base para detectar quando o sticky colou */}
+      <div ref={filterSentinelRef} aria-hidden className="h-px w-full" />
+
       {/* ✅ FILTRO FIXO ABAIXO DO QUICKSEARCH */}
       <div
-        className="sticky z-[60] bg-zinc-100"
-        style={{ top: 'calc(67px + env(safe-area-inset-top))' }}
+        className={[
+          'sticky z-[60] transition-colors',
+          filterIsStuck ? 'bg-zinc-200/95 backdrop-blur-[2px]' : 'bg-zinc-100',
+        ].join(' ')}
+        style={{ top: FILTER_TOP }}
       >
         <div className="px-3 pt-3">
           <div className="no-scrollbar flex gap-2 overflow-x-auto pb-4 pt-1">
+            {/* ✅ NOVO: Todos (primeiro e já selecionado) */}
+            <FilterChip isActive={active === 'todos'} onClick={() => setActiveAndSnap('todos')}>
+              Todos
+            </FilterChip>
+
             <FilterChip
               isActive={active === 'descontos'}
               onClick={() => setActiveAndSnap('descontos')}
@@ -408,12 +494,8 @@ export default function SponsoredOffersList({
         `}</style>
       </div>
 
-      {/* ✅ âncora do topo da lista (com offset do sticky/safe-area) */}
-      <div
-        ref={listTopRef}
-        className="no-anchor"
-        style={{ scrollMarginTop: 'calc(67px + env(safe-area-inset-top))' }}
-      />
+      {/* ✅ âncora do topo da lista */}
+      <div ref={listTopRef} className="no-anchor" style={{ scrollMarginTop: FILTER_TOP }} />
 
       {/* LISTA */}
       <div className="px-3 no-anchor" style={needsStickySpacer ? { minHeight: spacerHeight } : {}}>
