@@ -323,7 +323,7 @@ export default function SponsoredOffersList({
 
   // ✅ mantém altura quando tem pouco/0 cards (você disse que vh funcionava melhor)
   const needsStickySpacer = total <= 6;
-  const spacerHeight = `100vh`;
+  const spacerHeight = `85vh`;
 
   // ✅ âncora do topo da lista (logo abaixo do filtro)
   const listTopRef = useRef<HTMLDivElement | null>(null);
