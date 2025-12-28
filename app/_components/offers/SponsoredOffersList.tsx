@@ -321,12 +321,11 @@ export default function SponsoredOffersList({
 
   const showTitle = !!title && title.trim().length > 0;
 
-  // ✅ mantém a altura quando tem pouco/0 cards (você testou 77vh)
-  const needsStickySpacer = total <= 6;
-  const STICKY_SPACER_VH = 77;
-
-  // ✅ âncora fixa (antes do sticky) para reancorar o scroll ao trocar filtro
   const STICKY_TOP = 67;
+  const STICKY_SPACER_VH = 77;
+  const needsStickySpacer = total <= 6;
+
+  // ✅ âncora fixa (antes do sticky) para não “perder” o sticky ao alternar filtros
   const stickyAnchorRef = useRef<HTMLDivElement | null>(null);
 
   const setActiveKeepingSticky = (next: FilterKey) => {
@@ -339,7 +338,7 @@ export default function SponsoredOffersList({
     const anchorTop = anchor.getBoundingClientRect().top + window.scrollY;
     const desiredScrollTop = Math.max(0, anchorTop - STICKY_TOP);
 
-    // só força se o usuário já está na região do sticky
+    // só força quando o usuário já está na região do sticky (pra não puxar quem está no topo do app)
     const alreadyAtStickyRegion = window.scrollY >= desiredScrollTop - 2;
 
     setActive(next);
@@ -353,7 +352,6 @@ export default function SponsoredOffersList({
         window.scrollTo({ top: desiredScrollTop, behavior: 'auto' });
       });
       window.setTimeout(() => window.scrollTo({ top: desiredScrollTop, behavior: 'auto' }), 30);
-      window.setTimeout(() => window.scrollTo({ top: desiredScrollTop, behavior: 'auto' }), 90);
     });
   };
 
@@ -372,10 +370,7 @@ export default function SponsoredOffersList({
       <div className="sticky top-[67px] z-[60] bg-zinc-100">
         <div className="px-3 pt-3">
           <div className="no-scrollbar flex gap-2 overflow-x-auto pb-4 pt-1">
-            <FilterChip
-              isActive={active === 'descontos'}
-              onClick={() => setActiveKeepingSticky('descontos')}
-            >
+            <FilterChip isActive={active === 'descontos'} onClick={() => setActiveKeepingSticky('descontos')}>
               Maiores descontos
             </FilterChip>
 
@@ -392,10 +387,7 @@ export default function SponsoredOffersList({
               );
             })}
 
-            <FilterChip
-              isActive={active === 'melhores'}
-              onClick={() => setActiveKeepingSticky('melhores')}
-            >
+            <FilterChip isActive={active === 'melhores'} onClick={() => setActiveKeepingSticky('melhores')}>
               melhores avaliados
             </FilterChip>
           </div>
@@ -425,9 +417,7 @@ export default function SponsoredOffersList({
               Nenhum item encontrado para este filtro.
             </div>
 
-            {needsStickySpacer ? (
-              <div aria-hidden style={{ height: `${STICKY_SPACER_VH}vh` }} />
-            ) : null}
+            {needsStickySpacer ? <div aria-hidden className={`h-[${STICKY_SPACER_VH}vh]`} /> : null}
           </>
         ) : (
           <>
@@ -552,9 +542,7 @@ export default function SponsoredOffersList({
               <div className="py-2" />
             )}
 
-            {needsStickySpacer ? (
-              <div aria-hidden style={{ height: `${STICKY_SPACER_VH}vh` }} />
-            ) : null}
+            {needsStickySpacer ? <div aria-hidden className={`h-[${STICKY_SPACER_VH}vh]`} /> : null}
           </>
         )}
       </div>
