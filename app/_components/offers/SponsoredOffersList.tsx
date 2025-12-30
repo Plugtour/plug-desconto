@@ -1,7 +1,7 @@
 // app/_components/offers/SponsoredOffersList.tsx
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { SponsoredOffer } from '../../../_data/sponsoredOffers';
 import SideDrawer from './SideDrawer';
 
@@ -220,7 +220,7 @@ export default function SponsoredOffersList({
   const [favIds, setFavIds] = useState<Record<string, boolean>>({});
   const [modalOpen, setModalOpen] = useState(false);
 
-  // ✅ AGORA: "Todos" como padrão (e será o primeiro chip)
+  // 🔵 Mantive seu padrão: "melhores" (que você está usando como "Todos")
   const [active, setActive] = useState<FilterKey>('melhores');
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
@@ -251,8 +251,7 @@ export default function SponsoredOffersList({
     const list = Array.isArray(items) ? [...items] : [];
 
     if (isCatFilter(active)) {
-      const wantedTitle =
-        uniqueCats.find((c) => c.id === active.id)?.title?.toLowerCase() ?? '';
+      const wantedTitle = uniqueCats.find((c) => c.id === active.id)?.title?.toLowerCase() ?? '';
       if (!wantedTitle) return list;
 
       return list.filter((it: any) => {
@@ -286,6 +285,7 @@ export default function SponsoredOffersList({
       const bv = Number(b?.reviews ?? 0);
       return bv - av;
     });
+
     return list;
   }, [active, items, uniqueCats]);
 
@@ -297,10 +297,7 @@ export default function SponsoredOffersList({
     setVisibleCount(Math.min(initialCount, total));
   }, [active, initialCount, total]);
 
-  const visibleItems = useMemo(
-    () => filteredItems.slice(0, visibleCount),
-    [filteredItems, visibleCount]
-  );
+  const visibleItems = useMemo(() => filteredItems.slice(0, visibleCount), [filteredItems, visibleCount]);
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const lockRef = useRef(false);
@@ -343,21 +340,16 @@ export default function SponsoredOffersList({
 
   const showTitle = !!title && title.trim().length > 0;
 
-  // ✅ mantém altura quando tem pouco/0 cards
   const needsStickySpacer = total <= 6;
   const spacerHeight = `90vh`;
 
-  // ✅ âncora do topo da lista (logo abaixo do filtro)
   const listTopRef = useRef<HTMLDivElement | null>(null);
 
-  // ✅ sentinela para detectar quando o filtro "colou"
   const filterSentinelRef = useRef<HTMLDivElement | null>(null);
   const [filterIsStuck, setFilterIsStuck] = useState(false);
 
-  // mantém seu estilo original no sticky
   const FILTER_TOP = 'calc(67px + env(safe-area-inset-top))';
 
-  // ✅ detecção compatível: compara o top do sentinela com o offset real (67 + safe-area em px)
   useEffect(() => {
     let raf = 0;
     let safeTopPx = 0;
@@ -400,46 +392,48 @@ export default function SponsoredOffersList({
   }, []);
 
   /* =========================================================
-     ✅ FIX DO BUG:
-     - não faz scrollIntoView no mesmo frame do setActive
-     - espera o layout estabilizar (visibleCount atualizado)
+     ✅ TRAVA DO SCROLL (FIX DO BUG)
+     - No clique: guarda scrollY e troca o filtro
+     - Depois do reflow (visibleCount atualizado): força scrollY de volta (2 frames)
+     - Isso evita o "cair para baixo" e a perda da cor do sticky
   ========================================================= */
-  const pendingSnapRef = useRef(false);
+  const freezeScrollRef = useRef<{ y: number; tries: number } | null>(null);
 
-  const setActiveAndSnap = (next: FilterKey) => {
+  const setActiveAndFreezeScroll = (next: FilterKey) => {
+    // guarda a posição atual do scroll (antes do reflow)
+    const y = typeof window !== 'undefined' ? window.scrollY : 0;
+    freezeScrollRef.current = { y, tries: 2 };
     setActive(next);
-    pendingSnapRef.current = true;
   };
 
-  useEffect(() => {
-    if (!pendingSnapRef.current) return;
+  useLayoutEffect(() => {
+    const st = freezeScrollRef.current;
+    if (!st) return;
 
-    const el = listTopRef.current;
-    if (!el) {
-      pendingSnapRef.current = false;
-      return;
-    }
+    const restore = () => {
+      const cur = window.scrollY;
+      if (Math.abs(cur - st.y) > 0) {
+        window.scrollTo({ top: st.y, behavior: 'auto' });
+      }
+      st.tries -= 1;
+      if (st.tries > 0) {
+        requestAnimationFrame(restore);
+      } else {
+        freezeScrollRef.current = null;
+      }
+    };
 
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        el.scrollIntoView({ block: 'start', behavior: 'auto' });
-        pendingSnapRef.current = false;
-      });
-    });
-  }, [visibleCount]);
+    requestAnimationFrame(restore);
+  }, [visibleCount]); // quando a lista muda de fato (reflow), restauramos
 
   return (
     <section className={['w-full', className || ''].join(' ')}>
       <SideDrawer open={modalOpen} onClose={closeModal} />
 
-      {showTitle ? (
-        <div className="mb-1 px-4 text-[12px] font-medium text-zinc-500">{title}</div>
-      ) : null}
+      {showTitle ? <div className="mb-1 px-4 text-[12px] font-medium text-zinc-500">{title}</div> : null}
 
-      {/* ✅ sentinela 1px: base para detectar quando o sticky colou */}
       <div ref={filterSentinelRef} aria-hidden className="h-px w-full" />
 
-      {/* ✅ FILTRO FIXO ABAIXO DO QUICKSEARCH */}
       <div
         className={[
           'sticky z-[60] transition-colors',
@@ -449,15 +443,12 @@ export default function SponsoredOffersList({
       >
         <div className="px-3 pt-3">
           <div className="no-scrollbar flex gap-2 overflow-x-auto pb-4 pt-1">
-            {/* ✅ NOVO: "Todos" primeiro e selecionado por padrão */}
-            <FilterChip isActive={active === 'melhores'} onClick={() => setActiveAndSnap('melhores')}>
+            {/* ✅ "Todos" primeiro e já selecionado (usa active === 'melhores') */}
+            <FilterChip isActive={active === 'melhores'} onClick={() => setActiveAndFreezeScroll('melhores')}>
               Todos
             </FilterChip>
 
-            <FilterChip
-              isActive={active === 'descontos'}
-              onClick={() => setActiveAndSnap('descontos')}
-            >
+            <FilterChip isActive={active === 'descontos'} onClick={() => setActiveAndFreezeScroll('descontos')}>
               Maiores descontos
             </FilterChip>
 
@@ -467,17 +458,14 @@ export default function SponsoredOffersList({
                 <FilterChip
                   key={c.id}
                   isActive={isActiveNow}
-                  onClick={() => setActiveAndSnap({ kind: 'cat', id: c.id })}
+                  onClick={() => setActiveAndFreezeScroll({ kind: 'cat', id: c.id })}
                 >
                   {c.title}
                 </FilterChip>
               );
             })}
 
-            <FilterChip
-              isActive={active === 'melhores'}
-              onClick={() => setActiveAndSnap('melhores')}
-            >
+            <FilterChip isActive={active === 'melhores'} onClick={() => setActiveAndFreezeScroll('melhores')}>
               melhores avaliados
             </FilterChip>
           </div>
@@ -496,23 +484,17 @@ export default function SponsoredOffersList({
             -ms-overflow-style: none;
             -webkit-overflow-scrolling: touch;
           }
-
-          /* evita “ancoragem” do scroll quando o conteúdo muda de tamanho */
           .no-anchor {
             overflow-anchor: none;
           }
         `}</style>
       </div>
 
-      {/* ✅ âncora do topo da lista */}
       <div ref={listTopRef} className="no-anchor" style={{ scrollMarginTop: FILTER_TOP }} />
 
-      {/* LISTA */}
       <div className="px-3 no-anchor" style={needsStickySpacer ? { minHeight: spacerHeight } : {}}>
         {total === 0 ? (
-          <div className="px-1 py-4 text-[12px] font-medium text-zinc-500">
-            Nenhum item encontrado para este filtro.
-          </div>
+          <div className="px-1 py-4 text-[12px] font-medium text-zinc-500">Nenhum item encontrado para este filtro.</div>
         ) : (
           <>
             {visibleItems.map((item, idx) => {
@@ -560,9 +542,7 @@ export default function SponsoredOffersList({
                           <div className="text-[11px] text-zinc-500 line-clamp-1">{tagsLine}</div>
 
                           {priceText ? (
-                            <div className="-mt-[2px] text-[11px] font-medium text-zinc-900">
-                              Economia de {priceText}
-                            </div>
+                            <div className="-mt-[2px] text-[11px] font-medium text-zinc-900">Economia de {priceText}</div>
                           ) : null}
                         </div>
 
@@ -570,11 +550,8 @@ export default function SponsoredOffersList({
                           <div>
                             <StarsRow rating={Number(rating)} />
                             <div className="-mt-0.5 text-[11px] text-zinc-500">
-                              <span className="font-semibold text-zinc-700">
-                                {Number(rating).toFixed(1)}
-                              </span>{' '}
-                              de <span className="font-semibold text-zinc-700">{reviews}</span>{' '}
-                              avaliações
+                              <span className="font-semibold text-zinc-700">{Number(rating).toFixed(1)}</span>{' '}
+                              de <span className="font-semibold text-zinc-700">{reviews}</span> avaliações
                             </div>
                           </div>
 
@@ -611,17 +588,14 @@ export default function SponsoredOffersList({
                     >
                       <HeartIcon
                         filled={isFav}
-                        className={[
-                          'h-9 w-9 transition',
-                          isFav ? 'text-red-500' : 'text-zinc-300 hover:text-zinc-400',
-                        ].join(' ')}
+                        className={['h-9 w-9 transition', isFav ? 'text-red-500' : 'text-zinc-300 hover:text-zinc-400'].join(
+                          ' '
+                        )}
                       />
                     </button>
                   </div>
 
-                  {idx < visibleItems.length - 1 ? (
-                    <div className="mx-2 border-b border-dotted border-zinc-300" />
-                  ) : null}
+                  {idx < visibleItems.length - 1 ? <div className="mx-2 border-b border-dotted border-zinc-300" /> : null}
                 </div>
               );
             })}
