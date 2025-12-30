@@ -14,14 +14,13 @@ type Props = {
   items: SponsoredOffer[];
   className?: string;
   title?: string;
-  initialCount?: number;
-  step?: number;
+  initialCount?: number; // default 5
+  step?: number; // default 5
   categories?: FilterCategory[];
-  topOffsetPx?: number; // ✅ NOVO: topo acumulado (menu flutuante + quicksearch)
 };
 
 /* =========================
-   ESTRELAS
+   ESTRELAS (preenchimento proporcional, coladas)
 ========================= */
 function Star({ fillPct }: { fillPct: number }) {
   const id = React.useId();
@@ -63,6 +62,9 @@ function StarsRow({ rating }: { rating: number }) {
   );
 }
 
+/* =========================
+   TAGS — Cidade | Categoria | Tipo
+========================= */
 function buildTags(item: SponsoredOffer) {
   if (Array.isArray((item as any).tags) && (item as any).tags.length === 3) {
     return (item as any).tags.join(' | ');
@@ -70,6 +72,9 @@ function buildTags(item: SponsoredOffer) {
   return '';
 }
 
+/* =========================
+   CORAÇÃO (vasado → preenchido)
+========================= */
 function HeartIcon({
   filled,
   className,
@@ -92,6 +97,9 @@ function HeartIcon({
   );
 }
 
+/* =========================
+   PLACEHOLDER (SVG centralizado)
+========================= */
 function TempImagePlaceholder() {
   return (
     <div className="relative h-full w-full bg-zinc-200">
@@ -229,6 +237,9 @@ function FilterIcon({
   }
 }
 
+/* =========================
+   CHIP (ativo em verde)
+========================= */
 function FilterChip({
   isActive,
   children,
@@ -264,6 +275,9 @@ function FilterChip({
   );
 }
 
+/* =========================
+   LOADING (leve)
+========================= */
 function LoadingRow({ text = 'Carregando...' }: { text?: string }) {
   return (
     <div className="px-3 py-3">
@@ -277,8 +291,14 @@ function LoadingRow({ text = 'Carregando...' }: { text?: string }) {
   );
 }
 
+/* =========================
+   TIPOS DO FILTRO
+========================= */
 type FilterKey = 'todos' | 'melhores' | 'descontos' | 'novo' | 'aberto' | 'perto' | 'delivery';
 
+/* =========================
+   ✅ lê safe-area-top em px
+========================= */
 function readSafeAreaTopPx(): number {
   if (typeof window === 'undefined' || typeof document === 'undefined') return 0;
   try {
@@ -299,6 +319,9 @@ function readSafeAreaTopPx(): number {
   }
 }
 
+/* =========================
+   ✅ LOCK REAL DO SCROLL (body fixed)
+========================= */
 function lockScroll(): number {
   if (typeof window === 'undefined' || typeof document === 'undefined') return 0;
 
@@ -307,7 +330,6 @@ function lockScroll(): number {
 
   const scrollBarW = window.innerWidth - document.documentElement.clientWidth;
   const prevPadRight = body.style.paddingRight;
-
   (body as any).__prevPadRight = prevPadRight;
 
   if (scrollBarW > 0) body.style.paddingRight = `${scrollBarW}px`;
@@ -338,7 +360,9 @@ function unlockScroll(y: number) {
   body.style.paddingRight = typeof prevPadRight === 'string' ? prevPadRight : '';
   try {
     delete (body as any).__prevPadRight;
-  } catch {}
+  } catch {
+    // ignore
+  }
 
   window.scrollTo({ top: y, behavior: 'auto' });
 }
@@ -350,7 +374,6 @@ export default function SponsoredOffersList({
   initialCount = 5,
   step = 5,
   categories = [],
-  topOffsetPx = 67, // fallback
 }: Props) {
   const [favIds, setFavIds] = useState<Record<string, boolean>>({});
   const [modalOpen, setModalOpen] = useState(false);
@@ -426,10 +449,7 @@ export default function SponsoredOffersList({
     setVisibleCount(Math.min(initialCount, total));
   }, [active, initialCount, total]);
 
-  const visibleItems = useMemo(
-    () => filteredItems.slice(0, visibleCount),
-    [filteredItems, visibleCount]
-  );
+  const visibleItems = useMemo(() => filteredItems.slice(0, visibleCount), [filteredItems, visibleCount]);
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const lockRef = useRef(false);
@@ -480,27 +500,29 @@ export default function SponsoredOffersList({
   const filterSentinelRef = useRef<HTMLDivElement | null>(null);
   const [filterIsStuck, setFilterIsStuck] = useState(false);
 
-  // ✅ topo dinâmico: recebido do Home (menu flutuante + quicksearch) + safe-area
-  const safeTopPxRef = useRef(0);
-
-  const FILTER_TOP = useMemo(() => {
-    return `calc(${Math.max(0, Math.round(topOffsetPx))}px + env(safe-area-inset-top))`;
-  }, [topOffsetPx]);
+  // ✅ agora o filtro usa a pilha sticky real (menu flutuante + quicksearch)
+  const FILTER_TOP = 'calc(var(--sticky-stack-h, 130px) + env(safe-area-inset-top))';
 
   useEffect(() => {
     let raf = 0;
+    let safeTopPx = 0;
 
     const compute = () => {
       raf = 0;
       const s = filterSentinelRef.current;
       if (!s) return;
 
-      if (!safeTopPxRef.current) safeTopPxRef.current = readSafeAreaTopPx();
+      if (!safeTopPx) safeTopPx = readSafeAreaTopPx();
 
-      const thresholdTop = Math.max(0, Math.round(topOffsetPx)) + safeTopPxRef.current;
+      // pega o valor do CSS var em px
+      const root = document.documentElement;
+      const raw = window.getComputedStyle(root).getPropertyValue('--sticky-stack-h').trim();
+      const stackH = Number.parseFloat(raw || '67');
+      const thresholdTop = (Number.isFinite(stackH) ? stackH : 67) + safeTopPx;
+
       const top = s.getBoundingClientRect().top;
-
       const stuck = top <= thresholdTop + 0.5;
+
       setFilterIsStuck((prev) => (prev === stuck ? prev : stuck));
     };
 
@@ -510,7 +532,7 @@ export default function SponsoredOffersList({
     };
 
     const onResize = () => {
-      safeTopPxRef.current = 0;
+      safeTopPx = 0;
       onScroll();
     };
 
@@ -525,7 +547,7 @@ export default function SponsoredOffersList({
       window.removeEventListener('resize', onResize);
       window.removeEventListener('orientationchange', onResize);
     };
-  }, [topOffsetPx]);
+  }, []);
 
   const pendingUnlockRef = useRef<{ y: number; frames: number } | null>(null);
 
@@ -567,7 +589,7 @@ export default function SponsoredOffersList({
 
       <div
         className={[
-          'sticky z-[60] transition-colors',
+          'sticky z-[60]',
           filterIsStuck ? 'bg-zinc-200/95 backdrop-blur-[2px]' : 'bg-zinc-100',
         ].join(' ')}
         style={{ top: FILTER_TOP }}
@@ -578,11 +600,19 @@ export default function SponsoredOffersList({
               Todos
             </FilterChip>
 
-            <FilterChip iconKind="melhores" isActive={active === 'melhores'} onClick={() => setActiveAndFreezeScroll('melhores')}>
+            <FilterChip
+              iconKind="melhores"
+              isActive={active === 'melhores'}
+              onClick={() => setActiveAndFreezeScroll('melhores')}
+            >
               Melhores avaliados
             </FilterChip>
 
-            <FilterChip iconKind="descontos" isActive={active === 'descontos'} onClick={() => setActiveAndFreezeScroll('descontos')}>
+            <FilterChip
+              iconKind="descontos"
+              isActive={active === 'descontos'}
+              onClick={() => setActiveAndFreezeScroll('descontos')}
+            >
               Maiores descontos
             </FilterChip>
 
@@ -590,15 +620,27 @@ export default function SponsoredOffersList({
               Novo
             </FilterChip>
 
-            <FilterChip iconKind="aberto" isActive={active === 'aberto'} onClick={() => setActiveAndFreezeScroll('aberto')}>
+            <FilterChip
+              iconKind="aberto"
+              isActive={active === 'aberto'}
+              onClick={() => setActiveAndFreezeScroll('aberto')}
+            >
               Aberto agora
             </FilterChip>
 
-            <FilterChip iconKind="perto" isActive={active === 'perto'} onClick={() => setActiveAndFreezeScroll('perto')}>
+            <FilterChip
+              iconKind="perto"
+              isActive={active === 'perto'}
+              onClick={() => setActiveAndFreezeScroll('perto')}
+            >
               Perto de mim
             </FilterChip>
 
-            <FilterChip iconKind="delivery" isActive={active === 'delivery'} onClick={() => setActiveAndFreezeScroll('delivery')}>
+            <FilterChip
+              iconKind="delivery"
+              isActive={active === 'delivery'}
+              onClick={() => setActiveAndFreezeScroll('delivery')}
+            >
               Delivery
             </FilterChip>
           </div>
@@ -687,11 +729,8 @@ export default function SponsoredOffersList({
                           <div>
                             <StarsRow rating={Number(rating)} />
                             <div className="-mt-0.5 text-[11px] text-zinc-500">
-                              <span className="font-semibold text-zinc-700">
-                                {Number(rating).toFixed(1)}
-                              </span>{' '}
-                              de <span className="font-semibold text-zinc-700">{reviews}</span>{' '}
-                              avaliações
+                              <span className="font-semibold text-zinc-700">{Number(rating).toFixed(1)}</span> de{' '}
+                              <span className="font-semibold text-zinc-700">{reviews}</span> avaliações
                             </div>
                           </div>
 
@@ -728,10 +767,7 @@ export default function SponsoredOffersList({
                     >
                       <HeartIcon
                         filled={isFav}
-                        className={[
-                          'h-9 w-9 transition',
-                          isFav ? 'text-red-500' : 'text-zinc-300 hover:text-zinc-400',
-                        ].join(' ')}
+                        className={['h-9 w-9 transition', isFav ? 'text-red-500' : 'text-zinc-300 hover:text-zinc-400'].join(' ')}
                       />
                     </button>
                   </div>

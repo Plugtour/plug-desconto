@@ -1,7 +1,7 @@
 // app/_components/menu/FloatingTopMenu.tsx
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 type IconKey =
   | 'pin'
@@ -13,7 +13,7 @@ type IconKey =
   | 'car'
   | 'star';
 
-export type FloatingMenuCategoryItem = {
+type CategoryItem = {
   id: string;
   title: string;
   count: number;
@@ -21,15 +21,12 @@ export type FloatingMenuCategoryItem = {
 };
 
 type Props = {
-  categories: FloatingMenuCategoryItem[];
+  categories: CategoryItem[];
   visible: boolean;
-  topOffsetPx: number;
-  className?: string;
-  onHeightChange?: (h: number) => void;
 };
 
 /* =========================
-   SETAS (duplas, abertas, sem fundo)
+   SETAS (duplas abertas) — IGUAL MenuCarousel
 ========================= */
 function DoubleChevronOpen({
   dir,
@@ -56,15 +53,9 @@ function DoubleChevronOpen({
 }
 
 /* =========================
-   ÍCONES (iguais ao MenuCarousel)
+   ÍCONES — IGUAL MenuCarousel
 ========================= */
-function Icon({
-  iconKey,
-  className,
-}: {
-  iconKey: IconKey;
-  className?: string;
-}) {
+function Icon({ iconKey, className }: { iconKey: IconKey; className?: string }) {
   const common = 'h-5 w-5';
   const cls = className ? `${common} ${className}` : common;
 
@@ -78,11 +69,7 @@ function Icon({
             strokeWidth="2"
             strokeLinejoin="round"
           />
-          <path
-            d="M12 11.2a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4z"
-            stroke="#22C55E"
-            strokeWidth="2"
-          />
+          <path d="M12 11.2a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4z" stroke="#22C55E" strokeWidth="2" />
         </svg>
       );
 
@@ -120,18 +107,8 @@ function Icon({
     case 'fork':
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none">
-          <path
-            d="M7 3v7M10 3v7M8.5 10v11"
-            stroke="#EF4444"
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
-          <path
-            d="M17 3c2 2.4 2 4.8 0 7v11"
-            stroke="#EF4444"
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
+          <path d="M7 3v7M10 3v7M8.5 10v11" stroke="#EF4444" strokeWidth="2" strokeLinecap="round" />
+          <path d="M17 3c2 2.4 2 4.8 0 7v11" stroke="#EF4444" strokeWidth="2" strokeLinecap="round" />
         </svg>
       );
 
@@ -144,30 +121,15 @@ function Icon({
             strokeWidth="2"
             strokeLinejoin="round"
           />
-          <path
-            d="M5 12h14v6.8M5 18.8v-2.2M19 18.8v-2.2"
-            stroke="#A855F7"
-            strokeWidth="2"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M8 12v-1.6M16 12v-1.6"
-            stroke="#A855F7"
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
+          <path d="M5 12h14v6.8M5 18.8v-2.2M19 18.8v-2.2" stroke="#A855F7" strokeWidth="2" strokeLinejoin="round" />
+          <path d="M8 12v-1.6M16 12v-1.6" stroke="#A855F7" strokeWidth="2" strokeLinecap="round" />
         </svg>
       );
 
     case 'bag':
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none">
-          <path
-            d="M7.5 9h9l-.7 10H8.2L7.5 9z"
-            stroke="#F97316"
-            strokeWidth="2"
-            strokeLinejoin="round"
-          />
+          <path d="M7.5 9h9l-.7 10H8.2L7.5 9z" stroke="#F97316" strokeWidth="2" strokeLinejoin="round" />
           <path
             d="M9.2 9c0-2 1.2-3.2 2.8-3.2S14.8 7 14.8 9"
             stroke="#F97316"
@@ -212,31 +174,32 @@ function Icon({
   }
 }
 
-export default function FloatingTopMenu({
-  categories,
-  visible,
-  topOffsetPx,
-  className,
-  onHeightChange,
-}: Props) {
-  const rootRef = useRef<HTMLDivElement | null>(null);
+export default function FloatingTopMenu({ categories, visible }: Props) {
   const scrollerRef = useRef<HTMLDivElement | null>(null);
-
-  const canShow = !!visible && Array.isArray(categories) && categories.length > 0;
 
   const [canLeft, setCanLeft] = useState(false);
   const [canRight, setCanRight] = useState(false);
+  const [hasOverflow, setHasOverflow] = useState(false);
 
-  const topStyle = useMemo(
-    () => ({
-      top: `calc(${topOffsetPx}px + env(safe-area-inset-top))`,
-    }),
-    [topOffsetPx]
-  );
+  const [renderLeft, setRenderLeft] = useState(false);
+  const [renderRight, setRenderRight] = useState(false);
+  const [leftAnim, setLeftAnim] = useState<'enter' | 'exit'>('enter');
+  const [rightAnim, setRightAnim] = useState<'enter' | 'exit'>('enter');
+
+  const canShow = !!visible;
 
   function computeNavState() {
     const el = scrollerRef.current;
     if (!el) return;
+
+    const overflow = el.scrollWidth > el.clientWidth + 1;
+    setHasOverflow(overflow);
+
+    if (!overflow) {
+      setCanLeft(false);
+      setCanRight(false);
+      return;
+    }
 
     const tol = 6;
     const leftOk = el.scrollLeft > tol;
@@ -250,10 +213,20 @@ export default function FloatingTopMenu({
     const el = scrollerRef.current;
     if (!el) return;
 
+    el.scrollLeft = 0;
     computeNavState();
+    requestAnimationFrame(() => computeNavState());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categories.length]);
+
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
 
     const onScroll = () => computeNavState();
     el.addEventListener('scroll', onScroll, { passive: true });
+
+    computeNavState();
 
     const ro = new ResizeObserver(() => computeNavState());
     ro.observe(el);
@@ -262,25 +235,42 @@ export default function FloatingTopMenu({
       el.removeEventListener('scroll', onScroll);
       ro.disconnect();
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categories.length]);
 
-  // ✅ reporta altura real para empurrar o QuickSearch e o filtro
   useEffect(() => {
-    const el = rootRef.current;
-    if (!el || !onHeightChange) return;
+    if (!hasOverflow || !canShow) {
+      setRenderLeft(false);
+      return;
+    }
+    if (canLeft) {
+      setRenderLeft(true);
+      setLeftAnim('enter');
+      return;
+    }
+    if (renderLeft) {
+      setLeftAnim('exit');
+      const t = window.setTimeout(() => setRenderLeft(false), 220);
+      return () => window.clearTimeout(t);
+    }
+  }, [canLeft, hasOverflow, renderLeft, canShow]);
 
-    const report = () => {
-      const h = canShow ? Math.round(el.getBoundingClientRect().height) : 0;
-      onHeightChange(h);
-    };
-
-    report();
-
-    const ro = new ResizeObserver(() => report());
-    ro.observe(el);
-
-    return () => ro.disconnect();
-  }, [canShow, onHeightChange]);
+  useEffect(() => {
+    if (!hasOverflow || !canShow) {
+      setRenderRight(false);
+      return;
+    }
+    if (canRight) {
+      setRenderRight(true);
+      setRightAnim('enter');
+      return;
+    }
+    if (renderRight) {
+      setRightAnim('exit');
+      const t = window.setTimeout(() => setRenderRight(false), 220);
+      return () => window.clearTimeout(t);
+    }
+  }, [canRight, hasOverflow, renderRight, canShow]);
 
   function go(dir: 'left' | 'right') {
     const el = scrollerRef.current;
@@ -296,47 +286,56 @@ export default function FloatingTopMenu({
 
   return (
     <div
-      ref={rootRef}
       className={[
-        'fixed left-0 right-0 z-[120]',
+        'fixed left-0 right-0 z-[110]',
         'transition-all duration-200',
         canShow
           ? 'opacity-100 translate-y-0 pointer-events-auto'
           : 'opacity-0 -translate-y-2 pointer-events-none',
-        className ?? '',
+        // ✅ mesmo cinza do QuickSearch/filtro
+        'bg-zinc-200/95 backdrop-blur-[2px]',
       ].join(' ')}
-      style={topStyle}
+      style={{ top: `env(safe-area-inset-top)` }}
     >
-      {/* ✅ mesmo fundo cinza do layout (sem caixa branca) */}
-      <section className="relative px-4 pt-3 pb-2 bg-zinc-100">
+      <section className="relative px-4 pt-4">
         <div className="pointer-events-none absolute inset-0 z-[1]">
-          <div className="absolute left-0 top-0 h-full w-10 bg-gradient-to-r from-zinc-100 to-transparent" />
-          <div className="absolute right-0 top-0 h-full w-10 bg-gradient-to-l from-zinc-100 to-transparent" />
-          <div className="absolute bottom-0 left-0 h-10 w-full bg-gradient-to-t from-zinc-100 to-transparent blur-[2px]" />
+          <div className="absolute left-0 top-0 h-full w-10 bg-gradient-to-r from-zinc-200 to-transparent" />
+          <div className="absolute right-0 top-0 h-full w-10 bg-gradient-to-l from-zinc-200 to-transparent" />
+          <div className="absolute bottom-0 left-0 h-10 w-full bg-gradient-to-t from-zinc-200 to-transparent blur-[2px]" />
         </div>
 
         <div className="relative z-[2]">
-          {canLeft && (
+          {renderLeft && (
             <button
               type="button"
               onClick={() => go('left')}
               aria-label="Voltar"
               className="pointer-events-auto absolute left-1 top-1/2 z-[50] -translate-y-1/2"
             >
-              <span className="block text-zinc-400 hover:text-zinc-600">
+              <span
+                className={[
+                  'block text-zinc-400 hover:text-zinc-600',
+                  leftAnim === 'enter' ? 'arrow-enter-left' : 'arrow-exit-left',
+                ].join(' ')}
+              >
                 <DoubleChevronOpen dir="left" className="h-10 w-10 scale-125" />
               </span>
             </button>
           )}
 
-          {canRight && (
+          {renderRight && (
             <button
               type="button"
               onClick={() => go('right')}
               aria-label="Avançar"
               className="pointer-events-auto absolute right-1 top-1/2 z-[50] -translate-y-1/2"
             >
-              <span className="block text-zinc-400 hover:text-zinc-600">
+              <span
+                className={[
+                  'block text-zinc-400 hover:text-zinc-600',
+                  rightAnim === 'enter' ? 'arrow-enter-right' : 'arrow-exit-right',
+                ].join(' ')}
+              >
                 <DoubleChevronOpen dir="right" className="h-10 w-10 scale-125" />
               </span>
             </button>
@@ -349,7 +348,7 @@ export default function FloatingTopMenu({
                 'no-scrollbar',
                 'flex gap-3',
                 'overflow-x-auto',
-                'px-1',
+                'px-1 py-2',
                 'touch-manipulation',
                 'overscroll-x-contain',
                 'scroll-smooth',
@@ -383,6 +382,60 @@ export default function FloatingTopMenu({
             scrollbar-width: none;
             -ms-overflow-style: none;
             -webkit-overflow-scrolling: touch;
+          }
+
+          @keyframes arrowEnterLeft {
+            from {
+              transform: translateX(-18px);
+              opacity: 0;
+            }
+            to {
+              transform: translateX(0);
+              opacity: 0.9;
+            }
+          }
+          @keyframes arrowEnterRight {
+            from {
+              transform: translateX(18px);
+              opacity: 0;
+            }
+            to {
+              transform: translateX(0);
+              opacity: 0.9;
+            }
+          }
+          @keyframes arrowExitLeft {
+            from {
+              transform: translateX(0);
+              opacity: 0.9;
+            }
+            to {
+              transform: translateX(-18px);
+              opacity: 0;
+            }
+          }
+          @keyframes arrowExitRight {
+            from {
+              transform: translateX(0);
+              opacity: 0.9;
+            }
+            to {
+              transform: translateX(18px);
+              opacity: 0;
+            }
+          }
+
+          .arrow-enter-left {
+            animation: arrowEnterLeft 220ms ease-out both;
+          }
+          .arrow-enter-right {
+            animation: arrowEnterRight 220ms ease-out both;
+          }
+          .arrow-exit-left {
+            animation: arrowExitLeft 220ms ease-in both;
+          }
+          .arrow-exit-right {
+            animation: arrowExitRight 220ms ease-in both;
           }
         `}</style>
       </section>

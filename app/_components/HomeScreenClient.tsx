@@ -1,7 +1,7 @@
 // app/_components/HomeScreenClient.tsx
 'use client';
 
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import HomeBanner from './HomeBanner';
 
 import QuickSearch from './search/QuickSearch';
@@ -39,170 +39,6 @@ type IconKey =
   | 'bag'
   | 'car'
   | 'star';
-
-/* =========================
-   ÍCONES (currentColor)
-========================= */
-
-function IconPin({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinejoin="round"
-    >
-      <path d="M12 22s7-4.5 7-11a7 7 0 10-14 0c0 6.5 7 11 7 11z" />
-      <circle cx="12" cy="11" r="2.5" />
-    </svg>
-  );
-}
-
-function IconTicket({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinejoin="round"
-    >
-      <path d="M4 9a2 2 0 012-2h12a2 2 0 012 2v2a2 2 0 010 4v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2a2 2 0 010-4V9z" />
-      <path d="M9 7v10" strokeDasharray="2 2" />
-    </svg>
-  );
-}
-
-function IconSpark({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinejoin="round"
-    >
-      <path d="M12 2l1.5 6.5L20 10l-6.5 1.5L12 18l-1.5-6.5L4 10l6.5-1.5L12 2z" />
-      <path d="M19 14l.8 3.2L23 18l-3.2.8L19 22l-.8-3.2L15 18l3.2-.8L19 14z" />
-    </svg>
-  );
-}
-
-function IconFork({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinejoin="round"
-    >
-      <path d="M6 2v8" />
-      <path d="M10 2v8" />
-      <path d="M6 6h4" />
-      <path d="M8 10v12" />
-      <path d="M18 2v20" />
-      <path d="M18 6a3 3 0 00-3 3v1h6V9a3 3 0 00-3-3z" />
-    </svg>
-  );
-}
-
-function IconBed({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinejoin="round"
-    >
-      <path d="M3 10h18a2 2 0 012 2v7H1v-7a2 2 0 012-2z" />
-      <path d="M7 10V7a2 2 0 012-2h6a2 2 0 012 2v3" />
-      <path d="M1 19v3" />
-      <path d="M23 19v3" />
-    </svg>
-  );
-}
-
-function IconBag({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinejoin="round"
-    >
-      <path d="M6 7l1-3h10l1 3" />
-      <path d="M5 7h14l-1 14H6L5 7z" />
-      <path d="M9 11a3 3 0 006 0" />
-    </svg>
-  );
-}
-
-function IconCar({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinejoin="round"
-    >
-      <path d="M3 13l2-6a2 2 0 012-1h10a2 2 0 012 1l2 6" />
-      <path d="M5 13h14a2 2 0 012 2v4H3v-4a2 2 0 012-2z" />
-      <path d="M7 19a2 2 0 104 0" />
-      <path d="M13 19a2 2 0 104 0" />
-      <path d="M7 9h10" />
-    </svg>
-  );
-}
-
-function IconStar({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinejoin="round"
-    >
-      <path d="M12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 18.8 5.8 21l1.2-6.8-5-4.9 6.9-1L12 2z" />
-    </svg>
-  );
-}
-
-function iconFromKey(key: IconKey): React.ComponentType<{ className?: string }> {
-  switch (key) {
-    case 'pin':
-      return IconPin;
-    case 'ticket':
-      return IconTicket;
-    case 'spark':
-      return IconSpark;
-    case 'fork':
-      return IconFork;
-    case 'bed':
-      return IconBed;
-    case 'bag':
-      return IconBag;
-    case 'car':
-      return IconCar;
-    case 'star':
-      return IconStar;
-    default:
-      return IconPin;
-  }
-}
 
 export default function HomeScreenClient({
   regionLabel = 'Serra Gaúcha',
@@ -356,19 +192,20 @@ export default function HomeScreenClient({
   }, []);
 
   /* =========================
-     MENU FLUTUANTE (aparece ao rolar)
+     MENU FLUTUANTE (trigger)
+     - NÃO usa medir altura por DOM (fixed não mede)
+     - usa altura fixa (regulável)
   ========================= */
   const gridMenuRef = useRef<HTMLDivElement | null>(null);
-  const quickSearchRef = useRef<HTMLDivElement | null>(null);
-
   const [showFloatingMenu, setShowFloatingMenu] = useState(false);
-  const rafRef = useRef<number | null>(null);
 
+  // ✅ REGULAGEM DA ALTURA DO MENU FLUTUANTE (empurra o QuickSearch)
+  // Se quiser mais espaço, aumenta aqui.
+  const FLOATING_MENU_H = 75; // px (ajuste fino aqui)
+
+  const rafRef = useRef<number | null>(null);
   const HYSTERESIS_PX = 18;
   const MIN_SCROLL_TO_ENABLE = 8;
-
-  // ✅ altura real do menu flutuante para empurrar QuickSearch e o filtro
-  const [floatingMenuHeight, setFloatingMenuHeight] = useState(0);
 
   useEffect(() => {
     const computeTriggerDocY = () => {
@@ -378,7 +215,10 @@ export default function HomeScreenClient({
       const rect = el.getBoundingClientRect();
       const topDoc = window.scrollY + rect.top;
 
+      // MenuCarousel: 2 linhas visíveis por página
       const rowH = rect.height / 2;
+
+      // metade da 2ª linha = 1.5 linhas
       return topDoc + rowH * 1.5;
     };
 
@@ -410,7 +250,6 @@ export default function HomeScreenClient({
     };
 
     setShowFloatingMenu(false);
-
     window.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('resize', onScroll, { passive: true });
 
@@ -421,32 +260,7 @@ export default function HomeScreenClient({
     };
   }, []);
 
-  // ✅ top do QuickSearch: quando menu flutuante aparece, ele desce
-  const qsTopPx = showFloatingMenu ? floatingMenuHeight : 0;
-
-  // ✅ altura do QuickSearch (para empurrar o filtro abaixo dele)
-  const [quickSearchHeight, setQuickSearchHeight] = useState(67);
-  useLayoutEffect(() => {
-    const measure = () => {
-      const h = quickSearchRef.current?.getBoundingClientRect().height;
-      if (h && h > 0) setQuickSearchHeight(Math.round(h));
-    };
-    measure();
-    window.addEventListener('resize', measure, { passive: true });
-    return () => window.removeEventListener('resize', measure);
-  }, []);
-
-  // ✅ top do filtro: menu flutuante + quicksearch
-  const listFilterTopOffset = qsTopPx + quickSearchHeight;
-
-  const floatingCategories = useMemo(() => {
-    return categories.map((c) => ({
-      id: c.id,
-      title: c.title,
-      count: c.count,
-      iconKey: c.iconKey,
-    }));
-  }, [categories]);
+  const quickSearchTop = showFloatingMenu ? FLOATING_MENU_H : 0;
 
   return (
     <div className="mx-auto w-full max-w-md bg-zinc-100">
@@ -461,31 +275,26 @@ export default function HomeScreenClient({
         <div className="mt-3 border-t border-zinc-300" />
       </div>
 
-      {/* MENU CARROSSEL */}
+      {/* MENU CARROSSEL (original) */}
       <div ref={gridMenuRef}>
         <MenuCarousel categories={categories} />
       </div>
 
       <HomeBanner className="mt-4" />
 
+      {/* sentinel */}
       <div ref={stickySentinelRef} className="h-px w-full" />
 
-      {/* ✅ MENU FLUTUANTE (fica no topo, acima do QuickSearch) */}
-      <FloatingTopMenu
-        categories={floatingCategories}
-        visible={showFloatingMenu}
-        topOffsetPx={0}
-        onHeightChange={(h) => setFloatingMenuHeight(h)}
-      />
+      {/* MENU FLUTUANTE */}
+      <FloatingTopMenu categories={categories} visible={showFloatingMenu} />
 
-      {/* ✅ QuickSearch sticky — sempre abaixo do menu flutuante quando ele existir */}
+      {/* ✅ QuickSearch sticky: agora SEMPRE abaixo do menu flutuante */}
       <div
-        ref={quickSearchRef}
         className={[
-          'sticky z-[110] transition-colors',
+          'sticky z-[90] transition-colors duration-0', // ✅ sem delay perceptível
           qsStuck ? 'bg-zinc-200' : 'bg-transparent',
         ].join(' ')}
-        style={{ top: qsTopPx }}
+        style={{ top: `calc(${quickSearchTop}px + env(safe-area-inset-top))` }}
       >
         <div className="pt-2">
           <div className="px-4 mt-3 pb-2">
@@ -512,7 +321,6 @@ export default function HomeScreenClient({
         initialCount={5}
         step={5}
         categories={categories.map((c) => ({ id: c.id, title: c.title }))}
-        topOffsetPx={listFilterTopOffset}
       />
     </div>
   );
