@@ -476,3 +476,4 @@ export default function MenuCarousel({ categories, className }: Props) {
     </section>
   );
 }
+ 
