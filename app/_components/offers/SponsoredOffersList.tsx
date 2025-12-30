@@ -1,7 +1,7 @@
 // app/_components/offers/SponsoredOffersList.tsx
 'use client';
 
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { SponsoredOffer } from '../../../_data/sponsoredOffers';
 import SideDrawer from './SideDrawer';
 
@@ -209,6 +209,56 @@ function readSafeAreaTopPx(): number {
   }
 }
 
+/* =========================
+   ✅ LOCK REAL DO SCROLL (body fixed)
+========================= */
+function lockScroll(): number {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return 0;
+
+  const y = window.scrollY || 0;
+  const body = document.body;
+
+  // evita layout shift quando some scrollbar (desktop)
+  const scrollBarW = window.innerWidth - document.documentElement.clientWidth;
+  const prevPadRight = body.style.paddingRight;
+
+  (body as any).__prevPadRight = prevPadRight;
+
+  if (scrollBarW > 0) body.style.paddingRight = `${scrollBarW}px`;
+
+  body.style.position = 'fixed';
+  body.style.top = `-${y}px`;
+  body.style.left = '0';
+  body.style.right = '0';
+  body.style.width = '100%';
+  body.style.overflow = 'hidden';
+
+  return y;
+}
+
+function unlockScroll(y: number) {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return;
+
+  const body = document.body;
+
+  body.style.position = '';
+  body.style.top = '';
+  body.style.left = '';
+  body.style.right = '';
+  body.style.width = '';
+  body.style.overflow = '';
+
+  const prevPadRight = (body as any).__prevPadRight;
+  body.style.paddingRight = typeof prevPadRight === 'string' ? prevPadRight : '';
+  try {
+    delete (body as any).__prevPadRight;
+  } catch {
+    // ignore
+  }
+
+  window.scrollTo({ top: y, behavior: 'auto' });
+}
+
 export default function SponsoredOffersList({
   items,
   className,
@@ -220,7 +270,7 @@ export default function SponsoredOffersList({
   const [favIds, setFavIds] = useState<Record<string, boolean>>({});
   const [modalOpen, setModalOpen] = useState(false);
 
-  // 🔵 Mantive seu padrão: "melhores" (que você está usando como "Todos")
+  // Mantive seu padrão: "melhores" como default (e agora é o "Todos")
   const [active, setActive] = useState<FilterKey>('melhores');
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
@@ -392,39 +442,36 @@ export default function SponsoredOffersList({
   }, []);
 
   /* =========================================================
-     ✅ TRAVA DO SCROLL (FIX DO BUG)
-     - No clique: guarda scrollY e troca o filtro
-     - Depois do reflow (visibleCount atualizado): força scrollY de volta (2 frames)
-     - Isso evita o "cair para baixo" e a perda da cor do sticky
+     ✅ BLOQUEIO DO SCROLL DURANTE TROCA DE FILTRO
   ========================================================= */
-  const freezeScrollRef = useRef<{ y: number; tries: number } | null>(null);
+  const pendingUnlockRef = useRef<{ y: number; frames: number } | null>(null);
 
   const setActiveAndFreezeScroll = (next: FilterKey) => {
-    // guarda a posição atual do scroll (antes do reflow)
-    const y = typeof window !== 'undefined' ? window.scrollY : 0;
-    freezeScrollRef.current = { y, tries: 2 };
+    const y = lockScroll(); // trava de verdade
+    pendingUnlockRef.current = { y, frames: 2 }; // destrava após 2 frames
     setActive(next);
   };
 
-  useLayoutEffect(() => {
-    const st = freezeScrollRef.current;
+  // após o reflow (mudança da lista), aguarda 2 frames e destrava + restaura o scroll
+  useEffect(() => {
+    const st = pendingUnlockRef.current;
     if (!st) return;
 
-    const restore = () => {
-      const cur = window.scrollY;
-      if (Math.abs(cur - st.y) > 0) {
-        window.scrollTo({ top: st.y, behavior: 'auto' });
-      }
-      st.tries -= 1;
-      if (st.tries > 0) {
-        requestAnimationFrame(restore);
-      } else {
-        freezeScrollRef.current = null;
-      }
-    };
+    let raf1 = 0;
+    let raf2 = 0;
 
-    requestAnimationFrame(restore);
-  }, [visibleCount]); // quando a lista muda de fato (reflow), restauramos
+    raf1 = window.requestAnimationFrame(() => {
+      raf2 = window.requestAnimationFrame(() => {
+        unlockScroll(st.y);
+        pendingUnlockRef.current = null;
+      });
+    });
+
+    return () => {
+      if (raf1) window.cancelAnimationFrame(raf1);
+      if (raf2) window.cancelAnimationFrame(raf2);
+    };
+  }, [visibleCount]);
 
   return (
     <section className={['w-full', className || ''].join(' ')}>
@@ -443,7 +490,6 @@ export default function SponsoredOffersList({
       >
         <div className="px-3 pt-3">
           <div className="no-scrollbar flex gap-2 overflow-x-auto pb-4 pt-1">
-            {/* ✅ "Todos" primeiro e já selecionado (usa active === 'melhores') */}
             <FilterChip isActive={active === 'melhores'} onClick={() => setActiveAndFreezeScroll('melhores')}>
               Todos
             </FilterChip>
