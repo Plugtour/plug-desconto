@@ -182,7 +182,15 @@ function LoadingRow({ text = 'Carregando...' }: { text?: string }) {
 /* =========================
    COMPONENTE PRINCIPAL
 ========================= */
-type FilterKey = 'melhores' | 'descontos' | { kind: 'cat'; id: string };
+type FilterKey =
+  | 'todos'
+  | 'melhores'
+  | 'descontos'
+  | 'novo'
+  | 'aberto'
+  | 'perto'
+  | 'delivery'
+  | { kind: 'cat'; id: string };
 
 function isCatFilter(v: FilterKey): v is { kind: 'cat'; id: string } {
   return typeof v === 'object' && v !== null && (v as any).kind === 'cat';
@@ -270,8 +278,8 @@ export default function SponsoredOffersList({
   const [favIds, setFavIds] = useState<Record<string, boolean>>({});
   const [modalOpen, setModalOpen] = useState(false);
 
-  // Mantive seu padrão: "melhores" como default (e agora é o "Todos")
-  const [active, setActive] = useState<FilterKey>('melhores');
+  // ✅ agora "Todos" é o default
+  const [active, setActive] = useState<FilterKey>('todos');
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   function openModal() {
@@ -300,6 +308,9 @@ export default function SponsoredOffersList({
   const filteredItems = useMemo(() => {
     const list = Array.isArray(items) ? [...items] : [];
 
+    // ✅ "Aberto agora" deve ficar em branco (sem conteúdo)
+    if (active === 'aberto') return [];
+
     if (isCatFilter(active)) {
       const wantedTitle = uniqueCats.find((c) => c.id === active.id)?.title?.toLowerCase() ?? '';
       if (!wantedTitle) return list;
@@ -326,16 +337,21 @@ export default function SponsoredOffersList({
       return list;
     }
 
-    list.sort((a: any, b: any) => {
-      const ar = Number(a?.rating ?? 0);
-      const br = Number(b?.rating ?? 0);
-      if (br !== ar) return br - ar;
+    // ✅ "Melhores avaliados" só aplica quando estiver selecionado
+    if (active === 'melhores') {
+      list.sort((a: any, b: any) => {
+        const ar = Number(a?.rating ?? 0);
+        const br = Number(b?.rating ?? 0);
+        if (br !== ar) return br - ar;
 
-      const av = Number(a?.reviews ?? 0);
-      const bv = Number(b?.reviews ?? 0);
-      return bv - av;
-    });
+        const av = Number(a?.reviews ?? 0);
+        const bv = Number(b?.reviews ?? 0);
+        return bv - av;
+      });
+      return list;
+    }
 
+    // ✅ "Todos", "Novo", "Perto de mim", "Delivery" (sem regra ainda) => lista como vier
     return list;
   }, [active, items, uniqueCats]);
 
@@ -347,7 +363,10 @@ export default function SponsoredOffersList({
     setVisibleCount(Math.min(initialCount, total));
   }, [active, initialCount, total]);
 
-  const visibleItems = useMemo(() => filteredItems.slice(0, visibleCount), [filteredItems, visibleCount]);
+  const visibleItems = useMemo(
+    () => filteredItems.slice(0, visibleCount),
+    [filteredItems, visibleCount]
+  );
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const lockRef = useRef(false);
@@ -452,7 +471,6 @@ export default function SponsoredOffersList({
     setActive(next);
   };
 
-  // após o reflow (mudança da lista), aguarda 2 frames e destrava + restaura o scroll
   useEffect(() => {
     const st = pendingUnlockRef.current;
     if (!st) return;
@@ -477,7 +495,9 @@ export default function SponsoredOffersList({
     <section className={['w-full', className || ''].join(' ')}>
       <SideDrawer open={modalOpen} onClose={closeModal} />
 
-      {showTitle ? <div className="mb-1 px-4 text-[12px] font-medium text-zinc-500">{title}</div> : null}
+      {showTitle ? (
+        <div className="mb-1 px-4 text-[12px] font-medium text-zinc-500">{title}</div>
+      ) : null}
 
       <div ref={filterSentinelRef} aria-hidden className="h-px w-full" />
 
@@ -490,44 +510,52 @@ export default function SponsoredOffersList({
       >
         <div className="px-3 pt-3">
           <div className="no-scrollbar flex gap-2 overflow-x-auto pb-4 pt-1">
-            <FilterChip isActive={active === 'melhores'} onClick={() => setActiveAndFreezeScroll('melhores')}>
+            <FilterChip
+              isActive={active === 'todos'}
+              onClick={() => setActiveAndFreezeScroll('todos')}
+            >
               Todos
             </FilterChip>
 
-            <FilterChip isActive={active === 'descontos'} onClick={() => setActiveAndFreezeScroll('descontos')}>
+            <FilterChip
+              isActive={active === 'descontos'}
+              onClick={() => setActiveAndFreezeScroll('descontos')}
+            >
               Maiores descontos
             </FilterChip>
 
-            {/* ✅ ALTERAÇÃO ÚNICA: remove categorias e adiciona novos filtros fixos */}
             <FilterChip
-              isActive={active === ('novo' as any)}
-              onClick={() => setActiveAndFreezeScroll('novo' as any)}
+              isActive={active === 'novo'}
+              onClick={() => setActiveAndFreezeScroll('novo')}
             >
               Novo
             </FilterChip>
 
             <FilterChip
-              isActive={active === ('aberto' as any)}
-              onClick={() => setActiveAndFreezeScroll('aberto' as any)}
+              isActive={active === 'aberto'}
+              onClick={() => setActiveAndFreezeScroll('aberto')}
             >
               Aberto agora
             </FilterChip>
 
             <FilterChip
-              isActive={active === ('perto' as any)}
-              onClick={() => setActiveAndFreezeScroll('perto' as any)}
+              isActive={active === 'perto'}
+              onClick={() => setActiveAndFreezeScroll('perto')}
             >
               Perto de mim
             </FilterChip>
 
             <FilterChip
-              isActive={active === ('delivery' as any)}
-              onClick={() => setActiveAndFreezeScroll('delivery' as any)}
+              isActive={active === 'delivery'}
+              onClick={() => setActiveAndFreezeScroll('delivery')}
             >
               Delivery
             </FilterChip>
 
-            <FilterChip isActive={active === 'melhores'} onClick={() => setActiveAndFreezeScroll('melhores')}>
+            <FilterChip
+              isActive={active === 'melhores'}
+              onClick={() => setActiveAndFreezeScroll('melhores')}
+            >
               melhores avaliados
             </FilterChip>
           </div>
@@ -556,7 +584,9 @@ export default function SponsoredOffersList({
 
       <div className="px-3 no-anchor" style={needsStickySpacer ? { minHeight: spacerHeight } : {}}>
         {total === 0 ? (
-          <div className="px-1 py-4 text-[12px] font-medium text-zinc-500">Nenhum item encontrado para este filtro.</div>
+          <div className="px-1 py-4 text-[12px] font-medium text-zinc-500">
+            Nenhum item encontrado para este filtro.
+          </div>
         ) : (
           <>
             {visibleItems.map((item, idx) => {
@@ -604,7 +634,9 @@ export default function SponsoredOffersList({
                           <div className="text-[11px] text-zinc-500 line-clamp-1">{tagsLine}</div>
 
                           {priceText ? (
-                            <div className="-mt-[2px] text-[11px] font-medium text-zinc-900">Economia de {priceText}</div>
+                            <div className="-mt-[2px] text-[11px] font-medium text-zinc-900">
+                              Economia de {priceText}
+                            </div>
                           ) : null}
                         </div>
 
@@ -612,8 +644,11 @@ export default function SponsoredOffersList({
                           <div>
                             <StarsRow rating={Number(rating)} />
                             <div className="-mt-0.5 text-[11px] text-zinc-500">
-                              <span className="font-semibold text-zinc-700">{Number(rating).toFixed(1)}</span>{' '}
-                              de <span className="font-semibold text-zinc-700">{reviews}</span> avaliações
+                              <span className="font-semibold text-zinc-700">
+                                {Number(rating).toFixed(1)}
+                              </span>{' '}
+                              de <span className="font-semibold text-zinc-700">{reviews}</span>{' '}
+                              avaliações
                             </div>
                           </div>
 
@@ -650,14 +685,17 @@ export default function SponsoredOffersList({
                     >
                       <HeartIcon
                         filled={isFav}
-                        className={['h-9 w-9 transition', isFav ? 'text-red-500' : 'text-zinc-300 hover:text-zinc-400'].join(
-                          ' '
-                        )}
+                        className={[
+                          'h-9 w-9 transition',
+                          isFav ? 'text-red-500' : 'text-zinc-300 hover:text-zinc-400',
+                        ].join(' ')}
                       />
                     </button>
                   </div>
 
-                  {idx < visibleItems.length - 1 ? <div className="mx-2 border-b border-dotted border-zinc-300" /> : null}
+                  {idx < visibleItems.length - 1 ? (
+                    <div className="mx-2 border-b border-dotted border-zinc-300" />
+                  ) : null}
                 </div>
               );
             })}
