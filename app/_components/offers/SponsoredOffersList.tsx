@@ -132,33 +132,153 @@ function TempImagePlaceholder() {
 }
 
 /* =========================
+   ✅ ICONES SVG DO FILTRO
+   - quando ativo: branco (herda do texto)
+   - quando inativo: colorido
+========================= */
+function FilterIcon({
+  kind,
+  isActive,
+}: {
+  kind: 'todos' | 'melhores' | 'descontos' | 'novo' | 'aberto' | 'perto' | 'delivery';
+  isActive: boolean;
+}) {
+  const cls = 'h-[19.8px] w-[19.8px]'; // 18px + 10%
+  const c = isActive
+    ? 'currentColor'
+    : kind === 'todos'
+      ? '#0F172A'
+      : kind === 'melhores'
+        ? '#FACC15'
+        : kind === 'descontos'
+          ? '#059669'
+          : kind === 'novo'
+            ? '#3B82F6'
+            : kind === 'aberto'
+              ? '#2563EB'
+              : kind === 'perto'
+                ? '#EF4444'
+                : '#8B5CF6';
+
+  switch (kind) {
+    case 'todos':
+      return (
+        <svg viewBox="0 0 24 24" className={cls} fill="none" aria-hidden="true">
+          <path d="M6.5 7.5h11M6.5 12h11M6.5 16.5h11" stroke={c} strokeWidth="2" strokeLinecap="round" />
+        </svg>
+      );
+
+    case 'melhores':
+      return (
+        <svg viewBox="0 0 24 24" className={cls} fill="none" aria-hidden="true">
+          <path
+            d="M12 3.6l2.5 5.3 5.8.5-4.4 3.8 1.4 5.7L12 16.1 6.7 18.9l1.4-5.7-4.4-3.8 5.8-.5L12 3.6z"
+            fill={c}
+          />
+          <path
+            d="M12 3.6l2.5 5.3 5.8.5-4.4 3.8 1.4 5.7L12 16.1 6.7 18.9l1.4-5.7-4.4-3.8 5.8-.5L12 3.6z"
+            stroke={isActive ? 'currentColor' : '#CA8A04'}
+            strokeWidth="1.2"
+            strokeLinejoin="round"
+          />
+        </svg>
+      );
+
+    case 'descontos':
+      return (
+        <svg viewBox="0 0 24 24" className={cls} fill="none" aria-hidden="true">
+          <path d="M6 3h7l5 5v13H6V3Z" stroke={c} strokeWidth="2" strokeLinejoin="round" />
+          <path d="M15.5 9 8.5 16" stroke={c} strokeWidth="2" strokeLinecap="round" />
+          <circle cx="9" cy="10" r="1.35" fill={c} />
+          <circle cx="15" cy="15" r="1.35" fill={c} />
+        </svg>
+      );
+
+    case 'novo':
+      return (
+        <svg viewBox="0 0 24 24" className={cls} fill="none" aria-hidden="true">
+          <path d="M12 3v18" stroke={c} strokeWidth="2" strokeLinecap="round" />
+          <path d="M3 12h18" stroke={c} strokeWidth="2" strokeLinecap="round" />
+          <circle cx="12" cy="12" r="8.5" stroke={c} strokeWidth="2" />
+        </svg>
+      );
+
+    case 'aberto':
+      return (
+        <svg viewBox="0 0 24 24" className={cls} fill="none" aria-hidden="true">
+          <circle cx="12" cy="12" r="9" stroke={c} strokeWidth="2" />
+          <path
+            d="M12 7v5l3 2"
+            stroke={c}
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      );
+
+    case 'perto':
+      return (
+        <svg viewBox="0 0 24 24" className={cls} fill="none" aria-hidden="true">
+          <path
+            d="M12 21s7-4.5 7-10a7 7 0 1 0-14 0c0 5.5 7 10 7 10Z"
+            stroke={c}
+            strokeWidth="2"
+            strokeLinejoin="round"
+          />
+          <path d="M12 11.2a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4z" stroke={c} strokeWidth="2" />
+        </svg>
+      );
+
+    case 'delivery':
+      return (
+        <svg viewBox="0 0 24 24" className={cls} fill="none" aria-hidden="true">
+          <path d="M3 6h13v9H3z" stroke={c} strokeWidth="2" strokeLinejoin="round" />
+          <path d="M16 10h3l2 3v2h-5z" stroke={c} strokeWidth="2" strokeLinejoin="round" />
+          <path d="M7 18a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z" fill={c} />
+          <path d="M17 18a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z" fill={c} />
+        </svg>
+      );
+
+    default:
+      return null;
+  }
+}
+
+/* =========================
    CHIP (ativo em verde)
-   FIX: evitar "pulo" por foco/scroll
 ========================= */
 function FilterChip({
   isActive,
   children,
   onClick,
+  iconKind,
 }: {
   isActive: boolean;
   children: React.ReactNode;
   onClick: () => void;
+  iconKind: 'todos' | 'melhores' | 'descontos' | 'novo' | 'aberto' | 'perto' | 'delivery';
 }) {
   return (
     <button
       type="button"
-      onMouseDown={(e) => e.preventDefault()}
-      onTouchStart={(e) => e.preventDefault()}
       onClick={onClick}
       className={[
-        'shrink-0 rounded-full px-3 py-1 text-[12px] font-semibold',
+        'shrink-0 rounded-full',
+        'px-4 py-2',
+        'min-h-[44px]',
+        'inline-flex items-center gap-2',
         'border transition-colors',
+        'touch-manipulation select-none',
         isActive
           ? 'border-emerald-700 bg-emerald-700 text-white'
           : 'border-zinc-300 bg-zinc-100 text-zinc-700 hover:bg-zinc-200',
       ].join(' ')}
     >
-      {children}
+      <span className="inline-flex items-center justify-center">
+        <FilterIcon kind={iconKind} isActive={isActive} />
+      </span>
+      <span className="whitespace-nowrap text-[13px] font-semibold">{children}</span>
     </button>
   );
 }
@@ -180,23 +300,13 @@ function LoadingRow({ text = 'Carregando...' }: { text?: string }) {
 }
 
 /* =========================
-   COMPONENTE PRINCIPAL
+   TIPOS DO FILTRO
 ========================= */
-type FilterKey =
-  | 'todos'
-  | 'melhores'
-  | 'descontos'
-  | 'novo'
-  | 'aberto'
-  | 'perto'
-  | 'delivery'
-  | { kind: 'cat'; id: string };
+type FilterKey = 'todos' | 'melhores' | 'descontos' | 'novo' | 'aberto' | 'perto' | 'delivery';
 
-function isCatFilter(v: FilterKey): v is { kind: 'cat'; id: string } {
-  return typeof v === 'object' && v !== null && (v as any).kind === 'cat';
-}
-
-// ✅ lê safe-area-top em px (quando existir). 100% compatível.
+/* =========================
+   ✅ lê safe-area-top em px (quando existir). 100% compatível.
+========================= */
 function readSafeAreaTopPx(): number {
   if (typeof window === 'undefined' || typeof document === 'undefined') return 0;
   try {
@@ -226,7 +336,6 @@ function lockScroll(): number {
   const y = window.scrollY || 0;
   const body = document.body;
 
-  // evita layout shift quando some scrollbar (desktop)
   const scrollBarW = window.innerWidth - document.documentElement.clientWidth;
   const prevPadRight = body.style.paddingRight;
 
@@ -278,7 +387,6 @@ export default function SponsoredOffersList({
   const [favIds, setFavIds] = useState<Record<string, boolean>>({});
   const [modalOpen, setModalOpen] = useState(false);
 
-  // ✅ agora "Todos" é o default
   const [active, setActive] = useState<FilterKey>('todos');
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
@@ -292,7 +400,8 @@ export default function SponsoredOffersList({
     setFavIds((prev) => ({ ...prev, [id]: !prev[id] }));
   }
 
-  const uniqueCats = useMemo(() => {
+  useMemo(() => {
+    // mantido para compat com sua prop categories, mesmo não usando no filtro atual
     const seen = new Set<string>();
     const out: FilterCategory[] = [];
     for (const c of categories) {
@@ -308,18 +417,7 @@ export default function SponsoredOffersList({
   const filteredItems = useMemo(() => {
     const list = Array.isArray(items) ? [...items] : [];
 
-    // ✅ "Aberto agora" deve ficar em branco (sem conteúdo)
     if (active === 'aberto') return [];
-
-    if (isCatFilter(active)) {
-      const wantedTitle = uniqueCats.find((c) => c.id === active.id)?.title?.toLowerCase() ?? '';
-      if (!wantedTitle) return list;
-
-      return list.filter((it: any) => {
-        const cat = String(it?.tags?.[1] ?? it?.category ?? it?.categoryLabel ?? '').toLowerCase();
-        return cat.includes(wantedTitle);
-      });
-    }
 
     if (active === 'descontos') {
       const parsePct = (v: any) => {
@@ -337,7 +435,6 @@ export default function SponsoredOffersList({
       return list;
     }
 
-    // ✅ "Melhores avaliados" só aplica quando estiver selecionado
     if (active === 'melhores') {
       list.sort((a: any, b: any) => {
         const ar = Number(a?.rating ?? 0);
@@ -351,9 +448,8 @@ export default function SponsoredOffersList({
       return list;
     }
 
-    // ✅ "Todos", "Novo", "Perto de mim", "Delivery" (sem regra ainda) => lista como vier
     return list;
-  }, [active, items, uniqueCats]);
+  }, [active, items]);
 
   const total = filteredItems.length;
 
@@ -460,14 +556,11 @@ export default function SponsoredOffersList({
     };
   }, []);
 
-  /* =========================================================
-     ✅ BLOQUEIO DO SCROLL DURANTE TROCA DE FILTRO
-  ========================================================= */
   const pendingUnlockRef = useRef<{ y: number; frames: number } | null>(null);
 
   const setActiveAndFreezeScroll = (next: FilterKey) => {
-    const y = lockScroll(); // trava de verdade
-    pendingUnlockRef.current = { y, frames: 2 }; // destrava após 2 frames
+    const y = lockScroll();
+    pendingUnlockRef.current = { y, frames: 2 };
     setActive(next);
   };
 
@@ -511,6 +604,7 @@ export default function SponsoredOffersList({
         <div className="px-3 pt-3">
           <div className="no-scrollbar flex gap-2 overflow-x-auto pb-4 pt-1">
             <FilterChip
+              iconKind="todos"
               isActive={active === 'todos'}
               onClick={() => setActiveAndFreezeScroll('todos')}
             >
@@ -518,6 +612,15 @@ export default function SponsoredOffersList({
             </FilterChip>
 
             <FilterChip
+              iconKind="melhores"
+              isActive={active === 'melhores'}
+              onClick={() => setActiveAndFreezeScroll('melhores')}
+            >
+              Melhores avaliados
+            </FilterChip>
+
+            <FilterChip
+              iconKind="descontos"
               isActive={active === 'descontos'}
               onClick={() => setActiveAndFreezeScroll('descontos')}
             >
@@ -525,6 +628,7 @@ export default function SponsoredOffersList({
             </FilterChip>
 
             <FilterChip
+              iconKind="novo"
               isActive={active === 'novo'}
               onClick={() => setActiveAndFreezeScroll('novo')}
             >
@@ -532,6 +636,7 @@ export default function SponsoredOffersList({
             </FilterChip>
 
             <FilterChip
+              iconKind="aberto"
               isActive={active === 'aberto'}
               onClick={() => setActiveAndFreezeScroll('aberto')}
             >
@@ -539,6 +644,7 @@ export default function SponsoredOffersList({
             </FilterChip>
 
             <FilterChip
+              iconKind="perto"
               isActive={active === 'perto'}
               onClick={() => setActiveAndFreezeScroll('perto')}
             >
@@ -546,17 +652,11 @@ export default function SponsoredOffersList({
             </FilterChip>
 
             <FilterChip
+              iconKind="delivery"
               isActive={active === 'delivery'}
               onClick={() => setActiveAndFreezeScroll('delivery')}
             >
               Delivery
-            </FilterChip>
-
-            <FilterChip
-              isActive={active === 'melhores'}
-              onClick={() => setActiveAndFreezeScroll('melhores')}
-            >
-              melhores avaliados
             </FilterChip>
           </div>
         </div>
