@@ -498,18 +498,34 @@ export default function SponsoredOffersList({
               Maiores descontos
             </FilterChip>
 
-            {uniqueCats.map((c) => {
-              const isActiveNow = isCatFilter(active) && active.id === c.id;
-              return (
-                <FilterChip
-                  key={c.id}
-                  isActive={isActiveNow}
-                  onClick={() => setActiveAndFreezeScroll({ kind: 'cat', id: c.id })}
-                >
-                  {c.title}
-                </FilterChip>
-              );
-            })}
+            {/* ✅ ALTERAÇÃO ÚNICA: remove categorias e adiciona novos filtros fixos */}
+            <FilterChip
+              isActive={active === ('novo' as any)}
+              onClick={() => setActiveAndFreezeScroll('novo' as any)}
+            >
+              Novo
+            </FilterChip>
+
+            <FilterChip
+              isActive={active === ('aberto' as any)}
+              onClick={() => setActiveAndFreezeScroll('aberto' as any)}
+            >
+              Aberto agora
+            </FilterChip>
+
+            <FilterChip
+              isActive={active === ('perto' as any)}
+              onClick={() => setActiveAndFreezeScroll('perto' as any)}
+            >
+              Perto de mim
+            </FilterChip>
+
+            <FilterChip
+              isActive={active === ('delivery' as any)}
+              onClick={() => setActiveAndFreezeScroll('delivery' as any)}
+            >
+              Delivery
+            </FilterChip>
 
             <FilterChip isActive={active === 'melhores'} onClick={() => setActiveAndFreezeScroll('melhores')}>
               melhores avaliados
