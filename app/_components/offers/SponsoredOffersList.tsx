@@ -14,13 +14,14 @@ type Props = {
   items: SponsoredOffer[];
   className?: string;
   title?: string;
-  initialCount?: number; // default 5
-  step?: number; // default 5
+  initialCount?: number;
+  step?: number;
   categories?: FilterCategory[];
+  topOffsetPx?: number; // ✅ NOVO: topo acumulado (menu flutuante + quicksearch)
 };
 
 /* =========================
-   ESTRELAS (preenchimento proporcional, coladas)
+   ESTRELAS
 ========================= */
 function Star({ fillPct }: { fillPct: number }) {
   const id = React.useId();
@@ -62,9 +63,6 @@ function StarsRow({ rating }: { rating: number }) {
   );
 }
 
-/* =========================
-   TAGS — Cidade | Categoria | Tipo
-========================= */
 function buildTags(item: SponsoredOffer) {
   if (Array.isArray((item as any).tags) && (item as any).tags.length === 3) {
     return (item as any).tags.join(' | ');
@@ -72,9 +70,6 @@ function buildTags(item: SponsoredOffer) {
   return '';
 }
 
-/* =========================
-   CORAÇÃO (vasado → preenchido)
-========================= */
 function HeartIcon({
   filled,
   className,
@@ -97,9 +92,6 @@ function HeartIcon({
   );
 }
 
-/* =========================
-   PLACEHOLDER (SVG centralizado)
-========================= */
 function TempImagePlaceholder() {
   return (
     <div className="relative h-full w-full bg-zinc-200">
@@ -133,8 +125,6 @@ function TempImagePlaceholder() {
 
 /* =========================
    ✅ ICONES SVG DO FILTRO
-   - quando ativo: branco (herda do texto)
-   - quando inativo: colorido
 ========================= */
 function FilterIcon({
   kind,
@@ -143,7 +133,7 @@ function FilterIcon({
   kind: 'todos' | 'melhores' | 'descontos' | 'novo' | 'aberto' | 'perto' | 'delivery';
   isActive: boolean;
 }) {
-  const cls = 'h-[19.8px] w-[19.8px]'; // 18px + 10%
+  const cls = 'h-[19.8px] w-[19.8px]';
   const c = isActive
     ? 'currentColor'
     : kind === 'todos'
@@ -207,13 +197,7 @@ function FilterIcon({
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none" aria-hidden="true">
           <circle cx="12" cy="12" r="9" stroke={c} strokeWidth="2" />
-          <path
-            d="M12 7v5l3 2"
-            stroke={c}
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
+          <path d="M12 7v5l3 2" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       );
 
@@ -245,9 +229,6 @@ function FilterIcon({
   }
 }
 
-/* =========================
-   CHIP (ativo em verde)
-========================= */
 function FilterChip({
   isActive,
   children,
@@ -283,9 +264,6 @@ function FilterChip({
   );
 }
 
-/* =========================
-   LOADING (leve)
-========================= */
 function LoadingRow({ text = 'Carregando...' }: { text?: string }) {
   return (
     <div className="px-3 py-3">
@@ -299,14 +277,8 @@ function LoadingRow({ text = 'Carregando...' }: { text?: string }) {
   );
 }
 
-/* =========================
-   TIPOS DO FILTRO
-========================= */
 type FilterKey = 'todos' | 'melhores' | 'descontos' | 'novo' | 'aberto' | 'perto' | 'delivery';
 
-/* =========================
-   ✅ lê safe-area-top em px (quando existir). 100% compatível.
-========================= */
 function readSafeAreaTopPx(): number {
   if (typeof window === 'undefined' || typeof document === 'undefined') return 0;
   try {
@@ -327,9 +299,6 @@ function readSafeAreaTopPx(): number {
   }
 }
 
-/* =========================
-   ✅ LOCK REAL DO SCROLL (body fixed)
-========================= */
 function lockScroll(): number {
   if (typeof window === 'undefined' || typeof document === 'undefined') return 0;
 
@@ -369,9 +338,7 @@ function unlockScroll(y: number) {
   body.style.paddingRight = typeof prevPadRight === 'string' ? prevPadRight : '';
   try {
     delete (body as any).__prevPadRight;
-  } catch {
-    // ignore
-  }
+  } catch {}
 
   window.scrollTo({ top: y, behavior: 'auto' });
 }
@@ -383,6 +350,7 @@ export default function SponsoredOffersList({
   initialCount = 5,
   step = 5,
   categories = [],
+  topOffsetPx = 67, // fallback
 }: Props) {
   const [favIds, setFavIds] = useState<Record<string, boolean>>({});
   const [modalOpen, setModalOpen] = useState(false);
@@ -401,7 +369,6 @@ export default function SponsoredOffersList({
   }
 
   useMemo(() => {
-    // mantido para compat com sua prop categories, mesmo não usando no filtro atual
     const seen = new Set<string>();
     const out: FilterCategory[] = [];
     for (const c of categories) {
@@ -513,20 +480,24 @@ export default function SponsoredOffersList({
   const filterSentinelRef = useRef<HTMLDivElement | null>(null);
   const [filterIsStuck, setFilterIsStuck] = useState(false);
 
-  const FILTER_TOP = 'calc(67px + env(safe-area-inset-top))';
+  // ✅ topo dinâmico: recebido do Home (menu flutuante + quicksearch) + safe-area
+  const safeTopPxRef = useRef(0);
+
+  const FILTER_TOP = useMemo(() => {
+    return `calc(${Math.max(0, Math.round(topOffsetPx))}px + env(safe-area-inset-top))`;
+  }, [topOffsetPx]);
 
   useEffect(() => {
     let raf = 0;
-    let safeTopPx = 0;
 
     const compute = () => {
       raf = 0;
       const s = filterSentinelRef.current;
       if (!s) return;
 
-      if (!safeTopPx) safeTopPx = readSafeAreaTopPx();
+      if (!safeTopPxRef.current) safeTopPxRef.current = readSafeAreaTopPx();
 
-      const thresholdTop = 67 + safeTopPx;
+      const thresholdTop = Math.max(0, Math.round(topOffsetPx)) + safeTopPxRef.current;
       const top = s.getBoundingClientRect().top;
 
       const stuck = top <= thresholdTop + 0.5;
@@ -539,7 +510,7 @@ export default function SponsoredOffersList({
     };
 
     const onResize = () => {
-      safeTopPx = 0;
+      safeTopPxRef.current = 0;
       onScroll();
     };
 
@@ -554,7 +525,7 @@ export default function SponsoredOffersList({
       window.removeEventListener('resize', onResize);
       window.removeEventListener('orientationchange', onResize);
     };
-  }, []);
+  }, [topOffsetPx]);
 
   const pendingUnlockRef = useRef<{ y: number; frames: number } | null>(null);
 
@@ -603,59 +574,31 @@ export default function SponsoredOffersList({
       >
         <div className="px-3 pt-3">
           <div className="no-scrollbar flex gap-2 overflow-x-auto pb-4 pt-1">
-            <FilterChip
-              iconKind="todos"
-              isActive={active === 'todos'}
-              onClick={() => setActiveAndFreezeScroll('todos')}
-            >
+            <FilterChip iconKind="todos" isActive={active === 'todos'} onClick={() => setActiveAndFreezeScroll('todos')}>
               Todos
             </FilterChip>
 
-            <FilterChip
-              iconKind="melhores"
-              isActive={active === 'melhores'}
-              onClick={() => setActiveAndFreezeScroll('melhores')}
-            >
+            <FilterChip iconKind="melhores" isActive={active === 'melhores'} onClick={() => setActiveAndFreezeScroll('melhores')}>
               Melhores avaliados
             </FilterChip>
 
-            <FilterChip
-              iconKind="descontos"
-              isActive={active === 'descontos'}
-              onClick={() => setActiveAndFreezeScroll('descontos')}
-            >
+            <FilterChip iconKind="descontos" isActive={active === 'descontos'} onClick={() => setActiveAndFreezeScroll('descontos')}>
               Maiores descontos
             </FilterChip>
 
-            <FilterChip
-              iconKind="novo"
-              isActive={active === 'novo'}
-              onClick={() => setActiveAndFreezeScroll('novo')}
-            >
+            <FilterChip iconKind="novo" isActive={active === 'novo'} onClick={() => setActiveAndFreezeScroll('novo')}>
               Novo
             </FilterChip>
 
-            <FilterChip
-              iconKind="aberto"
-              isActive={active === 'aberto'}
-              onClick={() => setActiveAndFreezeScroll('aberto')}
-            >
+            <FilterChip iconKind="aberto" isActive={active === 'aberto'} onClick={() => setActiveAndFreezeScroll('aberto')}>
               Aberto agora
             </FilterChip>
 
-            <FilterChip
-              iconKind="perto"
-              isActive={active === 'perto'}
-              onClick={() => setActiveAndFreezeScroll('perto')}
-            >
+            <FilterChip iconKind="perto" isActive={active === 'perto'} onClick={() => setActiveAndFreezeScroll('perto')}>
               Perto de mim
             </FilterChip>
 
-            <FilterChip
-              iconKind="delivery"
-              isActive={active === 'delivery'}
-              onClick={() => setActiveAndFreezeScroll('delivery')}
-            >
+            <FilterChip iconKind="delivery" isActive={active === 'delivery'} onClick={() => setActiveAndFreezeScroll('delivery')}>
               Delivery
             </FilterChip>
           </div>
@@ -815,4 +758,3 @@ export default function SponsoredOffersList({
     </section>
   );
 }
- 
