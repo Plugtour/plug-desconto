@@ -26,7 +26,7 @@ export default function BottomNav({ items, className, heightPx = 74 }: Props) {
       className={[
         'fixed left-0 right-0 bottom-0 z-[140]',
         'border-t border-black/10',
-        'bg-zinc-100', // ✅ sólido (sem transparência)
+        'bg-zinc-100',
         className ?? '',
       ].join(' ')}
       style={{
@@ -51,12 +51,15 @@ export default function BottomNav({ items, className, heightPx = 74 }: Props) {
                   'active:scale-[0.99]',
                 ].join(' ')}
               >
-                {/* Conteúdo */}
+                {/* Área visual do item */}
                 <div
                   className={[
-                    'flex flex-col items-center justify-center gap-1',
+                    'relative flex flex-col items-center justify-center gap-1',
+                    'h-full w-full',
                     'transition-colors duration-150',
-                    isActive ? 'text-emerald-700' : 'text-zinc-500',
+                    isActive
+                      ? 'bg-emerald-700/10 text-emerald-700'
+                      : 'bg-transparent text-zinc-500',
                   ].join(' ')}
                 >
                   <span className="inline-flex items-center justify-center">
@@ -66,19 +69,19 @@ export default function BottomNav({ items, className, heightPx = 74 }: Props) {
                   <span className="text-[11px] font-semibold leading-none">
                     {it.label}
                   </span>
-                </div>
 
-                {/* Linha decorativa inferior (ativo) */}
-                {isActive && (
-                  <span
-                    className={[
-                      'pointer-events-none',
-                      'absolute bottom-[6px]',
-                      'h-[2px] w-6 rounded-full',
-                      'bg-emerald-600',
-                    ].join(' ')}
-                  />
-                )}
+                  {/* Linha decorativa inferior */}
+                  {isActive && (
+                    <span
+                      className={[
+                        'pointer-events-none',
+                        'absolute bottom-[6px]',
+                        'h-[2px] w-6 rounded-full',
+                        'bg-emerald-600',
+                      ].join(' ')}
+                    />
+                  )}
+                </div>
               </Link>
             );
           })}
