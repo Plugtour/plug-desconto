@@ -137,7 +137,6 @@ export default function ExposedCarouselRow({
         className="no-scrollbar flex gap-4 px-4 overflow-x-auto scroll-smooth"
       >
         {list.map((item, idx) => {
-          const isFav = !!fav[item.id];
           const rating = item.rating ?? 4.8;
           const reviews = item.reviews ?? 812;
           const savings = item.savingsText ?? 'Economia de R$30 a R$90';
@@ -145,13 +144,13 @@ export default function ExposedCarouselRow({
           return (
             <div
               key={item.id}
-              className="relative min-w-[206px] max-w-[206px] flex-shrink-0 rounded-lg overflow-hidden"
+              className="relative min-w-[228px] max-w-[228px] flex-shrink-0 rounded-lg overflow-hidden"
               onClick={() => setDrawerOpen(true)}
               role="button"
               tabIndex={0}
             >
-              {/* FOTO (↑ 25%) */}
-              <div className="relative h-[131px] bg-zinc-200">
+              {/* FOTO */}
+              <div className="relative h-[144px] bg-zinc-200">
                 {item.imageUrl ? (
                   <img
                     src={item.imageUrl}
@@ -164,17 +163,17 @@ export default function ExposedCarouselRow({
                 )}
               </div>
 
-              {/* TEXTO — mais espaçoso */}
-              <div className="bg-zinc-200 px-3 py-3">
-                <div className="min-h-[32px] text-[12px] font-extrabold leading-[1.2] text-zinc-900 line-clamp-2">
+              {/* TEXTO */}
+              <div className="bg-zinc-200 px-4 py-3">
+                <div className="min-h-[36px] text-[13px] font-extrabold leading-[1.25] text-zinc-900 line-clamp-2">
                   {item.title}
                 </div>
 
                 <div className="mt-3">
-                  <div className="text-[12px] font-normal text-zinc-600 leading-[1.15]">
+                  <div className="text-[12px] font-normal text-zinc-600 leading-[1.2]">
                     {categoryLabel}
                   </div>
-                  <div className="mt-[3px] text-[12px] font-medium text-zinc-900 leading-[1.15]">
+                  <div className="mt-[3px] text-[12px] font-medium text-zinc-900 leading-[1.2]">
                     {savings}
                   </div>
                 </div>
@@ -205,7 +204,7 @@ export default function ExposedCarouselRow({
         {/* CARD FINAL */}
         <Link
           href={viewAllHref}
-          className="min-w-[206px] max-w-[206px] flex-shrink-0 rounded-lg overflow-hidden"
+          className="min-w-[228px] max-w-[228px] flex-shrink-0 rounded-lg overflow-hidden"
         >
           <div className="bg-zinc-200 h-full grid place-items-center px-4 text-center">
             <div className="text-sm font-semibold text-zinc-900 leading-tight">
