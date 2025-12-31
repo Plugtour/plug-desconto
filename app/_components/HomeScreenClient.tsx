@@ -17,6 +17,9 @@ import FloatingTopMenu from './menu/FloatingTopMenu';
 import { SPONSORED_OFFERS } from '../../_data/sponsoredOffers';
 import { EXPOSED_GASTRONOMY } from '../../_data/exposedOffers';
 
+import BottomNav from './bottom-nav/BottomNav';
+import { BOTTOM_NAV_ITEMS } from './bottom-nav/items';
+
 /* =========================
    TIPOS
 ========================= */
@@ -263,7 +266,12 @@ export default function HomeScreenClient({
   const quickSearchTop = showFloatingMenu ? FLOATING_MENU_H : 0;
 
   return (
-    <div className="mx-auto w-full max-w-md bg-zinc-100">
+    <div
+      className="mx-auto w-full max-w-md bg-zinc-100"
+      style={{
+        paddingBottom: 'calc(74px + env(safe-area-inset-bottom))',
+      }}
+    >
       <div className="px-4 pt-4">
         <div className="flex items-center justify-center">
           <button className="text-2xl font-extrabold text-zinc-800">
@@ -322,6 +330,9 @@ export default function HomeScreenClient({
         step={5}
         categories={categories.map((c) => ({ id: c.id, title: c.title }))}
       />
+
+      {/* ✅ Rodapé estilo app — fixo e somente na Home */}
+      <BottomNav items={BOTTOM_NAV_ITEMS} heightPx={74} />
     </div>
   );
 }
