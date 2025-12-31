@@ -26,7 +26,7 @@ export default function BottomNav({ items, className, heightPx = 74 }: Props) {
       className={[
         'fixed left-0 right-0 bottom-0 z-[140]',
         'border-t border-black/10',
-        'bg-zinc-100/95 backdrop-blur-[2px]',
+        'bg-zinc-100/100 backdrop-blur-[2px]',
         className ?? '',
       ].join(' ')}
       style={{
