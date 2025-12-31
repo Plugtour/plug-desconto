@@ -750,7 +750,7 @@ export default function SponsoredOffersList({
                         e.stopPropagation();
                         toggleFav((item as any).id);
                       }}
-                      className="absolute -right-[7px] top-1 inline-flex h-10 w-10 items-center justify-center"
+                      className="absolute -right-[4px] top-1 inline-flex h-10 w-10 items-center justify-center"
                     >
                       <HeartIcon
                         filled={isFav}
