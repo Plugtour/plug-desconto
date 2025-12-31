@@ -164,7 +164,8 @@ export default function SponsoredOffersRow({
 
     const step = () => {
       const rect = el.getBoundingClientRect();
-      const viewportBottom = window.innerHeight + 100;
+const TOP_FIXED_OFFSET = 100; // altura real do topo fixo (filtro)
+const viewportBottom = window.innerHeight - TOP_FIXED_OFFSET;
       if (rect.bottom > viewportBottom) {
         const delta = rect.bottom - viewportBottom;
         window.scrollBy({ top: delta, behavior: 'smooth' });
