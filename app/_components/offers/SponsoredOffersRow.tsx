@@ -143,6 +143,7 @@ export default function SponsoredOffersRow({
 
   const [animating, setAnimating] = useState(false);
 
+  // ✅ Modal (agora é o mesmo do carrossel)
   const [modalOpen, setModalOpen] = useState(false);
 
   function openModal() {
@@ -269,6 +270,7 @@ export default function SponsoredOffersRow({
 
   return (
     <section className={['w-full', className || ''].join(' ')}>
+      {/* ✅ Agora usa o modal do carrossel */}
       <SideDrawer open={modalOpen} onClose={closeModal} />
 
       <div className="mb-1 px-4 text-[12px] font-medium text-zinc-500">{title}</div>
@@ -333,17 +335,20 @@ export default function SponsoredOffersRow({
                       </div>
 
                       <div className="min-w-0 flex-1">
-                        <div className="pr-14 text-[11px] font-extrabold leading-snug text-zinc-900 line-clamp-2">
+                        {/* ✅ 12px */}
+                        <div className="pr-[41px] text-[12px] font-extrabold leading-snug text-zinc-900 line-clamp-2">
                           {item.title}
                         </div>
 
                         <div className="mt-[4px]">
-                          <div className="text-[11px] text-zinc-500 line-clamp-1">
+                          {/* ✅ 12px */}
+                          <div className="text-[12px] text-zinc-500 line-clamp-1">
                             {tagsLine}
                           </div>
 
                           {item.priceText ? (
-                            <div className="-mt-[2px] text-[11px] font-medium text-zinc-900">
+                            // ✅ 12px
+                            <div className="-mt-[2px] text-[12px] font-medium text-zinc-900">
                               Economia de {item.priceText}
                             </div>
                           ) : null}
@@ -352,7 +357,8 @@ export default function SponsoredOffersRow({
                         <div className="mt-1.5 flex items-end justify-between">
                           <div>
                             <StarsRow rating={rating} />
-                            <div className="-mt-0.5 text-[11px] text-zinc-500">
+                            {/* ✅ 12px */}
+                            <div className="-mt-0.5 text-[12px] text-zinc-500">
                               <span className="font-semibold text-zinc-700">
                                 {rating.toFixed(1)}
                               </span>{' '}
