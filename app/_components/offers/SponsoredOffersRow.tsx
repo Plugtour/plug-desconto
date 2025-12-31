@@ -164,7 +164,7 @@ export default function SponsoredOffersRow({
 
     const step = () => {
       const rect = el.getBoundingClientRect();
-      const viewportBottom = window.innerHeight + 170;
+      const viewportBottom = window.innerHeight + 180;
       if (rect.bottom > viewportBottom) {
         const delta = rect.bottom - viewportBottom;
         window.scrollBy({ top: delta, behavior: 'smooth' });
