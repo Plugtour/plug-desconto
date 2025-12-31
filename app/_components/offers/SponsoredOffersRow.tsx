@@ -129,7 +129,8 @@ export default function SponsoredOffersRow({
   const [favIds, setFavIds] = useState<Record<string, boolean>>({});
   const [expanded, setExpanded] = useState(false);
 
-  const CARD_ROW_HEIGHT = 108;
+  // ✅ +10% no "tamanho base" do card (impacta colapso/gradiente)
+  const CARD_ROW_HEIGHT = 119; // era 108
   const GRADIENT_TOP_OFFSET = 14;
   const COLLAPSED_HEIGHT = Math.round(CARD_ROW_HEIGHT * 1.5) + 5;
 
@@ -142,7 +143,6 @@ export default function SponsoredOffersRow({
 
   const [animating, setAnimating] = useState(false);
 
-  // ✅ Modal (agora é o mesmo do carrossel)
   const [modalOpen, setModalOpen] = useState(false);
 
   function openModal() {
@@ -269,7 +269,6 @@ export default function SponsoredOffersRow({
 
   return (
     <section className={['w-full', className || ''].join(' ')}>
-      {/* ✅ Agora usa o modal do carrossel */}
       <SideDrawer open={modalOpen} onClose={closeModal} />
 
       <div className="mb-1 px-4 text-[12px] font-medium text-zinc-500">{title}</div>
@@ -319,10 +318,12 @@ export default function SponsoredOffersRow({
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') handleCardClick();
                     }}
-                    className="block py-3 cursor-pointer"
+                    // ✅ +10% no padding vertical do card
+                    className="block py-[13px] cursor-pointer"
                   >
                     <div className="flex gap-3">
-                      <div className="h-24 w-24 flex-none overflow-hidden rounded-md bg-zinc-200">
+                      {/* ✅ +10% na thumb (96px -> 106px) */}
+                      <div className="h-[106px] w-[106px] flex-none overflow-hidden rounded-md bg-zinc-200">
                         <img
                           src={item.imageUrl}
                           alt={item.title}
