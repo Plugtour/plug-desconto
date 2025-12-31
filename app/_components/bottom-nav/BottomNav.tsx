@@ -50,7 +50,8 @@ export default function BottomNav({ items, className, heightPx = 74 }: Props) {
                   'relative flex flex-col items-center justify-center gap-1',
                   'touch-manipulation select-none',
                   'active:scale-[0.99]',
-                  'transition-colors duration-150',
+                  // 🔹 micro-interação de fundo + texto
+                  'transition-[background-color,color] duration-200 ease-out',
                   isActive
                     ? 'bg-zinc-200 text-emerald-700'
                     : 'bg-transparent text-zinc-500',
@@ -64,10 +65,17 @@ export default function BottomNav({ items, className, heightPx = 74 }: Props) {
                   {it.label}
                 </span>
 
-                {/* Linha decorativa inferior (ativo) */}
-                {isActive && (
-                  <span className="pointer-events-none absolute bottom-[6px] h-[2px] w-6 rounded-full bg-emerald-600" />
-                )}
+                {/* Underline animado */}
+                <span
+                  className={[
+                    'pointer-events-none absolute bottom-[6px]',
+                    'h-[2px] w-6 rounded-full bg-emerald-600',
+                    'transition-all duration-200 ease-out',
+                    isActive
+                      ? 'opacity-100 translate-y-0'
+                      : 'opacity-0 translate-y-1',
+                  ].join(' ')}
+                />
               </Link>
             );
           })}
