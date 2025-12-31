@@ -39,49 +39,35 @@ export default function BottomNav({ items, className, heightPx = 74 }: Props) {
         <div className="grid h-full grid-cols-5 px-2">
           {items.map((it) => {
             const isActive =
-              pathname === it.href || (it.href !== '/' && pathname?.startsWith(it.href));
+              pathname === it.href ||
+              (it.href !== '/' && pathname?.startsWith(it.href));
 
             return (
               <Link
                 key={it.id}
                 href={it.href}
                 className={[
-                  'relative flex items-center justify-center',
+                  'relative flex flex-col items-center justify-center gap-1',
                   'touch-manipulation select-none',
                   'active:scale-[0.99]',
+                  'transition-colors duration-150',
+                  isActive
+                    ? 'bg-zinc-200 text-emerald-700'
+                    : 'bg-transparent text-zinc-500',
                 ].join(' ')}
               >
-                {/* Área visual do item */}
-                <div
-                  className={[
-                    'relative flex flex-col items-center justify-center gap-1',
-                    'h-full w-full',
-                    'transition-colors duration-150',
-                    isActive
-                      ? 'bg-emerald-700/10 text-emerald-700'
-                      : 'bg-transparent text-zinc-500',
-                  ].join(' ')}
-                >
-                  <span className="inline-flex items-center justify-center">
-                    <IconForKey icon={it.icon} className="h-6 w-6" />
-                  </span>
+                <span className="inline-flex items-center justify-center">
+                  <IconForKey icon={it.icon} className="h-6 w-6" />
+                </span>
 
-                  <span className="text-[11px] font-semibold leading-none">
-                    {it.label}
-                  </span>
+                <span className="text-[11px] font-semibold leading-none">
+                  {it.label}
+                </span>
 
-                  {/* Linha decorativa inferior */}
-                  {isActive && (
-                    <span
-                      className={[
-                        'pointer-events-none',
-                        'absolute bottom-[6px]',
-                        'h-[2px] w-6 rounded-full',
-                        'bg-emerald-600',
-                      ].join(' ')}
-                    />
-                  )}
-                </div>
+                {/* Linha decorativa inferior (ativo) */}
+                {isActive && (
+                  <span className="pointer-events-none absolute bottom-[6px] h-[2px] w-6 rounded-full bg-emerald-600" />
+                )}
               </Link>
             );
           })}
