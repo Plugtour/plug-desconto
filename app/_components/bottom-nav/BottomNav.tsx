@@ -26,7 +26,7 @@ export default function BottomNav({ items, className, heightPx = 74 }: Props) {
       className={[
         'fixed left-0 right-0 bottom-0 z-[140]',
         'border-t border-black/10',
-        'bg-zinc-100/100 backdrop-blur-[2px]',
+        'bg-zinc-100', // ✅ sólido (sem transparência)
         className ?? '',
       ].join(' ')}
       style={{
@@ -36,7 +36,7 @@ export default function BottomNav({ items, className, heightPx = 74 }: Props) {
       aria-label="Menu inferior"
     >
       <div className="mx-auto w-full max-w-md h-full">
-        <div className="grid h-full grid-cols-4 px-2">
+        <div className="grid h-full grid-cols-5 px-2">
           {items.map((it) => {
             const isActive =
               pathname === it.href || (it.href !== '/' && pathname?.startsWith(it.href));
