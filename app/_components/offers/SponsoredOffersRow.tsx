@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import type { SponsoredOffer } from '../../../_data/sponsoredOffers';
 import SideDrawer from './SideDrawer';
 
@@ -158,23 +158,26 @@ export default function SponsoredOffersRow({
     setFavIds((prev) => ({ ...prev, [id]: !prev[id] }));
   }
 
+  /**
+   * ✅ Scroll ajustado para encaixar EXATAMENTE abaixo do topo fixo
+   * - mede a altura real do stack fixo via #top-fixed-stack (no HomeScreenClient)
+   * - faz scrollTo (não scrollBy) => evita “travadas” e “acúmulo”
+   * - margem final de 8px para não encostar
+   */
   function smoothRevealAfterExpand() {
     const el = wrapperRef.current;
     if (!el) return;
 
-    const step = () => {
-      const rect = el.getBoundingClientRect();
-const TOP_FIXED_OFFSET = 100; // altura real do topo fixo (filtro)
-const viewportBottom = window.innerHeight - TOP_FIXED_OFFSET;
-      if (rect.bottom > viewportBottom) {
-        const delta = rect.bottom - viewportBottom;
-        window.scrollBy({ top: delta, behavior: 'smooth' });
-      }
-    };
+    const fixedH =
+      document.getElementById('top-fixed-stack')?.getBoundingClientRect().height ?? 0;
 
-    requestAnimationFrame(() => requestAnimationFrame(step));
-    window.setTimeout(step, 220);
-    window.setTimeout(step, 420);
+    const rect = el.getBoundingClientRect();
+    const targetTop = window.scrollY + rect.top - fixedH - 8;
+
+    window.scrollTo({
+      top: Math.max(0, Math.round(targetTop)),
+      behavior: 'smooth',
+    });
   }
 
   function stopHeightAnim() {

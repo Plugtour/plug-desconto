@@ -203,8 +203,7 @@ export default function HomeScreenClient({
   const [showFloatingMenu, setShowFloatingMenu] = useState(false);
 
   // ✅ REGULAGEM DA ALTURA DO MENU FLUTUANTE (empurra o QuickSearch)
-  // Se quiser mais espaço, aumenta aqui.
-  const FLOATING_MENU_H = 75; // px (ajuste fino aqui)
+  const FLOATING_MENU_H = 75; // px
 
   const rafRef = useRef<number | null>(null);
   const HYSTERESIS_PX = 18;
@@ -265,6 +264,10 @@ export default function HomeScreenClient({
 
   const quickSearchTop = showFloatingMenu ? FLOATING_MENU_H : 0;
 
+  // ✅ altura aproximada do bloco do QuickSearch (para "reservar" espaço na medição)
+  // Se quiser ajustar fino: aumente/diminua aqui.
+  const QUICKSEARCH_STACK_H = 94; // px
+
   return (
     <div
       className="mx-auto w-full max-w-md bg-zinc-100"
@@ -272,6 +275,16 @@ export default function HomeScreenClient({
         paddingBottom: 'calc(74px + env(safe-area-inset-bottom))',
       }}
     >
+      {/* ✅ STACK INVISÍVEL SÓ PARA MEDIÇÃO (NÃO ENVOLVE O QUICKSEARCH) */}
+      <div
+        id="top-fixed-stack"
+        className="pointer-events-none absolute inset-x-0 top-0"
+        aria-hidden="true"
+      >
+        <div style={{ height: showFloatingMenu ? FLOATING_MENU_H : 0 }} />
+        <div style={{ height: QUICKSEARCH_STACK_H }} />
+      </div>
+
       <div className="px-4 pt-4">
         <div className="flex items-center justify-center">
           <button className="text-2xl font-extrabold text-zinc-800">
@@ -296,10 +309,10 @@ export default function HomeScreenClient({
       {/* MENU FLUTUANTE */}
       <FloatingTopMenu categories={categories} visible={showFloatingMenu} />
 
-      {/* ✅ QuickSearch sticky: agora SEMPRE abaixo do menu flutuante */}
+      {/* ✅ QuickSearch sticky: MANTÉM O COMPORTAMENTO ORIGINAL */}
       <div
         className={[
-          'sticky z-[90] transition-colors duration-0', // ✅ sem delay perceptível
+          'sticky z-[90]',
           qsStuck ? 'bg-zinc-200' : 'bg-transparent',
         ].join(' ')}
         style={{ top: `calc(${quickSearchTop}px + env(safe-area-inset-top))` }}
