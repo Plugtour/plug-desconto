@@ -404,7 +404,7 @@ export default function SponsoredOffersRow({
                         toggleFav(item.id);
                       }}
                       className={[
-                        'absolute right-2 top-2 inline-flex h-10 w-10 items-center justify-center',
+                        'absolute -right-[7px] top-1 inline-flex h-10 w-10 items-center justify-center',
                         disableHeart ? 'pointer-events-none opacity-0' : '',
                       ].join(' ')}
                       tabIndex={disableHeart ? -1 : 0}

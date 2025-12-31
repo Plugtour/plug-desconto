@@ -291,14 +291,8 @@ function LoadingRow({ text = 'Carregando...' }: { text?: string }) {
   );
 }
 
-/* =========================
-   TIPOS DO FILTRO
-========================= */
 type FilterKey = 'todos' | 'melhores' | 'descontos' | 'novo' | 'aberto' | 'perto' | 'delivery';
 
-/* =========================
-   ✅ lê safe-area-top em px
-========================= */
 function readSafeAreaTopPx(): number {
   if (typeof window === 'undefined' || typeof document === 'undefined') return 0;
   try {
@@ -319,9 +313,6 @@ function readSafeAreaTopPx(): number {
   }
 }
 
-/* =========================
-   ✅ LOCK REAL DO SCROLL (body fixed)
-========================= */
 function lockScroll(): number {
   if (typeof window === 'undefined' || typeof document === 'undefined') return 0;
 
@@ -360,9 +351,7 @@ function unlockScroll(y: number) {
   body.style.paddingRight = typeof prevPadRight === 'string' ? prevPadRight : '';
   try {
     delete (body as any).__prevPadRight;
-  } catch {
-    // ignore
-  }
+  } catch {}
 
   window.scrollTo({ top: y, behavior: 'auto' });
 }
@@ -500,7 +489,6 @@ export default function SponsoredOffersList({
   const filterSentinelRef = useRef<HTMLDivElement | null>(null);
   const [filterIsStuck, setFilterIsStuck] = useState(false);
 
-  // ✅ agora o filtro usa a pilha sticky real (menu flutuante + quicksearch)
   const FILTER_TOP = 'calc(var(--sticky-stack-h, 130px) + env(safe-area-inset-top))';
 
   useEffect(() => {
@@ -514,7 +502,6 @@ export default function SponsoredOffersList({
 
       if (!safeTopPx) safeTopPx = readSafeAreaTopPx();
 
-      // pega o valor do CSS var em px
       const root = document.documentElement;
       const raw = window.getComputedStyle(root).getPropertyValue('--sticky-stack-h').trim();
       const stackH = Number.parseFloat(raw || '67');
@@ -693,10 +680,10 @@ export default function SponsoredOffersList({
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') handleCardClick();
                     }}
-                    className="block py-3 cursor-pointer"
+                    className="block py-[13px] cursor-pointer"
                   >
                     <div className="flex gap-3">
-                      <div className="h-24 w-24 flex-none overflow-hidden rounded-md bg-zinc-200">
+                      <div className="h-[106px] w-[106px] flex-none overflow-hidden rounded-md bg-zinc-200">
                         {imageUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
@@ -711,15 +698,15 @@ export default function SponsoredOffersList({
                       </div>
 
                       <div className="min-w-0 flex-1">
-                        <div className="pr-14 text-[11px] font-extrabold leading-snug text-zinc-900 line-clamp-2">
+                        <div className="pr-[41px] text-[12px] font-extrabold leading-snug text-zinc-900 line-clamp-2">
                           {(item as any).title}
                         </div>
 
                         <div className="mt-[4px]">
-                          <div className="text-[11px] text-zinc-500 line-clamp-1">{tagsLine}</div>
+                          <div className="text-[12px] text-zinc-500 line-clamp-1">{tagsLine}</div>
 
                           {priceText ? (
-                            <div className="-mt-[2px] text-[11px] font-medium text-zinc-900">
+                            <div className="-mt-[2px] text-[12px] font-medium text-zinc-900">
                               Economia de {priceText}
                             </div>
                           ) : null}
@@ -728,7 +715,7 @@ export default function SponsoredOffersList({
                         <div className="mt-1.5 flex items-end justify-between">
                           <div>
                             <StarsRow rating={Number(rating)} />
-                            <div className="-mt-0.5 text-[11px] text-zinc-500">
+                            <div className="-mt-0.5 text-[12px] text-zinc-500">
                               <span className="font-semibold text-zinc-700">{Number(rating).toFixed(1)}</span> de{' '}
                               <span className="font-semibold text-zinc-700">{reviews}</span> avaliações
                             </div>
@@ -763,11 +750,14 @@ export default function SponsoredOffersList({
                         e.stopPropagation();
                         toggleFav((item as any).id);
                       }}
-                      className="absolute right-2 top-2 inline-flex h-10 w-10 items-center justify-center"
+                      className="absolute -right-[7px] top-1 inline-flex h-10 w-10 items-center justify-center"
                     >
                       <HeartIcon
                         filled={isFav}
-                        className={['h-9 w-9 transition', isFav ? 'text-red-500' : 'text-zinc-300 hover:text-zinc-400'].join(' ')}
+                        className={[
+                          'h-9 w-9 transition',
+                          isFav ? 'text-red-500' : 'text-zinc-300 hover:text-zinc-400',
+                        ].join(' ')}
                       />
                     </button>
                   </div>
