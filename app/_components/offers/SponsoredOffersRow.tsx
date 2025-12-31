@@ -1,8 +1,10 @@
+// app/_components/offers/SponsoredOffersRow.tsx
 'use client';
 
 import React, { useMemo, useRef, useState } from 'react';
 import type { SponsoredOffer } from '../../../_data/sponsoredOffers';
 import SideDrawer from './SideDrawer';
+import OfferEconomyLine from './OfferEconomyLine';
 
 type Props = {
   items: SponsoredOffer[];
@@ -129,7 +131,6 @@ export default function SponsoredOffersRow({
   const [favIds, setFavIds] = useState<Record<string, boolean>>({});
   const [expanded, setExpanded] = useState(false);
 
-  // ✅ +10% no "tamanho base" do card (impacta colapso/gradiente)
   const CARD_ROW_HEIGHT = 119; // era 108
   const GRADIENT_TOP_OFFSET = 14;
   const COLLAPSED_HEIGHT = Math.round(CARD_ROW_HEIGHT * 1.5) + 5;
@@ -143,7 +144,6 @@ export default function SponsoredOffersRow({
 
   const [animating, setAnimating] = useState(false);
 
-  // ✅ Modal (agora é o mesmo do carrossel)
   const [modalOpen, setModalOpen] = useState(false);
 
   function openModal() {
@@ -158,12 +158,6 @@ export default function SponsoredOffersRow({
     setFavIds((prev) => ({ ...prev, [id]: !prev[id] }));
   }
 
-  /**
-   * ✅ Scroll ajustado para encaixar EXATAMENTE abaixo do topo fixo
-   * - mede a altura real do stack fixo via #top-fixed-stack (no HomeScreenClient)
-   * - faz scrollTo (não scrollBy) => evita “travadas” e “acúmulo”
-   * - margem final de 8px para não encostar
-   */
   function smoothRevealAfterExpand() {
     const el = wrapperRef.current;
     if (!el) return;
@@ -274,7 +268,6 @@ export default function SponsoredOffersRow({
 
   return (
     <section className={['w-full', className || ''].join(' ')}>
-      {/* ✅ Agora usa o modal do carrossel */}
       <SideDrawer open={modalOpen} onClose={closeModal} />
 
       <div className="mb-1 px-4 text-[12px] font-medium text-zinc-500">{title}</div>
@@ -324,11 +317,9 @@ export default function SponsoredOffersRow({
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') handleCardClick();
                     }}
-                    // ✅ +10% no padding vertical do card
                     className="block py-[13px] cursor-pointer"
                   >
                     <div className="flex gap-3">
-                      {/* ✅ +10% na thumb (96px -> 106px) */}
                       <div className="h-[106px] w-[106px] flex-none overflow-hidden rounded-md bg-zinc-200">
                         <img
                           src={item.imageUrl}
@@ -339,29 +330,25 @@ export default function SponsoredOffersRow({
                       </div>
 
                       <div className="min-w-0 flex-1">
-                        {/* ✅ 12px */}
                         <div className="pr-[41px] text-[12px] font-extrabold leading-snug text-zinc-900 line-clamp-2">
                           {item.title}
                         </div>
 
                         <div className="mt-[4px]">
-                          {/* ✅ 12px */}
                           <div className="text-[12px] text-zinc-500 line-clamp-1">
                             {tagsLine}
                           </div>
 
-                          {item.priceText ? (
-                            // ✅ 12px
-                            <div className="-mt-[2px] text-[12px] font-medium text-zinc-900">
-                              Economia de {item.priceText}
-                            </div>
-                          ) : null}
+                          {/* ✅ linha da economia padronizada */}
+                          <OfferEconomyLine
+                            savingsText={(item as any).savingsText ?? null}
+                            priceText={(item as any).priceText ?? null}
+                          />
                         </div>
 
                         <div className="mt-1.5 flex items-end justify-between">
                           <div>
                             <StarsRow rating={rating} />
-                            {/* ✅ 12px */}
                             <div className="-mt-0.5 text-[12px] text-zinc-500">
                               <span className="font-semibold text-zinc-700">
                                 {rating.toFixed(1)}
@@ -404,7 +391,7 @@ export default function SponsoredOffersRow({
                         toggleFav(item.id);
                       }}
                       className={[
-                        'absolute -right-[4px] top-1 inline-flex h-10 w-10 items-center justify-center',
+                        'absolute -right-[4px] top-2 inline-flex h-10 w-10 items-center justify-center',
                         disableHeart ? 'pointer-events-none opacity-0' : '',
                       ].join(' ')}
                       tabIndex={disableHeart ? -1 : 0}

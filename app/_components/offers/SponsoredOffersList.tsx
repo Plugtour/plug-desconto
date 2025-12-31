@@ -4,6 +4,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { SponsoredOffer } from '../../../_data/sponsoredOffers';
 import SideDrawer from './SideDrawer';
+import OfferEconomyLine from './OfferEconomyLine';
 
 type FilterCategory = {
   id: string;
@@ -666,7 +667,6 @@ export default function SponsoredOffersList({
               const tagsLine = buildTags(item);
               const rating = (item as any).rating ?? 4.8;
               const reviews = (item as any).reviews ?? 0;
-              const priceText = (item as any).priceText ?? (item as any).savingsText ?? null;
               const imageUrl = (item as any).imageUrl ?? null;
 
               const handleCardClick = () => openModal();
@@ -705,11 +705,11 @@ export default function SponsoredOffersList({
                         <div className="mt-[4px]">
                           <div className="text-[12px] text-zinc-500 line-clamp-1">{tagsLine}</div>
 
-                          {priceText ? (
-                            <div className="-mt-[2px] text-[12px] font-medium text-zinc-900">
-                              Economia de {priceText}
-                            </div>
-                          ) : null}
+                          {/* ✅ linha da economia padronizada */}
+                          <OfferEconomyLine
+                            savingsText={(item as any).savingsText ?? null}
+                            priceText={(item as any).priceText ?? null}
+                          />
                         </div>
 
                         <div className="mt-1.5 flex items-end justify-between">
