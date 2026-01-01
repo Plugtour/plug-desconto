@@ -285,16 +285,8 @@ export default function HomeScreenClient({
         <div style={{ height: QUICKSEARCH_STACK_H }} />
       </div>
 
-      <div className="px-4 pt-4">
-        <div className="flex items-center justify-center">
-          <button className="text-2xl font-extrabold text-zinc-800">
-            {regionLabel}
-            <span className="ml-2 text-zinc-500">⌄</span>
-          </button>
-        </div>
-
-        <div className="mt-3 border-t border-zinc-300" />
-      </div>
+      {/* ✅ REMOVIDO: título "Serra Gaúcha" + seta + linha
+          Agora destino fica apenas no menu topo (FloatingHeader). */}
 
       {/* MENU CARROSSEL (original) */}
       <div ref={gridMenuRef}>

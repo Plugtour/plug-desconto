@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import AppChrome from './_components/header/AppChrome';
 
 const siteUrl =
   process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, '') ||
@@ -22,7 +23,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
-      <body suppressHydrationWarning>{children}</body>
+      <body suppressHydrationWarning>
+        <AppChrome>
+          {children}
+        </AppChrome>
+      </body>
     </html>
   );
 }

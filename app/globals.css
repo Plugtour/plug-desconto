@@ -24,3 +24,14 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+@keyframes pd_sheetUp {
+  from {
+    transform: translateY(18px);
+    opacity: 0.98;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
