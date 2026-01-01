@@ -1,4 +1,3 @@
-// app/_components/menu/FloatingTopMenu.tsx
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
@@ -69,7 +68,11 @@ function Icon({ iconKey, className }: { iconKey: IconKey; className?: string }) 
             strokeWidth="2"
             strokeLinejoin="round"
           />
-          <path d="M12 11.2a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4z" stroke="#22C55E" strokeWidth="2" />
+          <path
+            d="M12 11.2a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4z"
+            stroke="#22C55E"
+            strokeWidth="2"
+          />
         </svg>
       );
 
@@ -121,7 +124,12 @@ function Icon({ iconKey, className }: { iconKey: IconKey; className?: string }) 
             strokeWidth="2"
             strokeLinejoin="round"
           />
-          <path d="M5 12h14v6.8M5 18.8v-2.2M19 18.8v-2.2" stroke="#A855F7" strokeWidth="2" strokeLinejoin="round" />
+          <path
+            d="M5 12h14v6.8M5 18.8v-2.2M19 18.8v-2.2"
+            stroke="#A855F7"
+            strokeWidth="2"
+            strokeLinejoin="round"
+          />
           <path d="M8 12v-1.6M16 12v-1.6" stroke="#A855F7" strokeWidth="2" strokeLinecap="round" />
         </svg>
       );
@@ -289,15 +297,13 @@ export default function FloatingTopMenu({ categories, visible }: Props) {
       className={[
         'fixed left-0 right-0 z-[110]',
         'transition-all duration-200',
-        canShow
-          ? 'opacity-100 translate-y-0 pointer-events-auto'
-          : 'opacity-0 -translate-y-2 pointer-events-none',
-        // ✅ mesmo cinza do QuickSearch/filtro
+        canShow ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 -translate-y-2 pointer-events-none',
         'bg-zinc-200/95 backdrop-blur-[2px]',
       ].join(' ')}
-      style={{ top: `env(safe-area-inset-top)` }}
+      // ✅ agora respeita o topo fixo do app (header)
+      style={{ top: 'var(--app-header-h, 55px)' }}
     >
-      <section className="relative px-4 pt-4">
+      <section className="relative px-4 pt-0">
         <div className="pointer-events-none absolute inset-0 z-[1]">
           <div className="absolute left-0 top-0 h-full w-10 bg-gradient-to-r from-zinc-200 to-transparent" />
           <div className="absolute right-0 top-0 h-full w-10 bg-gradient-to-l from-zinc-200 to-transparent" />

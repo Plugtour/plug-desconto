@@ -1,4 +1,3 @@
-// app/_components/HomeScreenClient.tsx
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -196,13 +195,11 @@ export default function HomeScreenClient({
 
   /* =========================
      MENU FLUTUANTE (trigger)
-     - NÃO usa medir altura por DOM (fixed não mede)
-     - usa altura fixa (regulável)
   ========================= */
   const gridMenuRef = useRef<HTMLDivElement | null>(null);
   const [showFloatingMenu, setShowFloatingMenu] = useState(false);
 
-  // ✅ REGULAGEM DA ALTURA DO MENU FLUTUANTE (empurra o QuickSearch)
+  // ✅ ALTURA DO MENU FLUTUANTE (conteúdo do FloatingTopMenu)
   const FLOATING_MENU_H = 75; // px
 
   const rafRef = useRef<number | null>(null);
@@ -262,17 +259,25 @@ export default function HomeScreenClient({
     };
   }, []);
 
-  const quickSearchTop = showFloatingMenu ? FLOATING_MENU_H : 0;
+  // ✅ altura aproximada do bloco do QuickSearch (stack)
+  const QUICKSEARCH_STACK_H = 55; // px
 
-  // ✅ altura aproximada do bloco do QuickSearch (para "reservar" espaço na medição)
-  // Se quiser ajustar fino: aumente/diminua aqui.
-  const QUICKSEARCH_STACK_H = 94; // px
+  // ✅ variável que empurra os sticky de baixo (QuickSearch + filtros)
+  const stickyStackPx = (showFloatingMenu ? FLOATING_MENU_H : 0) + QUICKSEARCH_STACK_H;
 
   return (
     <div
       className="mx-auto w-full max-w-md bg-zinc-100"
       style={{
         paddingBottom: 'calc(74px + env(safe-area-inset-bottom))',
+
+        // ✅ variáveis globais de layout (herdadas pelos filhos)
+        // Header fixo (definido no AppChrome): fallback para 56px + safe-area
+        // Mantemos o fallback aqui só por segurança.
+        ['--app-header-h' as any]: 'var(--app-header-h, calc(56px + env(safe-area-inset-top)))',
+        ['--floating-menu-h' as any]: showFloatingMenu ? `${FLOATING_MENU_H}px` : '0px',
+        ['--quicksearch-h' as any]: `${QUICKSEARCH_STACK_H}px`,
+        ['--sticky-stack-h' as any]: `${stickyStackPx}px`,
       }}
     >
       {/* ✅ STACK INVISÍVEL SÓ PARA MEDIÇÃO (NÃO ENVOLVE O QUICKSEARCH) */}
@@ -284,9 +289,6 @@ export default function HomeScreenClient({
         <div style={{ height: showFloatingMenu ? FLOATING_MENU_H : 0 }} />
         <div style={{ height: QUICKSEARCH_STACK_H }} />
       </div>
-
-      {/* ✅ REMOVIDO: título "Serra Gaúcha" + seta + linha
-          Agora destino fica apenas no menu topo (FloatingHeader). */}
 
       {/* MENU CARROSSEL (original) */}
       <div ref={gridMenuRef}>
@@ -301,16 +303,16 @@ export default function HomeScreenClient({
       {/* MENU FLUTUANTE */}
       <FloatingTopMenu categories={categories} visible={showFloatingMenu} />
 
-      {/* ✅ QuickSearch sticky: MANTÉM O COMPORTAMENTO ORIGINAL */}
+      {/* ✅ QuickSearch sticky */}
       <div
-        className={[
-          'sticky z-[90]',
-          qsStuck ? 'bg-zinc-200' : 'bg-transparent',
-        ].join(' ')}
-        style={{ top: `calc(${quickSearchTop}px + env(safe-area-inset-top))` }}
+        className={['sticky z-[90]', qsStuck ? 'bg-zinc-200' : 'bg-transparent'].join(' ')}
+        // ✅ agora soma o header fixo + (se existir) o menu flutuante
+        style={{
+          top: `calc(var(--app-header-h, 54px) + var(--floating-menu-h, 0px))`,
+        }}
       >
-        <div className="pt-2">
-          <div className="px-4 mt-3 pb-2">
+        <div className="pt-1">
+          <div className="px-4 mt-1 pb-2">
             <QuickSearch offers={searchData} categories={searchCategories} />
           </div>
         </div>

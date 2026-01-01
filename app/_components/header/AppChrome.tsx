@@ -25,7 +25,12 @@ export default function AppChrome({ children }: Props) {
   const [destinoId, setDestinoId] = useState<string>('serra-gaucha');
 
   return (
-    <>
+    <div
+      // ✅ variável global do topo fixo (header + safe-area)
+      style={{
+        ['--app-header-h' as any]: 'calc(56px + env(safe-area-inset-top))',
+      }}
+    >
       <FloatingHeader
         favoritesCount={favoritesCount}
         notificationsCount={notificationsCount}
@@ -42,11 +47,13 @@ export default function AppChrome({ children }: Props) {
         onSelect={(id) => setDestinoId(id)}
       />
 
-      {/* padding-top para não ficar por baixo do header */}
-      <div className="pt-14">{children}</div>
+      {/* ✅ padding-top para não ficar por baixo do header */}
+      <div className="pt-14" style={{ paddingTop: 'var(--app-header-h, 56px)' }}>
+        {children}
+      </div>
 
       {/* marker invisível (não impacta UI) — útil pra debug */}
       <div className="hidden" data-destino={destinoId} />
-    </>
+    </div>
   );
 }

@@ -1,4 +1,3 @@
-// app/_components/offers/SponsoredOffersList.tsx
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -122,11 +121,7 @@ function TempImagePlaceholder() {
           strokeWidth="2"
           strokeLinejoin="round"
         />
-        <path
-          d="M9 9.2a.9.9 0 1 0 0-1.8.9.9 0 0 0 0 1.8Z"
-          stroke="currentColor"
-          strokeWidth="2"
-        />
+        <path d="M9 9.2a.9.9 0 1 0 0-1.8.9.9 0 0 0 0 1.8Z" stroke="currentColor" strokeWidth="2" />
       </svg>
     </div>
   );
@@ -293,26 +288,6 @@ function LoadingRow({ text = 'Carregando...' }: { text?: string }) {
 }
 
 type FilterKey = 'todos' | 'melhores' | 'descontos' | 'novo' | 'aberto' | 'perto' | 'delivery';
-
-function readSafeAreaTopPx(): number {
-  if (typeof window === 'undefined' || typeof document === 'undefined') return 0;
-  try {
-    const el = document.createElement('div');
-    el.style.position = 'fixed';
-    el.style.top = '0';
-    el.style.left = '0';
-    el.style.width = '0';
-    el.style.height = '0';
-    el.style.paddingTop = 'env(safe-area-inset-top)';
-    document.body.appendChild(el);
-    const pt = window.getComputedStyle(el).paddingTop;
-    document.body.removeChild(el);
-    const n = Number.parseFloat(pt || '0');
-    return Number.isFinite(n) ? n : 0;
-  } catch {
-    return 0;
-  }
-}
 
 function lockScroll(): number {
   if (typeof window === 'undefined' || typeof document === 'undefined') return 0;
@@ -490,27 +465,23 @@ export default function SponsoredOffersList({
   const filterSentinelRef = useRef<HTMLDivElement | null>(null);
   const [filterIsStuck, setFilterIsStuck] = useState(false);
 
-  const FILTER_TOP = 'calc(var(--sticky-stack-h, 130px) + env(safe-area-inset-top))';
+  // ✅ agora o filtro fica abaixo de: Header + (FloatingTopMenu + QuickSearch stack)
+  const FILTER_TOP = 'calc(var(--app-header-h, 54px) + var(--sticky-stack-h, 130px))';
 
   useEffect(() => {
     let raf = 0;
-    let safeTopPx = 0;
 
     const compute = () => {
       raf = 0;
       const s = filterSentinelRef.current;
       if (!s) return;
 
-      if (!safeTopPx) safeTopPx = readSafeAreaTopPx();
-
-      const root = document.documentElement;
-      const raw = window.getComputedStyle(root).getPropertyValue('--sticky-stack-h').trim();
-      const stackH = Number.parseFloat(raw || '67');
-      const thresholdTop = (Number.isFinite(stackH) ? stackH : 67) + safeTopPx;
-
+      // threshold: quando sentinel passa do topo sticky
+      // usamos o mesmo cálculo de top do sticky (em px aproximado pelo rect)
       const top = s.getBoundingClientRect().top;
-      const stuck = top <= thresholdTop + 0.5;
+      const stuck = top <= 0.5; // sentinel encostou no topo do viewport, sticky já está ativo
 
+      // para não oscilar, só atualiza quando muda
       setFilterIsStuck((prev) => (prev === stuck ? prev : stuck));
     };
 
@@ -519,21 +490,14 @@ export default function SponsoredOffersList({
       raf = window.requestAnimationFrame(compute);
     };
 
-    const onResize = () => {
-      safeTopPx = 0;
-      onScroll();
-    };
-
     compute();
     window.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', onResize);
-    window.addEventListener('orientationchange', onResize);
+    window.addEventListener('resize', onScroll, { passive: true });
 
     return () => {
       if (raf) window.cancelAnimationFrame(raf);
       window.removeEventListener('scroll', onScroll);
-      window.removeEventListener('resize', onResize);
-      window.removeEventListener('orientationchange', onResize);
+      window.removeEventListener('resize', onScroll);
     };
   }, []);
 
@@ -582,8 +546,8 @@ export default function SponsoredOffersList({
         ].join(' ')}
         style={{ top: FILTER_TOP }}
       >
-        <div className="px-3 pt-3">
-          <div className="no-scrollbar flex gap-2 overflow-x-auto pb-4 pt-1">
+        <div className="px-3 pt-2">
+          <div className="no-scrollbar flex gap-2 overflow-x-auto pb-2 pt-0">
             <FilterChip iconKind="todos" isActive={active === 'todos'} onClick={() => setActiveAndFreezeScroll('todos')}>
               Todos
             </FilterChip>

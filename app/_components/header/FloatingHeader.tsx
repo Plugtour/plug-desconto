@@ -66,16 +66,18 @@ export default function FloatingHeader({
     <header
       className="
         fixed top-0 left-0 right-0 z-[150]
-        h-14 bg-white
+        bg-white
         flex items-center justify-between
         px-4
       "
+      // ✅ header real = 56px + safe-area (igual variável do AppChrome)
+      style={{
+        height: 'var(--app-header-h, calc(56px + env(safe-area-inset-top)))',
+        paddingTop: 'env(safe-area-inset-top)',
+      }}
     >
       {/* ESQUERDA — DESTINOS */}
-      <button
-        onClick={onOpenDestinos}
-        className="flex items-center gap-1 text-sm font-semibold"
-      >
+      <button onClick={onOpenDestinos} className="flex items-center gap-1 text-sm font-semibold">
         <IconMapPin />
         Destinos
       </button>
@@ -83,11 +85,7 @@ export default function FloatingHeader({
       {/* DIREITA — AÇÕES */}
       <div className="flex items-center gap-4">
         {/* FAVORITOS */}
-        <button
-          onClick={onOpenFavorites}
-          className="relative"
-          aria-label="Favoritos"
-        >
+        <button onClick={onOpenFavorites} className="relative" aria-label="Favoritos">
           <IconHeart />
           {favoritesCount > 0 && (
             <span
@@ -106,19 +104,12 @@ export default function FloatingHeader({
         </button>
 
         {/* BUSCA */}
-        <button
-          onClick={onOpenSearch}
-          aria-label="Buscar"
-        >
+        <button onClick={onOpenSearch} aria-label="Buscar">
           <IconSearch />
         </button>
 
         {/* AVISOS */}
-        <button
-          onClick={onOpenNotifications}
-          className="relative"
-          aria-label="Avisos"
-        >
+        <button onClick={onOpenNotifications} className="relative" aria-label="Avisos">
           <IconBell />
           {notificationsCount > 0 && (
             <span
