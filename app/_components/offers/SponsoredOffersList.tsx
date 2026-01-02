@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useLayoutEffect } from 'react';
 import type { SponsoredOffer } from '../../../_data/sponsoredOffers';
 import SideDrawer from './SideDrawer';
 import OfferEconomyLine from './OfferEconomyLine';
@@ -75,13 +75,7 @@ function buildTags(item: SponsoredOffer) {
 /* =========================
    CORAÇÃO (vasado → preenchido)
 ========================= */
-function HeartIcon({
-  filled,
-  className,
-}: {
-  filled: boolean;
-  className?: string;
-}) {
+function HeartIcon({ filled, className }: { filled: boolean; className?: string }) {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -162,15 +156,9 @@ function FilterIcon({
     case 'todos':
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none" aria-hidden="true">
-          <path
-            d="M6.5 7.5h11M6.5 12h11M6.5 16.5h11"
-            stroke={c}
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
+          <path d="M6.5 7.5h11M6.5 12h11M6.5 16.5h11" stroke={c} strokeWidth="2" strokeLinecap="round" />
         </svg>
       );
-
     case 'melhores':
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none" aria-hidden="true">
@@ -186,7 +174,6 @@ function FilterIcon({
           />
         </svg>
       );
-
     case 'descontos':
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none" aria-hidden="true">
@@ -196,7 +183,6 @@ function FilterIcon({
           <circle cx="15" cy="15" r="1.35" fill={c} />
         </svg>
       );
-
     case 'novo':
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none" aria-hidden="true">
@@ -205,21 +191,13 @@ function FilterIcon({
           <circle cx="12" cy="12" r="8.5" stroke={c} strokeWidth="2" />
         </svg>
       );
-
     case 'aberto':
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none" aria-hidden="true">
           <circle cx="12" cy="12" r="9" stroke={c} strokeWidth="2" />
-          <path
-            d="M12 7v5l3 2"
-            stroke={c}
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
+          <path d="M12 7v5l3 2" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       );
-
     case 'perto':
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none" aria-hidden="true">
@@ -229,14 +207,9 @@ function FilterIcon({
             strokeWidth="2"
             strokeLinejoin="round"
           />
-          <path
-            d="M12 11.2a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4z"
-            stroke={c}
-            strokeWidth="2"
-          />
+          <path d="M12 11.2a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4z" stroke={c} strokeWidth="2" />
         </svg>
       );
-
     case 'delivery':
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none" aria-hidden="true">
@@ -246,7 +219,6 @@ function FilterIcon({
           <path d="M17 18a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z" fill={c} />
         </svg>
       );
-
     default:
       return null;
   }
@@ -307,49 +279,6 @@ function LoadingRow({ text = 'Carregando...' }: { text?: string }) {
 }
 
 type FilterKey = 'todos' | 'melhores' | 'descontos' | 'novo' | 'aberto' | 'perto' | 'delivery';
-
-function lockScroll(): number {
-  if (typeof window === 'undefined' || typeof document === 'undefined') return 0;
-
-  const y = window.scrollY || 0;
-  const body = document.body;
-
-  const scrollBarW = window.innerWidth - document.documentElement.clientWidth;
-  const prevPadRight = body.style.paddingRight;
-  (body as any).__prevPadRight = prevPadRight;
-
-  if (scrollBarW > 0) body.style.paddingRight = `${scrollBarW}px`;
-
-  body.style.position = 'fixed';
-  body.style.top = `-${y}px`;
-  body.style.left = '0';
-  body.style.right = '0';
-  body.style.width = '100%';
-  body.style.overflow = 'hidden';
-
-  return y;
-}
-
-function unlockScroll(y: number) {
-  if (typeof window === 'undefined' || typeof document === 'undefined') return;
-
-  const body = document.body;
-
-  body.style.position = '';
-  body.style.top = '';
-  body.style.left = '';
-  body.style.right = '';
-  body.style.width = '';
-  body.style.overflow = '';
-
-  const prevPadRight = (body as any).__prevPadRight;
-  body.style.paddingRight = typeof prevPadRight === 'string' ? prevPadRight : '';
-  try {
-    delete (body as any).__prevPadRight;
-  } catch {}
-
-  window.scrollTo({ top: y, behavior: 'auto' });
-}
 
 export default function SponsoredOffersList({
   items,
@@ -480,13 +409,9 @@ export default function SponsoredOffersList({
   const spacerHeight = `90vh`;
 
   const listTopRef = useRef<HTMLDivElement | null>(null);
-
   const [filterIsStuck, setFilterIsStuck] = useState(false);
 
-  // ✅ agora o filtro fica abaixo de: Header + stack (menu flutuante)
   const FILTER_TOP = 'calc(var(--app-header-h, 54px) + var(--sticky-stack-h, 0px))';
-
-  // ✅ ref do próprio sticky (pra detectar “stuck” sem atraso)
   const filterStickyRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -504,13 +429,9 @@ export default function SponsoredOffersList({
 
     const compute = () => {
       raf = null;
-
       const topPx = readTopPx();
       const rect = el.getBoundingClientRect();
-
-      // ✅ ajuste que você fez (+4.0)
       const stuckNow = rect.top <= topPx + 4.0;
-
       setFilterIsStuck((prev) => (prev === stuckNow ? prev : stuckNow));
     };
 
@@ -530,33 +451,42 @@ export default function SponsoredOffersList({
     };
   }, []);
 
-  const pendingUnlockRef = useRef<{ y: number; frames: number } | null>(null);
+  /* =========================
+     ✅ FIX: preservar scroll SEM travar body
+     - elimina “pisca”
+     - elimina travamento / subir pro topo
+  ========================= */
+  const restoreScrollRef = useRef<number | null>(null);
+  const restoreRafsRef = useRef<number[]>([]);
 
-  const setActiveAndFreezeScroll = (next: FilterKey) => {
-    const y = lockScroll();
-    pendingUnlockRef.current = { y, frames: 2 };
+  const setActivePreserveScroll = (next: FilterKey) => {
+    if (next === active) return; // ✅ evita trabalho à toa
+    restoreScrollRef.current = window.scrollY || 0;
     setActive(next);
   };
 
-  useEffect(() => {
-    const st = pendingUnlockRef.current;
-    if (!st) return;
+  useLayoutEffect(() => {
+    const y = restoreScrollRef.current;
+    if (y == null) return;
 
-    let raf1 = 0;
-    let raf2 = 0;
+    // limpa rafs antigos
+    for (const id of restoreRafsRef.current) cancelAnimationFrame(id);
+    restoreRafsRef.current = [];
 
-    raf1 = window.requestAnimationFrame(() => {
-      raf2 = window.requestAnimationFrame(() => {
-        unlockScroll(st.y);
-        pendingUnlockRef.current = null;
+    const r1 = requestAnimationFrame(() => {
+      const r2 = requestAnimationFrame(() => {
+        window.scrollTo({ top: y, behavior: 'auto' });
+        restoreScrollRef.current = null;
       });
+      restoreRafsRef.current.push(r2);
     });
+    restoreRafsRef.current.push(r1);
 
     return () => {
-      if (raf1) window.cancelAnimationFrame(raf1);
-      if (raf2) window.cancelAnimationFrame(raf2);
+      for (const id of restoreRafsRef.current) cancelAnimationFrame(id);
+      restoreRafsRef.current = [];
     };
-  }, [visibleCount]);
+  }, [active, total]); // ✅ roda sempre que o filtro muda (mesmo se visibleCount não mudar)
 
   return (
     <section className={['w-full', className || ''].join(' ')}>
@@ -569,7 +499,6 @@ export default function SponsoredOffersList({
       <div
         ref={filterStickyRef}
         className={[
-          // ✅ transição suave pra não “piscar”
           'sticky z-[60] transition-colors duration-200 ease-out',
           filterIsStuck ? 'bg-zinc-200/95 backdrop-blur-[2px]' : 'bg-zinc-100',
         ].join(' ')}
@@ -577,51 +506,31 @@ export default function SponsoredOffersList({
       >
         <div className="px-3 pt-2">
           <div className="no-scrollbar flex gap-2 overflow-x-auto pb-2 pt-0">
-            <FilterChip iconKind="todos" isActive={active === 'todos'} onClick={() => setActiveAndFreezeScroll('todos')}>
+            <FilterChip iconKind="todos" isActive={active === 'todos'} onClick={() => setActivePreserveScroll('todos')}>
               Todos
             </FilterChip>
 
-            <FilterChip
-              iconKind="melhores"
-              isActive={active === 'melhores'}
-              onClick={() => setActiveAndFreezeScroll('melhores')}
-            >
+            <FilterChip iconKind="melhores" isActive={active === 'melhores'} onClick={() => setActivePreserveScroll('melhores')}>
               Melhores avaliados
             </FilterChip>
 
-            <FilterChip
-              iconKind="descontos"
-              isActive={active === 'descontos'}
-              onClick={() => setActiveAndFreezeScroll('descontos')}
-            >
+            <FilterChip iconKind="descontos" isActive={active === 'descontos'} onClick={() => setActivePreserveScroll('descontos')}>
               Maiores descontos
             </FilterChip>
 
-            <FilterChip iconKind="novo" isActive={active === 'novo'} onClick={() => setActiveAndFreezeScroll('novo')}>
+            <FilterChip iconKind="novo" isActive={active === 'novo'} onClick={() => setActivePreserveScroll('novo')}>
               Novo
             </FilterChip>
 
-            <FilterChip
-              iconKind="aberto"
-              isActive={active === 'aberto'}
-              onClick={() => setActiveAndFreezeScroll('aberto')}
-            >
+            <FilterChip iconKind="aberto" isActive={active === 'aberto'} onClick={() => setActivePreserveScroll('aberto')}>
               Aberto agora
             </FilterChip>
 
-            <FilterChip
-              iconKind="perto"
-              isActive={active === 'perto'}
-              onClick={() => setActiveAndFreezeScroll('perto')}
-            >
+            <FilterChip iconKind="perto" isActive={active === 'perto'} onClick={() => setActivePreserveScroll('perto')}>
               Perto de mim
             </FilterChip>
 
-            <FilterChip
-              iconKind="delivery"
-              isActive={active === 'delivery'}
-              onClick={() => setActiveAndFreezeScroll('delivery')}
-            >
+            <FilterChip iconKind="delivery" isActive={active === 'delivery'} onClick={() => setActivePreserveScroll('delivery')}>
               Delivery
             </FilterChip>
           </div>
@@ -698,7 +607,6 @@ export default function SponsoredOffersList({
                         <div className="mt-[4px]">
                           <div className="text-[12px] text-zinc-500 line-clamp-1">{tagsLine}</div>
 
-                          {/* ✅ linha da economia padronizada */}
                           <OfferEconomyLine
                             savingsText={(item as any).savingsText ?? null}
                             priceText={(item as any).priceText ?? null}
