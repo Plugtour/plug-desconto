@@ -1,3 +1,4 @@
+// app/_components/offers/SideDrawer.tsx
 'use client';
 
 import { useEffect } from 'react';
@@ -33,10 +34,7 @@ export default function SideDrawer({ open, onClose }: Props) {
   return (
     <div className="fixed inset-0 z-[999]">
       {/* overlay */}
-      <div
-        onClick={onClose}
-        className="absolute inset-0 bg-black/25 backdrop-blur-[6px]"
-      />
+      <div onClick={onClose} className="absolute inset-0 bg-black/25 backdrop-blur-[6px]" />
 
       {/* botão fechar */}
       <button

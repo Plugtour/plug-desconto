@@ -68,13 +68,7 @@ function buildTags(item: SponsoredOffer) {
 /* =========================
    CORAÇÃO (vasado → preenchido)
 ========================= */
-function HeartIcon({
-  filled,
-  className,
-}: {
-  filled: boolean;
-  className?: string;
-}) {
+function HeartIcon({ filled, className }: { filled: boolean; className?: string }) {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -93,24 +87,12 @@ function HeartIcon({
 /* =========================
    SETA DUPLA (mesma do menu)
 ========================= */
-function DoubleChevronOpen({
-  dir,
-  className,
-}: {
-  dir: 'up' | 'down';
-  className?: string;
-}) {
+function DoubleChevronOpen({ dir, className }: { dir: 'up' | 'down'; className?: string }) {
   const rotate = dir === 'down' ? 'rotate(90 14 14)' : 'rotate(-90 14 14)';
 
   return (
     <svg viewBox="0 0 28 28" className={className} aria-hidden="true" fill="none">
-      <g
-        transform={rotate}
-        stroke="currentColor"
-        strokeWidth="2.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
+      <g transform={rotate} stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round">
         <path d="M9 7.5 14.5 14 9 20.5" />
         <path d="M15 7.5 20.5 14 15 20.5" />
       </g>
@@ -121,11 +103,7 @@ function DoubleChevronOpen({
 /* =========================
    COMPONENTE PRINCIPAL
 ========================= */
-export default function SponsoredOffersRow({
-  items,
-  className,
-  title = 'Patrocinado',
-}: Props) {
+export default function SponsoredOffersRow({ items, className, title = 'Patrocinado' }: Props) {
   const shown = useMemo(() => items.slice(0, 5), [items]);
 
   const [favIds, setFavIds] = useState<Record<string, boolean>>({});
@@ -146,12 +124,35 @@ export default function SponsoredOffersRow({
 
   const [modalOpen, setModalOpen] = useState(false);
 
+  function scrollToFirstCard(behavior: ScrollBehavior = 'auto') {
+    const el = wrapperRef.current;
+    if (!el) return;
+
+    const fixedH = document.getElementById('top-fixed-stack')?.getBoundingClientRect().height ?? 0;
+    const rect = el.getBoundingClientRect();
+    const targetTop = window.scrollY + rect.top - fixedH - 8;
+
+    window.scrollTo({
+      top: Math.max(0, Math.round(targetTop)),
+      behavior,
+    });
+  }
+
   function openModal() {
+    // ✅ sempre posiciona no 1º card antes de abrir
+    scrollToFirstCard('auto');
     setModalOpen(true);
   }
 
   function closeModal() {
     setModalOpen(false);
+
+    // ✅ ao fechar, garante voltar e “assentar” no 1º card
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        scrollToFirstCard('auto');
+      });
+    });
   }
 
   function toggleFav(id: string) {
@@ -162,9 +163,7 @@ export default function SponsoredOffersRow({
     const el = wrapperRef.current;
     if (!el) return;
 
-    const fixedH =
-      document.getElementById('top-fixed-stack')?.getBoundingClientRect().height ?? 0;
-
+    const fixedH = document.getElementById('top-fixed-stack')?.getBoundingClientRect().height ?? 0;
     const rect = el.getBoundingClientRect();
     const targetTop = window.scrollY + rect.top - fixedH - 8;
 
@@ -232,6 +231,8 @@ export default function SponsoredOffersRow({
 
     animateHeight(current, target, () => {
       if (nextExpanded) smoothRevealAfterExpand();
+      // ✅ ao recolher também “assenta” no 1º card
+      if (!nextExpanded) scrollToFirstCard('auto');
     });
   }
 
@@ -321,12 +322,7 @@ export default function SponsoredOffersRow({
                   >
                     <div className="flex gap-3">
                       <div className="h-[106px] w-[106px] flex-none overflow-hidden rounded-md bg-zinc-200">
-                        <img
-                          src={item.imageUrl}
-                          alt={item.title}
-                          className="h-full w-full object-cover"
-                          loading="lazy"
-                        />
+                        <img src={item.imageUrl} alt={item.title} className="h-full w-full object-cover" loading="lazy" />
                       </div>
 
                       <div className="min-w-0 flex-1">
@@ -335,11 +331,8 @@ export default function SponsoredOffersRow({
                         </div>
 
                         <div className="mt-[4px]">
-                          <div className="text-[12px] text-zinc-500 line-clamp-1">
-                            {tagsLine}
-                          </div>
+                          <div className="text-[12px] text-zinc-500 line-clamp-1">{tagsLine}</div>
 
-                          {/* ✅ linha da economia padronizada */}
                           <OfferEconomyLine
                             savingsText={(item as any).savingsText ?? null}
                             priceText={(item as any).priceText ?? null}
@@ -350,12 +343,8 @@ export default function SponsoredOffersRow({
                           <div>
                             <StarsRow rating={rating} />
                             <div className="-mt-0.5 text-[12px] text-zinc-500">
-                              <span className="font-semibold text-zinc-700">
-                                {rating.toFixed(1)}
-                              </span>{' '}
-                              de{' '}
-                              <span className="font-semibold text-zinc-700">{reviews}</span>{' '}
-                              avaliações
+                              <span className="font-semibold text-zinc-700">{rating.toFixed(1)}</span> de{' '}
+                              <span className="font-semibold text-zinc-700">{reviews}</span> avaliações
                             </div>
                           </div>
 
@@ -398,17 +387,14 @@ export default function SponsoredOffersRow({
                     >
                       <HeartIcon
                         filled={isFav}
-                        className={[
-                          'h-9 w-9 transition',
-                          isFav ? 'text-red-500' : 'text-zinc-300 hover:text-zinc-400',
-                        ].join(' ')}
+                        className={['h-9 w-9 transition', isFav ? 'text-red-500' : 'text-zinc-300 hover:text-zinc-400'].join(
+                          ' '
+                        )}
                       />
                     </button>
                   </div>
 
-                  {idx < shown.length - 1 ? (
-                    <div className="mx-2 border-b border-dotted border-zinc-300" />
-                  ) : null}
+                  {idx < shown.length - 1 ? <div className="mx-2 border-b border-dotted border-zinc-300" /> : null}
                 </div>
               );
             })}
