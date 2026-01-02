@@ -124,13 +124,18 @@ export default function SponsoredOffersRow({ items, className, title = 'Patrocin
 
   const [modalOpen, setModalOpen] = useState(false);
 
+  // ✅ ajuste fino aqui (o “número que você quer mexer”)
+  // quanto MAIOR, mais “pra baixo” ele para
+  // quanto MENOR, mais “pra cima” ele para
+  const SCROLL_OFFSET = 90;
+
   function scrollToFirstCard(behavior: ScrollBehavior = 'auto') {
     const el = wrapperRef.current;
     if (!el) return;
 
     const fixedH = document.getElementById('top-fixed-stack')?.getBoundingClientRect().height ?? 0;
     const rect = el.getBoundingClientRect();
-    const targetTop = window.scrollY + rect.top - fixedH - 8;
+    const targetTop = window.scrollY + rect.top - fixedH - SCROLL_OFFSET;
 
     window.scrollTo({
       top: Math.max(0, Math.round(targetTop)),
@@ -159,17 +164,12 @@ export default function SponsoredOffersRow({ items, className, title = 'Patrocin
     setFavIds((prev) => ({ ...prev, [id]: !prev[id] }));
   }
 
-  function smoothRevealAfterExpand() {
-    const el = wrapperRef.current;
-    if (!el) return;
-
-    const fixedH = document.getElementById('top-fixed-stack')?.getBoundingClientRect().height ?? 0;
-    const rect = el.getBoundingClientRect();
-    const targetTop = window.scrollY + rect.top - fixedH - 8;
-
-    window.scrollTo({
-      top: Math.max(0, Math.round(targetTop)),
-      behavior: 'smooth',
+  // ✅ ao abrir (expandir), a página só “assenta” DEPOIS que layout estabiliza
+  function settleAfterExpand() {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        scrollToFirstCard('smooth');
+      });
     });
   }
 
@@ -219,7 +219,8 @@ export default function SponsoredOffersRow({ items, className, title = 'Patrocin
     if (!contentEl || !boxEl) {
       setExpanded(nextExpanded);
       setBoxH(nextExpanded ? 9999 : COLLAPSED_HEIGHT);
-      if (nextExpanded) smoothRevealAfterExpand();
+      if (nextExpanded) settleAfterExpand();
+      if (!nextExpanded) scrollToFirstCard('auto');
       return;
     }
 
@@ -230,8 +231,7 @@ export default function SponsoredOffersRow({ items, className, title = 'Patrocin
     setExpanded(nextExpanded);
 
     animateHeight(current, target, () => {
-      if (nextExpanded) smoothRevealAfterExpand();
-      // ✅ ao recolher também “assenta” no 1º card
+      if (nextExpanded) settleAfterExpand();
       if (!nextExpanded) scrollToFirstCard('auto');
     });
   }
