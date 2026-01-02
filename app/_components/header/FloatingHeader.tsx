@@ -70,12 +70,7 @@ export default function FloatingHeader({
 
   return (
     <header
-      className={[
-        'fixed top-0 left-0 right-0 z-[150]',
-        TOP_GLASS,
-        'flex items-center',
-        'px-4',
-      ].join(' ')}
+      className={['fixed top-0 left-0 right-0 z-[150]', TOP_GLASS, 'flex items-center', 'px-4'].join(' ')}
       style={{
         height: 'var(--app-header-h, calc(56px + env(safe-area-inset-top)))',
         paddingTop: 'env(safe-area-inset-top)',
@@ -134,33 +129,41 @@ export default function FloatingHeader({
       {/* DIREITA — AÇÕES */}
       <div className="flex items-center gap-0">
         {/* FAVORITOS */}
-        <button
-          onClick={onOpenFavorites}
-          className={[
-            'relative',
-            'min-h-[44px] min-w-[44px]',
-            'inline-flex items-center justify-center',
-            'touch-manipulation select-none',
-            'active:scale-[0.99]',
-          ].join(' ')}
-          aria-label="Favoritos"
-        >
-          <IconHeart />
-          {favoritesCount > 0 && (
-            <span
-              className="
-                absolute -top-1 -right-1
-                min-w-[16px] h-4
-                rounded-full bg-red-600
-                text-[10px] font-semibold text-white
-                flex items-center justify-center
-                px-1
-              "
-            >
-              {favoritesCount}
+          <button
+            onClick={onOpenFavorites}
+            className="
+              relative
+              min-h-[44px] min-w-[44px]
+              inline-flex items-center justify-center
+              touch-manipulation select-none
+              active:scale-[0.99]
+            "
+            aria-label="Favoritos"
+          >
+            {/* BOLINHA (fica atrás) */}
+            {favoritesCount > 0 && (
+              <span
+                className="
+                  absolute
+                  top-[4px] right-[4px]
+                  min-w-[16px] h-4
+                  rounded-full bg-red-500
+                  text-[9px] font-medium text-white
+                  flex items-center justify-center
+                  px-1
+                  ring-1 ring-black/1
+                  z-0
+                "
+              >
+                {favoritesCount}
+              </span>
+            )}
+
+            {/* CORAÇÃO (fica na frente) */}
+            <span className="relative z-10">
+              <IconHeart />
             </span>
-          )}
-        </button>
+          </button>
 
         {/* BUSCA (LUCIDE) */}
         <button
@@ -189,6 +192,7 @@ export default function FloatingHeader({
           aria-label="Avisos"
         >
           <Bell className="h-5 w-5" strokeWidth={1.75} />
+
           {notificationsCount > 0 && (
             <span
               className="
