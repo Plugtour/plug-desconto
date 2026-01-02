@@ -13,6 +13,10 @@ type Props = {
   placeholder?: string;
   maxResults?: number;
   maxCategories?: number;
+
+  // ✅ NOVO: quando true, não abre o sheet interno; chama onOpenExternal
+  useExternalModal?: boolean;
+  onOpenExternal?: () => void;
 };
 
 const QS_STORAGE_KEY = 'plugdesconto_quicksearch_v1';
@@ -254,19 +258,27 @@ function safeClearStoredQuery() {
   }
 }
 
-export default function QuickSearch({
+/* =========================================================
+   ✅ NOVO: Painel (conteúdo) para usar dentro do MenuCarouselModal
+========================================================= */
+export function QuickSearchPanel({
   offers,
   categories,
-  className,
   placeholder = 'Buscar ofertas, passeios, ingressos…',
   maxResults = 8,
   maxCategories = 24,
-}: Props) {
+  onRequestClose,
+}: {
+  offers: SearchOffer[];
+  categories: SearchCategory[];
+  placeholder?: string;
+  maxResults?: number;
+  maxCategories?: number;
+  onRequestClose?: () => void;
+}) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const clearTimerRef = useRef<number | null>(null);
 
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const [closing, setClosing] = useState(false);
   const [value, setValue] = useState('');
   const [active, setActive] = useState(0);
 
@@ -282,19 +294,19 @@ export default function QuickSearch({
   }, [categories, debounced, maxCategories]);
 
   useEffect(() => {
-    if (!sheetOpen) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [sheetOpen]);
+    const saved = safeReadStoredQuery();
+    if (saved) {
+      setValue(saved);
+      setActive(0);
+    } else {
+      setValue('');
+      setActive(0);
+    }
 
-  useEffect(() => {
-    if (!sheetOpen) return;
     const t = window.setTimeout(() => inputRef.current?.focus(), 70);
     return () => window.clearTimeout(t);
-  }, [sheetOpen]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -309,23 +321,7 @@ export default function QuickSearch({
     }, QS_TTL_MS);
   }
 
-  function openSheet() {
-    const saved = safeReadStoredQuery();
-    if (saved) {
-      setValue(saved);
-      setActive(0);
-    } else {
-      setValue('');
-      setActive(0);
-    }
-
-    setClosing(false);
-    setSheetOpen(true);
-  }
-
-  function closeSheet() {
-    if (closing) return;
-
+  function persistIfNeeded() {
     if (hasQuery) {
       safeStoreQuery(value.trim());
       scheduleAutoClear();
@@ -334,18 +330,12 @@ export default function QuickSearch({
       if (clearTimerRef.current) window.clearTimeout(clearTimerRef.current);
       clearTimerRef.current = null;
     }
-
-    setClosing(true);
-    window.setTimeout(() => {
-      setSheetOpen(false);
-      setClosing(false);
-      setActive(0);
-    }, 260);
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Escape') {
-      closeSheet();
+      persistIfNeeded();
+      onRequestClose?.();
       return;
     }
 
@@ -371,8 +361,211 @@ export default function QuickSearch({
   }
 
   return (
+    <div className="w-full">
+      {/* topo igual ao sheet */}
+      <div className="px-4 pt-3 pb-2">
+        <div className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-black/15" />
+
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 rounded-md bg-white/90 shadow-sm ring-1 ring-black/10 px-3 py-2 flex-1">
+            <span className="shrink-0 opacity-60" aria-hidden="true">
+              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none">
+                <path
+                  d="M10.5 18.5a8 8 0 1 1 0-16 8 8 0 0 1 0 16Z"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                />
+                <path
+                  d="M16.6 16.6 21 21"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </span>
+
+            <input
+              ref={inputRef}
+              value={value}
+              onChange={(e) => {
+                const next = e.target.value;
+                setValue(next);
+                setActive(0);
+
+                if (next.trim().length === 0) {
+                  safeClearStoredQuery();
+                  if (clearTimerRef.current) window.clearTimeout(clearTimerRef.current);
+                  clearTimerRef.current = null;
+                }
+              }}
+              onKeyDown={onKeyDown}
+              placeholder={placeholder}
+              className="w-full bg-transparent outline-none text-[16px] placeholder:text-black/45"
+              inputMode="search"
+              autoComplete="off"
+              spellCheck={false}
+            />
+
+            {hasQuery && (
+              <button
+                type="button"
+                onClick={() => {
+                  setValue('');
+                  setActive(0);
+                  safeClearStoredQuery();
+                  if (clearTimerRef.current) window.clearTimeout(clearTimerRef.current);
+                  clearTimerRef.current = null;
+                  inputRef.current?.focus();
+                }}
+                aria-label="Limpar pesquisa"
+                className="shrink-0 touch-manipulation rounded-md px-2 py-1 text-black/55 hover:text-black"
+              >
+                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none">
+                  <path
+                    d="M7 7l10 10M17 7 7 17"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </button>
+            )}
+          </div>
+
+          <button
+            type="button"
+            className="touch-manipulation rounded-md bg-emerald-600 px-3 py-2 text-[13px] font-semibold text-white shadow-sm hover:bg-emerald-700"
+            aria-label="Buscar"
+            onClick={() => inputRef.current?.focus()}
+          >
+            Buscar
+          </button>
+        </div>
+      </div>
+
+      <div className="h-[72vh] px-4 pb-5 overflow-hidden">
+        <div className="h-full overflow-auto">
+          {hasQuery && (
+            <div className="pt-2">
+              <div className="text-[12px] font-semibold text-black/60">Resultados</div>
+
+              {results.length === 0 ? (
+                <div className="mt-2 px-1 py-2 text-[13px] text-black/55 flex items-center gap-2">
+                  <span>Nenhum resultado encontrado.</span>
+                  <SadFaceIcon className="h-4 w-4 text-black/50" />
+                </div>
+              ) : (
+                <div className="mt-2 overflow-hidden rounded-xl bg-white/90 ring-1 ring-black/10">
+                  {results.map((o, idx) => {
+                    const isActive = idx === active;
+                    const href = buildOfferHref(o);
+
+                    return (
+                      <Link
+                        key={`${o.id}-${o.slug ?? ''}`}
+                        href={href}
+                        className={[
+                          'flex items-center gap-3 px-3 py-2.5 transition-colors',
+                          isActive ? 'bg-black/5' : 'hover:bg-black/5',
+                        ].join(' ')}
+                        onMouseEnter={() => setActive(idx)}
+                        onClick={() => {
+                          persistIfNeeded();
+                          onRequestClose?.();
+                        }}
+                      >
+                        <div className="h-10 w-10 overflow-hidden rounded-lg bg-black/5 shrink-0">
+                          {o.imageUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={o.imageUrl}
+                              alt=""
+                              className="h-full w-full object-cover"
+                              loading="lazy"
+                            />
+                          ) : null}
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-[14px] font-semibold text-black">
+                            {o.title}
+                          </div>
+                          <div className="truncate text-[12px] text-black/60">
+                            {o.subtitle || o.city || ''}
+                          </div>
+                        </div>
+
+                        {o.priceText ? (
+                          <div className="shrink-0 text-[12px] font-semibold text-black/70">
+                            {o.priceText}
+                          </div>
+                        ) : null}
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className={hasQuery ? 'pt-4' : 'pt-3'}>
+            <div className="text-[12px] font-semibold text-black/60">Categorias</div>
+
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              {filteredCats.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  className="touch-manipulation rounded-md bg-white/90 border border-neutral-200/60 px-2 py-2 flex flex-col items-center gap-0 hover:bg-black/5 transition-colors"
+                  onClick={() => {
+                    setValue(c.title);
+                    setActive(0);
+                    inputRef.current?.focus();
+                  }}
+                >
+                  <CategoryIcon id={c.id} className="h-5 w-5" />
+                  <span className="w-full px-1 text-center text-[11px] font-semibold leading-[1.15] text-neutral-800 line-clamp-2">
+                    {c.title}
+                  </span>
+
+                  {/* ✅ aqui é onde você ajusta o espaçamento entre nome e quantidade */}
+                  <span className="mt-[0px] text-[11px] text-neutral-500">
+                    {typeof c.count === 'number' ? c.count : ''}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function QuickSearch({
+  offers,
+  categories,
+  className,
+  placeholder = 'Buscar ofertas, passeios, ingressos…',
+  maxResults = 8,
+  maxCategories = 24,
+  useExternalModal = false,
+  onOpenExternal,
+}: Props) {
+  // ✅ quando usar modal externo, o componente vira “gatilho” e não abre sheet aqui
+  function openSheet() {
+    if (useExternalModal) {
+      onOpenExternal?.();
+      return;
+    }
+    // fallback: mantém seu comportamento antigo (sheet interno)
+    // (o antigo sheet foi removido daqui de propósito porque agora você vai usar o modal externo)
+    onOpenExternal?.();
+  }
+
+  return (
     <div className={className}>
-      {/* ✅ PADDING DO BLOCO (o que você grifou) */}
+      {/* PADDING DO BLOCO (o que você grifou) */}
       <div className="px-0 py-3">
         <div className="flex items-stretch gap-2">
           <button
@@ -381,7 +574,6 @@ export default function QuickSearch({
             className="flex-1 touch-manipulation"
             aria-label="Abrir busca"
           >
-            {/* ✅ altura e padding internos padronizados */}
             <div className="h-[44px] flex items-center rounded-md bg-white/95 shadow-sm ring-1 ring-black/10 px-3">
               <div className="flex-1 text-left text-[14px] leading-none text-black/45">
                 {placeholder}
@@ -399,266 +591,6 @@ export default function QuickSearch({
           </button>
         </div>
       </div>
-
-      {sheetOpen && (
-        <div className="fixed inset-0 z-[999]">
-          <button
-            type="button"
-            aria-label="Fechar"
-            onClick={closeSheet}
-            className={[
-              'absolute inset-0 rounded-md bg-black/35 backdrop-blur-[6px] touch-manipulation',
-              closing ? 'backdrop-exit' : 'backdrop-enter',
-            ].join(' ')}
-          />
-
-          <div className="absolute inset-x-0 bottom-0">
-            <div
-              className={[
-                'mx-auto w-full max-w-md px-[5px] pb-[5px] relative touch-manipulation',
-                closing ? 'sheet-exit' : 'sheet-enter',
-              ].join(' ')}
-            >
-              <button
-                type="button"
-                onClick={closeSheet}
-                className="absolute right-[5px] -top-9 touch-manipulation rounded-md bg-white/80 ring-1 ring-black/10 px-3 py-1.5 text-[13px] font-normal text-red-600 hover:text-red-700 hover:bg-white"
-              >
-                Fechar
-              </button>
-
-              <div className="rounded-t-md bg-zinc-100/92 shadow-2xl ring-1 ring-black/10 overflow-hidden">
-                <div className="px-4 pt-3 pb-2">
-                  <div className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-black/15" />
-
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-2 rounded-md bg-white/90 shadow-sm ring-1 ring-black/10 px-3 py-2 flex-1">
-                      <span className="shrink-0 opacity-60" aria-hidden="true">
-                        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none">
-                          <path
-                            d="M10.5 18.5a8 8 0 1 1 0-16 8 8 0 0 1 0 16Z"
-                            stroke="currentColor"
-                            strokeWidth="1.8"
-                          />
-                          <path
-                            d="M16.6 16.6 21 21"
-                            stroke="currentColor"
-                            strokeWidth="1.8"
-                            strokeLinecap="round"
-                          />
-                        </svg>
-                      </span>
-
-                      <input
-                        ref={inputRef}
-                        value={value}
-                        onChange={(e) => {
-                          const next = e.target.value;
-                          setValue(next);
-                          setActive(0);
-
-                          if (next.trim().length === 0) {
-                            safeClearStoredQuery();
-                            if (clearTimerRef.current) window.clearTimeout(clearTimerRef.current);
-                            clearTimerRef.current = null;
-                          }
-                        }}
-                        onKeyDown={onKeyDown}
-                        placeholder={placeholder}
-                        className="w-full bg-transparent outline-none text-[16px] placeholder:text-black/45"
-                        inputMode="search"
-                        autoComplete="off"
-                        spellCheck={false}
-                      />
-
-                      {hasQuery && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setValue('');
-                            setActive(0);
-                            safeClearStoredQuery();
-                            if (clearTimerRef.current) window.clearTimeout(clearTimerRef.current);
-                            clearTimerRef.current = null;
-                            inputRef.current?.focus();
-                          }}
-                          aria-label="Limpar pesquisa"
-                          className="shrink-0 touch-manipulation rounded-md px-2 py-1 text-black/55 hover:text-black"
-                        >
-                          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none">
-                            <path
-                              d="M7 7l10 10M17 7 7 17"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                            />
-                          </svg>
-                        </button>
-                      )}
-                    </div>
-
-                    <button
-                      type="button"
-                      className="touch-manipulation rounded-md bg-emerald-600 px-3 py-2 text-[13px] font-semibold text-white shadow-sm hover:bg-emerald-700"
-                      aria-label="Buscar"
-                      onClick={() => inputRef.current?.focus()}
-                    >
-                      Buscar
-                    </button>
-                  </div>
-                </div>
-
-                <div className="h-[72vh] px-4 pb-5 overflow-hidden">
-                  <div className="h-full overflow-auto">
-                    {hasQuery && (
-                      <div className="pt-2">
-                        <div className="text-[12px] font-semibold text-black/60">Resultados</div>
-
-                        {results.length === 0 ? (
-                          <div className="mt-2 px-1 py-2 text-[13px] text-black/55 flex items-center gap-2">
-                            <span>Nenhum resultado encontrado.</span>
-                            <SadFaceIcon className="h-4 w-4 text-black/50" />
-                          </div>
-                        ) : (
-                          <div className="mt-2 overflow-hidden rounded-xl bg-white/90 ring-1 ring-black/10">
-                            {results.map((o, idx) => {
-                              const isActive = idx === active;
-                              const href = buildOfferHref(o);
-
-                              return (
-                                <Link
-                                  key={`${o.id}-${o.slug ?? ''}`}
-                                  href={href}
-                                  className={[
-                                    'flex items-center gap-3 px-3 py-2.5 transition-colors',
-                                    isActive ? 'bg-black/5' : 'hover:bg-black/5',
-                                  ].join(' ')}
-                                  onMouseEnter={() => setActive(idx)}
-                                  onClick={closeSheet}
-                                >
-                                  <div className="h-10 w-10 overflow-hidden rounded-lg bg-black/5 shrink-0">
-                                    {o.imageUrl ? (
-                                      // eslint-disable-next-line @next/next/no-img-element
-                                      <img
-                                        src={o.imageUrl}
-                                        alt=""
-                                        className="h-full w-full object-cover"
-                                        loading="lazy"
-                                      />
-                                    ) : null}
-                                  </div>
-
-                                  <div className="min-w-0 flex-1">
-                                    <div className="truncate text-[14px] font-semibold text-black">
-                                      {o.title}
-                                    </div>
-                                    <div className="truncate text-[12px] text-black/60">
-                                      {o.subtitle || o.city || ''}
-                                    </div>
-                                  </div>
-
-                                  {o.priceText ? (
-                                    <div className="shrink-0 text-[12px] font-semibold text-black/70">
-                                      {o.priceText}
-                                    </div>
-                                  ) : null}
-                                </Link>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    <div className={hasQuery ? 'pt-4' : 'pt-3'}>
-                      <div className="text-[12px] font-semibold text-black/60">Categorias</div>
-
-                      <div className="mt-2 grid grid-cols-3 gap-2">
-                        {filteredCats.map((c) => (
-                          <button
-                            key={c.id}
-                            type="button"
-                            className="touch-manipulation rounded-md bg-white/90 border border-neutral-200/60 px-2 py-2 flex flex-col items-center gap-0 hover:bg-black/5 transition-colors"
-                            onClick={() => {
-                              setValue(c.title);
-                              setActive(0);
-                              inputRef.current?.focus();
-                            }}
-                          >
-                            <CategoryIcon id={c.id} className="h-5 w-5" />
-                            <span className="w-full px-1 text-center text-[11px] font-semibold leading-[1.15] text-neutral-800 line-clamp-2">
-                              {c.title}
-                            </span>
-                            <span className="text-[11px] text-neutral-500">
-                              {typeof c.count === 'number' ? c.count : ''}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <style jsx global>{`
-              html {
-                -webkit-text-size-adjust: 100%;
-              }
-
-              @keyframes sheetEnter {
-                from {
-                  transform: translateY(34px);
-                  opacity: 0;
-                }
-                to {
-                  transform: translateY(0);
-                  opacity: 1;
-                }
-              }
-              @keyframes sheetExit {
-                from {
-                  transform: translateY(0);
-                  opacity: 1;
-                }
-                to {
-                  transform: translateY(34px);
-                  opacity: 0;
-                }
-              }
-              .sheet-enter {
-                animation: sheetEnter 320ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
-              }
-              .sheet-exit {
-                animation: sheetExit 280ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
-              }
-
-              @keyframes backdropEnter {
-                from {
-                  opacity: 0;
-                }
-                to {
-                  opacity: 1;
-                }
-              }
-              @keyframes backdropExit {
-                from {
-                  opacity: 1;
-                }
-                to {
-                  opacity: 0;
-                }
-              }
-              .backdrop-enter {
-                animation: backdropEnter 220ms ease-out both;
-              }
-              .backdrop-exit {
-                animation: backdropExit 220ms ease-in both;
-              }
-            `}</style>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -26,6 +26,17 @@ type IconKey =
 type Props = {
   categories: CategoryItem[];
   className?: string;
+
+  /**
+   * ✅ NOVO: ao clicar em QUALQUER categoria, abre o modal
+   * e envia o nome da categoria (ex: "Passeios")
+   */
+  onOpenModal?: (categoryName: string) => void;
+
+  /**
+   * ✅ opcional: captura o objeto completo da categoria clicada
+   */
+  onCategoryClick?: (cat: CategoryItem) => void;
 };
 
 /* =========================
@@ -188,7 +199,12 @@ function Icon({
             strokeWidth="2"
             strokeLinejoin="round"
           />
-          <path d="M6 11h12v6H6v-6z" stroke="#06B6D4" strokeWidth="2" strokeLinejoin="round" />
+          <path
+            d="M6 11h12v6H6v-6z"
+            stroke="#06B6D4"
+            strokeWidth="2"
+            strokeLinejoin="round"
+          />
           <path
             d="M8 17.2a1.2 1.2 0 1 0 0-2.4 1.2 1.2 0 0 0 0 2.4zM16 17.2a1.2 1.2 0 1 0 0-2.4 1.2 1.2 0 0 0 0 2.4z"
             stroke="#06B6D4"
@@ -214,7 +230,12 @@ function Icon({
   }
 }
 
-export default function MenuCarousel({ categories, className }: Props) {
+export default function MenuCarousel({
+  categories,
+  className,
+  onOpenModal,
+  onCategoryClick,
+}: Props) {
   const scrollerRef = useRef<HTMLDivElement | null>(null);
 
   const [canLeft, setCanLeft] = useState(false);
@@ -226,7 +247,10 @@ export default function MenuCarousel({ categories, className }: Props) {
   const [leftAnim, setLeftAnim] = useState<'enter' | 'exit'>('enter');
   const [rightAnim, setRightAnim] = useState<'enter' | 'exit'>('enter');
 
-  const pagesCount = useMemo(() => Math.max(1, Math.ceil(categories.length / 8)), [categories.length]);
+  const pagesCount = useMemo(
+    () => Math.max(1, Math.ceil(categories.length / 8)),
+    [categories.length]
+  );
 
   function computeNavState() {
     const el = scrollerRef.current;
@@ -327,6 +351,11 @@ export default function MenuCarousel({ categories, className }: Props) {
     window.setTimeout(() => computeNavState(), 360);
   }
 
+  function handleCategoryClick(cat: CategoryItem) {
+    onCategoryClick?.(cat);
+    onOpenModal?.(cat.title);
+  }
+
   return (
     <section className={['relative px-4 pt-4', className ?? ''].join(' ')}>
       <div className="pointer-events-none absolute inset-0 z-[1]">
@@ -392,7 +421,8 @@ export default function MenuCarousel({ categories, className }: Props) {
                   <button
                     key={cat.id}
                     type="button"
-                    className="rounded-lg bg-white py-1 flex flex-col items-center gap-0 border border-neutral-200/60"
+                    onClick={() => handleCategoryClick(cat)}
+                    className="rounded-lg bg-white py-1 flex flex-col items-center gap-0 border border-neutral-200/60 active:scale-[0.99] touch-manipulation"
                   >
                     <Icon iconKey={cat.iconKey} />
                     <span className="w-full px-2 text-center text-[11px] font-semibold leading-[1.15] text-neutral-800 line-clamp-2">
@@ -476,4 +506,3 @@ export default function MenuCarousel({ categories, className }: Props) {
     </section>
   );
 }
- 

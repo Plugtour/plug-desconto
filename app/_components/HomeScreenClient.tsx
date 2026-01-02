@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import HomeBanner from './HomeBanner';
 
-import QuickSearch from './search/QuickSearch';
+import QuickSearch, { QuickSearchPanel } from './search/QuickSearch';
 import type { SearchCategory, SearchOffer } from './search/types';
 
 import SponsoredOffersRow from './offers/SponsoredOffersRow';
@@ -12,6 +12,7 @@ import SponsoredOffersList from './offers/SponsoredOffersList';
 
 import MenuCarousel from './menu/MenuCarousel';
 import FloatingTopMenu from './menu/FloatingTopMenu';
+import MenuCarouselModal from './menu/MenuCarouselModal';
 
 import { SPONSORED_OFFERS } from '../../_data/sponsoredOffers';
 import { EXPOSED_GASTRONOMY } from '../../_data/exposedOffers';
@@ -19,18 +20,7 @@ import { EXPOSED_GASTRONOMY } from '../../_data/exposedOffers';
 import BottomNav from './bottom-nav/BottomNav';
 import { BOTTOM_NAV_ITEMS } from './bottom-nav/items';
 
-/* =========================
-   TIPOS
-========================= */
-
 type OfferLike = any;
-
-type CategoryItem = {
-  id: string;
-  title: string;
-  count: number;
-  iconKey: IconKey;
-};
 
 type IconKey =
   | 'pin'
@@ -41,6 +31,13 @@ type IconKey =
   | 'bag'
   | 'car'
   | 'star';
+
+type CategoryItem = {
+  id: string;
+  title: string;
+  count: number;
+  iconKey: IconKey;
+};
 
 export default function HomeScreenClient({
   regionLabel = 'Serra Gaúcha',
@@ -71,6 +68,29 @@ export default function HomeScreenClient({
     ],
     []
   );
+
+  /* =========================
+     MODAL (Categorias)
+  ========================= */
+  const [menuModalOpen, setMenuModalOpen] = useState(false);
+  const [menuModalCategoryName, setMenuModalCategoryName] = useState<string>('');
+  const [menuModalCategoryCount, setMenuModalCategoryCount] = useState<number>(0);
+
+  const openMenuModal = () => setMenuModalOpen(true);
+  const closeMenuModal = () => setMenuModalOpen(false);
+
+  const handleCategoryClick = (cat: CategoryItem) => {
+    setMenuModalCategoryName(cat?.title ?? '');
+    setMenuModalCategoryCount(Number(cat?.count ?? 0));
+    openMenuModal();
+  };
+
+  /* =========================
+     ✅ NOVO: MODAL (Busca rápida)
+  ========================= */
+  const [searchModalOpen, setSearchModalOpen] = useState(false);
+  const openSearchModal = () => setSearchModalOpen(true);
+  const closeSearchModal = () => setSearchModalOpen(false);
 
   const top10Items = useMemo(() => {
     const base = Array.isArray(EXPOSED_GASTRONOMY) ? [...EXPOSED_GASTRONOMY] : [];
@@ -177,9 +197,7 @@ export default function HomeScreenClient({
   const gridMenuRef = useRef<HTMLDivElement | null>(null);
   const [showFloatingMenu, setShowFloatingMenu] = useState(false);
 
-  // ✅ ALTURA DO MENU FLUTUANTE (conteúdo do FloatingTopMenu)
   const FLOATING_MENU_H = 75; // px
-
   const rafRef = useRef<number | null>(null);
   const HYSTERESIS_PX = 18;
   const MIN_SCROLL_TO_ENABLE = 8;
@@ -192,10 +210,7 @@ export default function HomeScreenClient({
       const rect = el.getBoundingClientRect();
       const topDoc = window.scrollY + rect.top;
 
-      // MenuCarousel: 2 linhas visíveis por página
       const rowH = rect.height / 2;
-
-      // metade da 2ª linha = 1.5 linhas
       return topDoc + rowH * 1.5;
     };
 
@@ -237,7 +252,6 @@ export default function HomeScreenClient({
     };
   }, []);
 
-  // ✅ variável que empurra os sticky de baixo (agora: SOMENTE o menu flutuante)
   const stickyStackPx = showFloatingMenu ? FLOATING_MENU_H : 0;
 
   return (
@@ -245,17 +259,12 @@ export default function HomeScreenClient({
       className="mx-auto w-full max-w-md bg-zinc-100"
       style={{
         paddingBottom: 'calc(74px + env(safe-area-inset-bottom))',
-
-        // ✅ variáveis globais de layout (herdadas pelos filhos)
         ['--app-header-h' as any]: 'var(--app-header-h, calc(56px + env(safe-area-inset-top)))',
         ['--floating-menu-h' as any]: showFloatingMenu ? `${FLOATING_MENU_H}px` : '0px',
-
-        // ✅ QuickSearch não é mais sticky, então removemos sua altura do stack
         ['--quicksearch-h' as any]: '0px',
         ['--sticky-stack-h' as any]: `${stickyStackPx}px`,
       }}
     >
-      {/* ✅ STACK INVISÍVEL SÓ PARA MEDIÇÃO (agora só do FloatingTopMenu) */}
       <div
         id="top-fixed-stack"
         className="pointer-events-none absolute inset-x-0 top-0"
@@ -264,20 +273,59 @@ export default function HomeScreenClient({
         <div style={{ height: showFloatingMenu ? FLOATING_MENU_H : 0 }} />
       </div>
 
-      {/* MENU CARROSSEL (original) */}
+      {/* ✅ MODAL (Categorias) */}
+      <MenuCarouselModal
+        open={menuModalOpen}
+        onClose={closeMenuModal}
+        title="Categoria"
+        categoryName={menuModalCategoryName}
+        categoryCount={menuModalCategoryCount}
+      />
+
+      {/* ✅ MODAL (Busca rápida) — mesmo componente, conteúdo do QuickSearchPanel */}
+      <MenuCarouselModal
+        open={searchModalOpen}
+        onClose={closeSearchModal}
+        hideHeader
+      >
+        <div className="rounded-t-md bg-zinc-100/92 shadow-2xl ring-1 ring-black/10 overflow-hidden">
+          <QuickSearchPanel
+            offers={searchData}
+            categories={searchCategories}
+            onRequestClose={closeSearchModal}
+          />
+        </div>
+      </MenuCarouselModal>
+
+      {/* MENU CARROSSEL */}
       <div ref={gridMenuRef}>
-        <MenuCarousel categories={categories} />
+        <MenuCarousel
+          categories={categories}
+          className="pt-0"
+          onOpenModal={() => openMenuModal()}
+          onCategoryClick={handleCategoryClick}
+        />
       </div>
 
       <HomeBanner className="mt-4" />
 
       {/* MENU FLUTUANTE */}
-      <FloatingTopMenu categories={categories} visible={showFloatingMenu} />
+      <FloatingTopMenu
+        categories={categories}
+        visible={showFloatingMenu}
+        onOpenModal={() => openMenuModal()}
+        onCategoryClick={handleCategoryClick}
+      />
 
-      {/* ✅ QuickSearch NORMAL (não sticky) — rola junto e some */}
       <div className="pt-1">
         <div className="px-4 mt-1 pb-2">
-          <QuickSearch offers={searchData} categories={searchCategories} />
+          {/* ✅ AQUI: clique na busca abre o MenuCarouselModal (com conteúdo da 2ª imagem) */}
+          <QuickSearch
+            offers={searchData}
+            categories={searchCategories}
+            useExternalModal
+            onOpenExternal={openSearchModal}
+          />
         </div>
       </div>
 
@@ -301,7 +349,6 @@ export default function HomeScreenClient({
         categories={categories.map((c) => ({ id: c.id, title: c.title }))}
       />
 
-      {/* ✅ Rodapé estilo app — fixo e somente na Home */}
       <BottomNav items={BOTTOM_NAV_ITEMS} heightPx={74} />
     </div>
   );
