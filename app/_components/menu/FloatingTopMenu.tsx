@@ -295,13 +295,23 @@ export default function FloatingTopMenu({ categories, visible }: Props) {
   return (
     <div
       className={[
-        'fixed left-0 right-0 z-[110]',
-        'transition-all duration-200',
-        canShow ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 -translate-y-2 pointer-events-none',
+        // ✅ fica abaixo do header (em top), mas com z menor que o header -> “por trás”
+        'fixed left-0 right-0 z-[140]',
+        // ✅ MAIS SUAVE: duração maior + easing “mais macio” (cubic-bezier)
+        'transition-[transform,opacity] duration-450',
+        // ✅ leve blur/sombra não interfere
         'bg-zinc-200/95 backdrop-blur-[2px]',
+        // ✅ controla interação
+        canShow ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none',
       ].join(' ')}
-      // ✅ agora respeita o topo fixo do app (header)
-      style={{ top: 'var(--app-header-h, 55px)' }}
+      // ✅ topo encostado no header; ao esconder, sobe para trás do header
+      style={{
+        top: 'var(--app-header-h, 55px)',
+        transform: canShow ? 'translateY(0px)' : 'translateY(-100%)',
+        transitionTimingFunction: canShow
+          ? 'cubic-bezier(0.16, 1, 0.3, 1)' // abre mais “suave” tipo iOS
+          : 'cubic-bezier(0.4, 0, 0.2, 1)', // fecha um pouco mais rápido mas ainda macio
+      }}
     >
       <section className="relative px-4 pt-0">
         <div className="pointer-events-none absolute inset-0 z-[1]">

@@ -121,7 +121,11 @@ function TempImagePlaceholder() {
           strokeWidth="2"
           strokeLinejoin="round"
         />
-        <path d="M9 9.2a.9.9 0 1 0 0-1.8.9.9 0 0 0 0 1.8Z" stroke="currentColor" strokeWidth="2" />
+        <path
+          d="M9 9.2a.9.9 0 1 0 0-1.8.9.9 0 0 0 0 1.8Z"
+          stroke="currentColor"
+          strokeWidth="2"
+        />
       </svg>
     </div>
   );
@@ -158,7 +162,12 @@ function FilterIcon({
     case 'todos':
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none" aria-hidden="true">
-          <path d="M6.5 7.5h11M6.5 12h11M6.5 16.5h11" stroke={c} strokeWidth="2" strokeLinecap="round" />
+          <path
+            d="M6.5 7.5h11M6.5 12h11M6.5 16.5h11"
+            stroke={c}
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
         </svg>
       );
 
@@ -201,7 +210,13 @@ function FilterIcon({
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none" aria-hidden="true">
           <circle cx="12" cy="12" r="9" stroke={c} strokeWidth="2" />
-          <path d="M12 7v5l3 2" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          <path
+            d="M12 7v5l3 2"
+            stroke={c}
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </svg>
       );
 
@@ -214,7 +229,11 @@ function FilterIcon({
             strokeWidth="2"
             strokeLinejoin="round"
           />
-          <path d="M12 11.2a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4z" stroke={c} strokeWidth="2" />
+          <path
+            d="M12 11.2a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4z"
+            stroke={c}
+            strokeWidth="2"
+          />
         </svg>
       );
 
@@ -462,31 +481,41 @@ export default function SponsoredOffersList({
 
   const listTopRef = useRef<HTMLDivElement | null>(null);
 
-  const filterSentinelRef = useRef<HTMLDivElement | null>(null);
   const [filterIsStuck, setFilterIsStuck] = useState(false);
 
-  // ✅ agora o filtro fica abaixo de: Header + (FloatingTopMenu + QuickSearch stack)
-  const FILTER_TOP = 'calc(var(--app-header-h, 54px) + var(--sticky-stack-h, 130px))';
+  // ✅ agora o filtro fica abaixo de: Header + stack (menu flutuante)
+  const FILTER_TOP = 'calc(var(--app-header-h, 54px) + var(--sticky-stack-h, 0px))';
+
+  // ✅ ref do próprio sticky (pra detectar “stuck” sem atraso)
+  const filterStickyRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    let raf = 0;
+    const el = filterStickyRef.current;
+    if (!el) return;
+
+    let raf: number | null = null;
+
+    const readTopPx = () => {
+      const cs = window.getComputedStyle(el);
+      const topStr = cs.top || '0';
+      const topPx = Number.parseFloat(topStr);
+      return Number.isFinite(topPx) ? topPx : 0;
+    };
 
     const compute = () => {
-      raf = 0;
-      const s = filterSentinelRef.current;
-      if (!s) return;
+      raf = null;
 
-      // threshold: quando sentinel passa do topo sticky
-      // usamos o mesmo cálculo de top do sticky (em px aproximado pelo rect)
-      const top = s.getBoundingClientRect().top;
-      const stuck = top <= 0.5; // sentinel encostou no topo do viewport, sticky já está ativo
+      const topPx = readTopPx();
+      const rect = el.getBoundingClientRect();
 
-      // para não oscilar, só atualiza quando muda
-      setFilterIsStuck((prev) => (prev === stuck ? prev : stuck));
+      // ✅ ajuste que você fez (+2.0)
+      const stuckNow = rect.top <= topPx + 2.0;
+
+      setFilterIsStuck((prev) => (prev === stuckNow ? prev : stuckNow));
     };
 
     const onScroll = () => {
-      if (raf) return;
+      if (raf != null) return;
       raf = window.requestAnimationFrame(compute);
     };
 
@@ -495,7 +524,7 @@ export default function SponsoredOffersList({
     window.addEventListener('resize', onScroll, { passive: true });
 
     return () => {
-      if (raf) window.cancelAnimationFrame(raf);
+      if (raf != null) window.cancelAnimationFrame(raf);
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onScroll);
     };
@@ -537,11 +566,11 @@ export default function SponsoredOffersList({
         <div className="mb-1 px-4 text-[12px] font-medium text-zinc-500">{title}</div>
       ) : null}
 
-      <div ref={filterSentinelRef} aria-hidden className="h-px w-full" />
-
       <div
+        ref={filterStickyRef}
         className={[
-          'sticky z-[60]',
+          // ✅ transição suave pra não “piscar”
+          'sticky z-[60] transition-colors duration-200 ease-out',
           filterIsStuck ? 'bg-zinc-200/95 backdrop-blur-[2px]' : 'bg-zinc-100',
         ].join(' ')}
         style={{ top: FILTER_TOP }}

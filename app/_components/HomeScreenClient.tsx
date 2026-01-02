@@ -172,28 +172,6 @@ export default function HomeScreenClient({
   }, [offers]);
 
   /* =========================
-     Sticky: muda cor só quando gruda no topo
-  ========================= */
-  const stickySentinelRef = useRef<HTMLDivElement | null>(null);
-  const [qsStuck, setQsStuck] = useState(false);
-
-  useEffect(() => {
-    const el = stickySentinelRef.current;
-    if (!el) return;
-
-    const io = new IntersectionObserver(
-      (entries) => {
-        const entry = entries[0];
-        setQsStuck(!entry.isIntersecting);
-      },
-      { root: null, threshold: 0 }
-    );
-
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
-
-  /* =========================
      MENU FLUTUANTE (trigger)
   ========================= */
   const gridMenuRef = useRef<HTMLDivElement | null>(null);
@@ -259,11 +237,8 @@ export default function HomeScreenClient({
     };
   }, []);
 
-  // ✅ altura aproximada do bloco do QuickSearch (stack)
-  const QUICKSEARCH_STACK_H = 55; // px
-
-  // ✅ variável que empurra os sticky de baixo (QuickSearch + filtros)
-  const stickyStackPx = (showFloatingMenu ? FLOATING_MENU_H : 0) + QUICKSEARCH_STACK_H;
+  // ✅ variável que empurra os sticky de baixo (agora: SOMENTE o menu flutuante)
+  const stickyStackPx = showFloatingMenu ? FLOATING_MENU_H : 0;
 
   return (
     <div
@@ -272,22 +247,21 @@ export default function HomeScreenClient({
         paddingBottom: 'calc(74px + env(safe-area-inset-bottom))',
 
         // ✅ variáveis globais de layout (herdadas pelos filhos)
-        // Header fixo (definido no AppChrome): fallback para 56px + safe-area
-        // Mantemos o fallback aqui só por segurança.
         ['--app-header-h' as any]: 'var(--app-header-h, calc(56px + env(safe-area-inset-top)))',
         ['--floating-menu-h' as any]: showFloatingMenu ? `${FLOATING_MENU_H}px` : '0px',
-        ['--quicksearch-h' as any]: `${QUICKSEARCH_STACK_H}px`,
+
+        // ✅ QuickSearch não é mais sticky, então removemos sua altura do stack
+        ['--quicksearch-h' as any]: '0px',
         ['--sticky-stack-h' as any]: `${stickyStackPx}px`,
       }}
     >
-      {/* ✅ STACK INVISÍVEL SÓ PARA MEDIÇÃO (NÃO ENVOLVE O QUICKSEARCH) */}
+      {/* ✅ STACK INVISÍVEL SÓ PARA MEDIÇÃO (agora só do FloatingTopMenu) */}
       <div
         id="top-fixed-stack"
         className="pointer-events-none absolute inset-x-0 top-0"
         aria-hidden="true"
       >
         <div style={{ height: showFloatingMenu ? FLOATING_MENU_H : 0 }} />
-        <div style={{ height: QUICKSEARCH_STACK_H }} />
       </div>
 
       {/* MENU CARROSSEL (original) */}
@@ -297,24 +271,13 @@ export default function HomeScreenClient({
 
       <HomeBanner className="mt-4" />
 
-      {/* sentinel */}
-      <div ref={stickySentinelRef} className="h-px w-full" />
-
       {/* MENU FLUTUANTE */}
       <FloatingTopMenu categories={categories} visible={showFloatingMenu} />
 
-      {/* ✅ QuickSearch sticky */}
-      <div
-        className={['sticky z-[90]', qsStuck ? 'bg-zinc-200' : 'bg-transparent'].join(' ')}
-        // ✅ agora soma o header fixo + (se existir) o menu flutuante
-        style={{
-          top: `calc(var(--app-header-h, 54px) + var(--floating-menu-h, 0px))`,
-        }}
-      >
-        <div className="pt-1">
-          <div className="px-4 mt-1 pb-2">
-            <QuickSearch offers={searchData} categories={searchCategories} />
-          </div>
+      {/* ✅ QuickSearch NORMAL (não sticky) — rola junto e some */}
+      <div className="pt-1">
+        <div className="px-4 mt-1 pb-2">
+          <QuickSearch offers={searchData} categories={searchCategories} />
         </div>
       </div>
 
