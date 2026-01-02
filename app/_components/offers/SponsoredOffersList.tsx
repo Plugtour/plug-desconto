@@ -508,8 +508,8 @@ export default function SponsoredOffersList({
       const topPx = readTopPx();
       const rect = el.getBoundingClientRect();
 
-      // ✅ ajuste que você fez (+2.0)
-      const stuckNow = rect.top <= topPx + 2.0;
+      // ✅ ajuste que você fez (+4.0)
+      const stuckNow = rect.top <= topPx + 4.0;
 
       setFilterIsStuck((prev) => (prev === stuckNow ? prev : stuckNow));
     };
