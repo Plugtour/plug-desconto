@@ -12,6 +12,15 @@ type Props = {
 };
 
 /* =========================
+   TOKEN ÚNICO (TOPO "GLASS")
+   Use o MESMO no filtro sticky.
+========================= */
+const TOP_GLASS =
+  'bg-zinc-200/95 backdrop-blur-[2px] ' +
+  'transition-[background-color,backdrop-filter] duration-200 ease-out ' +
+  'will-change-[background-color,backdrop-filter]';
+
+/* =========================
    ÍCONES SVG (INLINE)
 ========================= */
 
@@ -64,20 +73,28 @@ export default function FloatingHeader({
 }: Props) {
   return (
     <header
-      className="
-        fixed top-0 left-0 right-0 z-[150]
-        bg-white
-        flex items-center justify-between
-        px-4
-      "
-      // ✅ header real = 56px + safe-area (igual variável do AppChrome)
+      className={[
+        'fixed top-0 left-0 right-0 z-[150]',
+        TOP_GLASS,
+        'flex items-center justify-between',
+        'px-4',
+      ].join(' ')}
       style={{
         height: 'var(--app-header-h, calc(56px + env(safe-area-inset-top)))',
         paddingTop: 'env(safe-area-inset-top)',
       }}
     >
       {/* ESQUERDA — DESTINOS */}
-      <button onClick={onOpenDestinos} className="flex items-center gap-1 text-sm font-semibold">
+      <button
+        onClick={onOpenDestinos}
+        className={[
+          'flex items-center gap-1',
+          'text-sm font-semibold',
+          'min-h-[44px] py-2',
+          'touch-manipulation select-none',
+          'active:scale-[0.99]',
+        ].join(' ')}
+      >
         <IconMapPin />
         Destinos
       </button>
@@ -85,7 +102,17 @@ export default function FloatingHeader({
       {/* DIREITA — AÇÕES */}
       <div className="flex items-center gap-4">
         {/* FAVORITOS */}
-        <button onClick={onOpenFavorites} className="relative" aria-label="Favoritos">
+        <button
+          onClick={onOpenFavorites}
+          className={[
+            'relative',
+            'min-h-[44px] min-w-[44px]',
+            'inline-flex items-center justify-center',
+            'touch-manipulation select-none',
+            'active:scale-[0.99]',
+          ].join(' ')}
+          aria-label="Favoritos"
+        >
           <IconHeart />
           {favoritesCount > 0 && (
             <span
@@ -104,12 +131,31 @@ export default function FloatingHeader({
         </button>
 
         {/* BUSCA */}
-        <button onClick={onOpenSearch} aria-label="Buscar">
+        <button
+          onClick={onOpenSearch}
+          className={[
+            'min-h-[44px] min-w-[44px]',
+            'inline-flex items-center justify-center',
+            'touch-manipulation select-none',
+            'active:scale-[0.99]',
+          ].join(' ')}
+          aria-label="Buscar"
+        >
           <IconSearch />
         </button>
 
         {/* AVISOS */}
-        <button onClick={onOpenNotifications} className="relative" aria-label="Avisos">
+        <button
+          onClick={onOpenNotifications}
+          className={[
+            'relative',
+            'min-h-[44px] min-w-[44px]',
+            'inline-flex items-center justify-center',
+            'touch-manipulation select-none',
+            'active:scale-[0.99]',
+          ].join(' ')}
+          aria-label="Avisos"
+        >
           <IconBell />
           {notificationsCount > 0 && (
             <span
