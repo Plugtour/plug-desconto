@@ -1,19 +1,23 @@
 'use client';
 
 import React from 'react';
+import { Search, Bell } from 'lucide-react';
 
 type Props = {
   favoritesCount?: number;
   notificationsCount?: number;
+
   onOpenDestinos: () => void;
+  onOpenClub: () => void;
   onOpenSearch: () => void;
   onOpenFavorites: () => void;
   onOpenNotifications: () => void;
+
+  userName?: string | null;
 };
 
 /* =========================
    TOKEN ÚNICO (TOPO "GLASS")
-   Use o MESMO no filtro sticky.
 ========================= */
 const TOP_GLASS =
   'bg-zinc-200/95 backdrop-blur-[2px] ' +
@@ -24,9 +28,16 @@ const TOP_GLASS =
    ÍCONES SVG (INLINE)
 ========================= */
 
-function IconMapPin() {
+function IconMapPin({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+    <svg
+      viewBox="0 0 24 24"
+      className={className ?? 'h-4 w-4'}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      aria-hidden="true"
+    >
       <path d="M12 21s6-5.33 6-10a6 6 0 10-12 0c0 4.67 6 10 6 10z" />
       <circle cx="12" cy="11" r="2" />
     </svg>
@@ -41,24 +52,6 @@ function IconHeart() {
   );
 }
 
-function IconSearch() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
-      <circle cx="11" cy="11" r="8" />
-      <line x1="21" y1="21" x2="16.65" y2="16.65" />
-    </svg>
-  );
-}
-
-function IconBell() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M18 8a6 6 0 00-12 0c0 7-3 7-3 7h18s-3 0-3-7" />
-      <path d="M13.73 21a2 2 0 01-3.46 0" />
-    </svg>
-  );
-}
-
 /* =========================
    COMPONENTE
 ========================= */
@@ -67,16 +60,20 @@ export default function FloatingHeader({
   favoritesCount = 0,
   notificationsCount = 0,
   onOpenDestinos,
+  onOpenClub,
   onOpenSearch,
   onOpenFavorites,
   onOpenNotifications,
+  userName = null,
 }: Props) {
+  const isLogged = !!(userName && userName.trim().length > 0);
+
   return (
     <header
       className={[
         'fixed top-0 left-0 right-0 z-[150]',
         TOP_GLASS,
-        'flex items-center justify-between',
+        'flex items-center',
         'px-4',
       ].join(' ')}
       style={{
@@ -84,23 +81,58 @@ export default function FloatingHeader({
         paddingTop: 'env(safe-area-inset-top)',
       }}
     >
-      {/* ESQUERDA — DESTINOS */}
-      <button
-        onClick={onOpenDestinos}
-        className={[
-          'flex items-center gap-1',
-          'text-sm font-semibold',
-          'min-h-[44px] py-2',
-          'touch-manipulation select-none',
-          'active:scale-[0.99]',
-        ].join(' ')}
-      >
-        <IconMapPin />
-        Destinos
-      </button>
+      {/* ESQUERDA — MEU CLUBE */}
+      <div className="flex items-center min-w-0">
+        <button
+          type="button"
+          onClick={onOpenClub}
+          className={[
+            'min-h-[44px]',
+            'touch-manipulation select-none',
+            'active:scale-[0.99]',
+            'text-left',
+            'leading-[1.05]',
+            'min-w-0',
+            'py-2',
+          ].join(' ')}
+          aria-label="Abrir meu clube"
+        >
+          {isLogged ? (
+            <div className="min-w-0">
+              <div className="truncate text-[13px] font-semibold text-black">{userName}</div>
+              <div className="truncate text-[11px] font-medium text-emerald-700">Ver meu clube</div>
+            </div>
+          ) : (
+            <div className="min-w-0">
+              <div className="truncate text-[13px] font-semibold text-black">Entrar</div>
+              <div className="truncate text-[11px] font-medium text-emerald-700">Ver meu clube</div>
+            </div>
+          )}
+        </button>
+      </div>
+
+      {/* MEIO — DESTINOS */}
+      <div className="flex-1 flex items-center justify-end px-0">
+        <button
+          type="button"
+          onClick={onOpenDestinos}
+          className={[
+            'min-h-[44px]',
+            'touch-manipulation select-none',
+            'active:scale-[0.99]',
+            'inline-flex items-center gap-[2px]',
+            'px-[15px]',
+            'text-black',
+          ].join(' ')}
+          aria-label="Selecionar destinos"
+        >
+          <IconMapPin className="h-7 w-7 opacity-60" />
+          <span className="text-[13px] font-medium">Destinos</span>
+        </button>
+      </div>
 
       {/* DIREITA — AÇÕES */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-0">
         {/* FAVORITOS */}
         <button
           onClick={onOpenFavorites}
@@ -130,7 +162,7 @@ export default function FloatingHeader({
           )}
         </button>
 
-        {/* BUSCA */}
+        {/* BUSCA (LUCIDE) */}
         <button
           onClick={onOpenSearch}
           className={[
@@ -141,10 +173,10 @@ export default function FloatingHeader({
           ].join(' ')}
           aria-label="Buscar"
         >
-          <IconSearch />
+          <Search className="h-5 w-5" strokeWidth={1.75} />
         </button>
 
-        {/* AVISOS */}
+        {/* AVISOS (LUCIDE) */}
         <button
           onClick={onOpenNotifications}
           className={[
@@ -156,7 +188,7 @@ export default function FloatingHeader({
           ].join(' ')}
           aria-label="Avisos"
         >
-          <IconBell />
+          <Bell className="h-5 w-5" strokeWidth={1.75} />
           {notificationsCount > 0 && (
             <span
               className="

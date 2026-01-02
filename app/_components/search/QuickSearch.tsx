@@ -86,7 +86,11 @@ function CategoryIcon({ id, className }: { id: string; className?: string }) {
             strokeWidth="2"
             strokeLinejoin="round"
           />
-          <path d="M12 11.2a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4z" stroke={stroke} strokeWidth="2" />
+          <path
+            d="M12 11.2a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4z"
+            stroke={stroke}
+            strokeWidth="2"
+          />
         </svg>
       );
 
@@ -368,28 +372,32 @@ export default function QuickSearch({
 
   return (
     <div className={className}>
-      <div className="flex items-stretch gap-2">
-        <button
-          type="button"
-          onClick={openSheet}
-          className="flex-1 touch-manipulation"
-          aria-label="Abrir busca"
-        >
-          <div className="h-10 flex items-center rounded-md bg-white/95 shadow-sm ring-1 ring-black/10 px-3 py-0">
-            <div className="flex-1 text-left text-[14px] leading-none text-black/45">
-              {placeholder}
+      {/* ✅ PADDING DO BLOCO (o que você grifou) */}
+      <div className="px-0 py-3">
+        <div className="flex items-stretch gap-2">
+          <button
+            type="button"
+            onClick={openSheet}
+            className="flex-1 touch-manipulation"
+            aria-label="Abrir busca"
+          >
+            {/* ✅ altura e padding internos padronizados */}
+            <div className="h-[44px] flex items-center rounded-md bg-white/95 shadow-sm ring-1 ring-black/10 px-3">
+              <div className="flex-1 text-left text-[14px] leading-none text-black/45">
+                {placeholder}
+              </div>
             </div>
-          </div>
-        </button>
+          </button>
 
-        <button
-          type="button"
-          onClick={openSheet}
-          className="h-10 touch-manipulation flex items-center justify-center rounded-md bg-emerald-600 px-3 py-0 text-[13px] font-semibold text-white shadow-sm hover:bg-emerald-700"
-          aria-label="Buscar"
-        >
-          Buscar
-        </button>
+          <button
+            type="button"
+            onClick={openSheet}
+            className="h-[44px] touch-manipulation flex items-center justify-center rounded-md bg-emerald-600 px-3 text-[13px] font-semibold text-white shadow-sm hover:bg-emerald-700"
+            aria-label="Buscar"
+          >
+            Buscar
+          </button>
+        </div>
       </div>
 
       {sheetOpen && (
