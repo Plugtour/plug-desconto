@@ -1,17 +1,12 @@
-// app/_components/chrome/AppChrome.tsx
+// app/_components/header/AppChrome.tsx
 'use client';
-
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 
 import FloatingHeader from './FloatingHeader';
 import MenuCarouselModal from '../menu/MenuCarouselModal';
 
-import {
-  getFavorites,
-  onFavoritesChange,
-  type FavoriteItem,
-} from '../favorites/favoritesStore';
+import { getFavorites, onFavoritesChange, type FavoriteItem } from '../favorites/favoritesStore';
 
 type Props = {
   children: React.ReactNode;
@@ -32,8 +27,12 @@ const DESTINOS: DestinoItem[] = [
   { id: 'caxias', title: 'Caxias do Sul', subtitle: 'Gastronomia • Cultura' },
 ];
 
+function safeHref(v: any) {
+  const s = typeof v === 'string' ? v.trim() : '';
+  return s.length ? s : '/';
+}
+
 export default function AppChrome({ children }: Props) {
-  // ✅ AJUSTE: agora o count vem do store real
   const [favoritesCount, setFavoritesCount] = useState<number>(0);
   const [notificationsCount] = useState<number>(0);
 
@@ -46,10 +45,8 @@ export default function AppChrome({ children }: Props) {
 
   const [destinoId, setDestinoId] = useState<string>('serra-gaucha');
 
-  // ✅ MOCK (trocar pelo login real)
   const [userName] = useState<string | null>('Marcelo');
 
-  // ✅ busca simples dentro do modal (layout parecido com seu sheet)
   const [destinosQuery, setDestinosQuery] = useState('');
   const destinosFiltered = DESTINOS.filter((d) => {
     const q = destinosQuery.trim().toLowerCase();
@@ -66,12 +63,11 @@ export default function AppChrome({ children }: Props) {
     setDestinosQuery('');
   }
 
-  // ✅ FAVORITOS: estado + sincronização (contagem e lista)
   const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
 
   useEffect(() => {
     const sync = () => {
-      const list = getFavorites();
+      const list = getFavorites(); // ✅ já normaliza e corrige storage
       setFavorites(list);
       setFavoritesCount(list.length);
     };
@@ -86,9 +82,7 @@ export default function AppChrome({ children }: Props) {
       return (
         <div className="px-4 pt-4 pb-6">
           <div className="text-[14px] font-semibold text-black">Nenhum favorito ainda</div>
-          <div className="mt-1 text-[13px] text-black/60">
-            Toque no coração nos cards para salvar aqui.
-          </div>
+          <div className="mt-1 text-[13px] text-black/60">Toque no coração nos cards para salvar aqui.</div>
         </div>
       );
     }
@@ -98,9 +92,7 @@ export default function AppChrome({ children }: Props) {
         <div className="px-4 pt-3 pb-3">
           <div className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-black/15" />
           <div className="text-[14px] font-semibold text-black">Favoritos</div>
-          <div className="mt-1 text-[13px] text-black/60">
-            Seus itens salvos aparecem aqui.
-          </div>
+          <div className="mt-1 text-[13px] text-black/60">Seus itens salvos aparecem aqui.</div>
         </div>
 
         <div className="px-4 pb-5 flex-1 overflow-hidden">
@@ -108,39 +100,34 @@ export default function AppChrome({ children }: Props) {
             <div className="text-[12px] font-semibold text-black/60">Itens</div>
 
             <div className="mt-2 overflow-hidden rounded-xl bg-white/90 ring-1 ring-black/10">
-              {favorites.map((f) => (
-                <Link
-                  key={f.id}
-                  href={f.href}
-                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-black/5 transition-colors"
-                  onClick={() => setFavoritesOpen(false)}
-                >
-                  <div className="h-11 w-11 overflow-hidden rounded-lg bg-black/5 shrink-0">
-                    {f.imageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={f.imageUrl}
-                        alt=""
-                        className="h-full w-full object-cover"
-                        loading="lazy"
-                      />
+              {favorites.map((f) => {
+                const hrefSafe = safeHref((f as any)?.href);
+
+                return (
+                  <Link
+                    key={f.id}
+                    href={hrefSafe}
+                    className="flex items-center gap-3 px-3 py-2.5 hover:bg-black/5 transition-colors"
+                    onClick={() => setFavoritesOpen(false)}
+                  >
+                    <div className="h-11 w-11 overflow-hidden rounded-lg bg-black/5 shrink-0">
+                      {f.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={f.imageUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+                      ) : null}
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[14px] font-semibold text-black">{f.title}</div>
+                      <div className="truncate text-[12px] text-black/60">{f.subtitle || f.city || ''}</div>
+                    </div>
+
+                    {f.priceText ? (
+                      <div className="shrink-0 text-[12px] font-semibold text-black/70">{f.priceText}</div>
                     ) : null}
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-[14px] font-semibold text-black">{f.title}</div>
-                    <div className="truncate text-[12px] text-black/60">
-                      {f.subtitle || f.city || ''}
-                    </div>
-                  </div>
-
-                  {f.priceText ? (
-                    <div className="shrink-0 text-[12px] font-semibold text-black/70">
-                      {f.priceText}
-                    </div>
-                  ) : null}
-                </Link>
-              ))}
+                  </Link>
+                );
+              })}
             </div>
 
             <div className="mt-4">
@@ -175,16 +162,14 @@ export default function AppChrome({ children }: Props) {
         onOpenNotifications={() => setNotificationsOpen(true)}
       />
 
-      {/* ✅ DESTINOS usa o MESMO MODAL */}
+      {/* DESTINOS */}
       <MenuCarouselModal open={destinosOpen} onClose={closeDestinos} hideHeader>
         <div className="h-full flex flex-col">
           <div className="px-4 pt-3 pb-3">
             <div className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-black/15" />
 
             <div className="text-[14px] font-semibold text-black">Destinos</div>
-            <div className="mt-1 text-[13px] text-black/60">
-              Escolha um destino para ver as ofertas disponíveis.
-            </div>
+            <div className="mt-1 text-[13px] text-black/60">Escolha um destino para ver as ofertas disponíveis.</div>
 
             <div className="mt-3 rounded-md bg-white/90 shadow-sm ring-1 ring-black/10 px-3 py-2 flex items-center gap-2">
               <span className="opacity-60" aria-hidden="true">
@@ -194,12 +179,7 @@ export default function AppChrome({ children }: Props) {
                     stroke="currentColor"
                     strokeWidth="1.8"
                   />
-                  <path
-                    d="M16.6 16.6 21 21"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                  />
+                  <path d="M16.6 16.6 21 21" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
                 </svg>
               </span>
 
@@ -221,12 +201,7 @@ export default function AppChrome({ children }: Props) {
                   className="shrink-0 touch-manipulation rounded-md px-2 py-1 text-black/55 hover:text-black"
                 >
                   <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none">
-                    <path
-                      d="M7 7l10 10M17 7 7 17"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                    />
+                    <path d="M7 7l10 10M17 7 7 17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                   </svg>
                 </button>
               )}
@@ -241,9 +216,7 @@ export default function AppChrome({ children }: Props) {
 
               <div className="mt-2 overflow-hidden rounded-xl bg-white/90 ring-1 ring-black/10">
                 {destinosFiltered.length === 0 ? (
-                  <div className="px-3 py-3 text-[13px] text-black/55">
-                    Nenhum destino encontrado.
-                  </div>
+                  <div className="px-3 py-3 text-[13px] text-black/55">Nenhum destino encontrado.</div>
                 ) : (
                   destinosFiltered.map((d) => {
                     const active = d.id === destinoId;
@@ -267,9 +240,7 @@ export default function AppChrome({ children }: Props) {
                         <div
                           className={[
                             'h-10 w-10 rounded-lg shrink-0',
-                            active
-                              ? 'bg-emerald-600/15 ring-1 ring-emerald-600/25'
-                              : 'bg-black/5',
+                            active ? 'bg-emerald-600/15 ring-1 ring-emerald-600/25' : 'bg-black/5',
                             'flex items-center justify-center',
                           ].join(' ')}
                           aria-hidden="true"
@@ -293,16 +264,12 @@ export default function AppChrome({ children }: Props) {
                         </div>
 
                         <div className="min-w-0 flex-1">
-                          <div className="truncate text-[14px] font-semibold text-black">
-                            {d.title}
-                          </div>
+                          <div className="truncate text-[14px] font-semibold text-black">{d.title}</div>
                           <div className="truncate text-[12px] text-black/60">{d.subtitle ?? ''}</div>
                         </div>
 
                         {active ? (
-                          <div className="shrink-0 text-[12px] font-semibold text-emerald-700">
-                            Ativo
-                          </div>
+                          <div className="shrink-0 text-[12px] font-semibold text-emerald-700">Ativo</div>
                         ) : (
                           <div className="shrink-0 text-[12px] font-semibold text-black/45">Ver</div>
                         )}
@@ -326,12 +293,12 @@ export default function AppChrome({ children }: Props) {
         </div>
       </MenuCarouselModal>
 
-      {/* ✅ FAVORITOS usa o MESMO MODAL */}
+      {/* FAVORITOS */}
       <MenuCarouselModal open={favoritesOpen} onClose={() => setFavoritesOpen(false)} hideHeader>
         {favoritesContent}
       </MenuCarouselModal>
 
-      {/* ✅ Placeholder do Clube (por enquanto) */}
+      {/* CLUBE placeholder */}
       {clubeOpen && (
         <div className="fixed inset-0 z-[999]">
           <button
@@ -346,9 +313,7 @@ export default function AppChrome({ children }: Props) {
                 <div className="px-4 pt-3 pb-4">
                   <div className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-black/15" />
                   <div className="text-[14px] font-semibold text-black">Meu Clube</div>
-                  <div className="mt-1 text-[13px] text-black/60">
-                    Aqui vão as informações do clube (placeholder).
-                  </div>
+                  <div className="mt-1 text-[13px] text-black/60">Aqui vão as informações do clube (placeholder).</div>
 
                   <button
                     type="button"

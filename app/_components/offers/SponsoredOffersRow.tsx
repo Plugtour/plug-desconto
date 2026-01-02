@@ -1,16 +1,21 @@
 // app/_components/offers/SponsoredOffersRow.tsx
 'use client';
 
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { SponsoredOffer } from '../../../_data/sponsoredOffers';
 import SideDrawer from './SideDrawer';
 import OfferEconomyLine from './OfferEconomyLine';
 
-type Props = {
-  items: SponsoredOffer[];
-  className?: string;
-  title?: string;
-};
+// ✅ store global de favoritos
+import { getFavorites, onFavoritesChange, toggleFavorite } from '../favorites/favoritesStore';
+
+/* =========================
+   HELPERS
+========================= */
+function safeHref(v: any) {
+  const s = typeof v === 'string' ? v.trim() : '';
+  return s.length ? s : '/';
+}
 
 /* =========================
    ESTRELAS (preenchimento proporcional, coladas)
@@ -59,8 +64,8 @@ function StarsRow({ rating }: { rating: number }) {
    TAGS — Cidade | Categoria | Tipo
 ========================= */
 function buildTags(item: SponsoredOffer) {
-  if (Array.isArray(item.tags) && item.tags.length === 3) {
-    return item.tags.join(' | ');
+  if (Array.isArray((item as any).tags) && (item as any).tags.length === 3) {
+    return (item as any).tags.join(' | ');
   }
   return '';
 }
@@ -100,6 +105,22 @@ function DoubleChevronOpen({ dir, className }: { dir: 'up' | 'down'; className?:
   );
 }
 
+function buildFavMapFromStore(): Record<string, boolean> {
+  const list = getFavorites?.() ?? [];
+  const map: Record<string, boolean> = {};
+  for (const it of list as any[]) {
+    const id = String((it as any)?.id ?? '');
+    if (id) map[id] = true;
+  }
+  return map;
+}
+
+type Props = {
+  items: SponsoredOffer[];
+  className?: string;
+  title?: string;
+};
+
 /* =========================
    COMPONENTE PRINCIPAL
 ========================= */
@@ -109,6 +130,7 @@ export default function SponsoredOffersRow({ items, className, title = 'Patrocin
   const [favIds, setFavIds] = useState<Record<string, boolean>>({});
   const [expanded, setExpanded] = useState(false);
 
+  // ✅ medidas (mantidas)
   const CARD_ROW_HEIGHT = 119; // era 108
   const GRADIENT_TOP_OFFSET = 14;
   const COLLAPSED_HEIGHT = Math.round(CARD_ROW_HEIGHT * 1.5) + 5;
@@ -119,15 +141,21 @@ export default function SponsoredOffersRow({ items, className, title = 'Patrocin
 
   const [boxH, setBoxH] = useState<number>(COLLAPSED_HEIGHT);
   const heightAnimRef = useRef<Animation | null>(null);
-
   const [animating, setAnimating] = useState(false);
 
   const [modalOpen, setModalOpen] = useState(false);
 
-  // ✅ ajuste fino aqui (o “número que você quer mexer”)
-  // quanto MAIOR, mais “pra baixo” ele para
-  // quanto MENOR, mais “pra cima” ele para
   const SCROLL_OFFSET = 90;
+
+  useEffect(() => {
+    const sync = () => setFavIds(buildFavMapFromStore());
+    sync();
+
+    const off = onFavoritesChange?.(sync);
+    return () => {
+      if (typeof off === 'function') off();
+    };
+  }, []);
 
   function scrollToFirstCard(behavior: ScrollBehavior = 'auto') {
     const el = wrapperRef.current;
@@ -144,15 +172,12 @@ export default function SponsoredOffersRow({ items, className, title = 'Patrocin
   }
 
   function openModal() {
-    // ✅ sempre posiciona no 1º card antes de abrir
     scrollToFirstCard('auto');
     setModalOpen(true);
   }
 
   function closeModal() {
     setModalOpen(false);
-
-    // ✅ ao fechar, garante voltar e “assentar” no 1º card
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         scrollToFirstCard('auto');
@@ -160,11 +185,6 @@ export default function SponsoredOffersRow({ items, className, title = 'Patrocin
     });
   }
 
-  function toggleFav(id: string) {
-    setFavIds((prev) => ({ ...prev, [id]: !prev[id] }));
-  }
-
-  // ✅ ao abrir (expandir), a página só “assenta” DEPOIS que layout estabiliza
   function settleAfterExpand() {
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
@@ -190,7 +210,6 @@ export default function SponsoredOffersRow({ items, className, title = 'Patrocin
 
     stopHeightAnim();
     setBoxH(from);
-
     setAnimating(true);
 
     const anim = el.animate([{ height: `${from}px` }, { height: `${to}px` }], {
@@ -290,8 +309,8 @@ export default function SponsoredOffersRow({ items, className, title = 'Patrocin
             {shown.map((item, idx) => {
               const isFav = !!favIds[item.id];
               const tagsLine = buildTags(item);
-              const rating = item.rating ?? 4.8;
-              const reviews = item.reviews ?? 0;
+              const rating = (item as any).rating ?? 4.8;
+              const reviews = (item as any).reviews ?? 0;
 
               const handleCardClick = () => {
                 if (idx === 0) {
@@ -322,12 +341,18 @@ export default function SponsoredOffersRow({ items, className, title = 'Patrocin
                   >
                     <div className="flex gap-3">
                       <div className="h-[106px] w-[106px] flex-none overflow-hidden rounded-md bg-zinc-200">
-                        <img src={item.imageUrl} alt={item.title} className="h-full w-full object-cover" loading="lazy" />
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={(item as any).imageUrl}
+                          alt={(item as any).title}
+                          className="h-full w-full object-cover"
+                          loading="lazy"
+                        />
                       </div>
 
                       <div className="min-w-0 flex-1">
                         <div className="pr-[41px] text-[12px] font-extrabold leading-snug text-zinc-900 line-clamp-2">
-                          {item.title}
+                          {(item as any).title}
                         </div>
 
                         <div className="mt-[4px]">
@@ -341,9 +366,9 @@ export default function SponsoredOffersRow({ items, className, title = 'Patrocin
 
                         <div className="mt-1.5 flex items-end justify-between">
                           <div>
-                            <StarsRow rating={rating} />
+                            <StarsRow rating={Number(rating)} />
                             <div className="-mt-0.5 text-[12px] text-zinc-500">
-                              <span className="font-semibold text-zinc-700">{rating.toFixed(1)}</span> de{' '}
+                              <span className="font-semibold text-zinc-700">{Number(rating).toFixed(1)}</span> de{' '}
                               <span className="font-semibold text-zinc-700">{reviews}</span> avaliações
                             </div>
                           </div>
@@ -369,6 +394,7 @@ export default function SponsoredOffersRow({ items, className, title = 'Patrocin
                       </div>
                     </div>
 
+                    {/* ✅ coração usa store (href sempre string) */}
                     <button
                       type="button"
                       aria-label={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
@@ -377,7 +403,20 @@ export default function SponsoredOffersRow({ items, className, title = 'Patrocin
                         e.preventDefault();
                         e.stopPropagation();
                         if (disableHeart) return;
-                        toggleFav(item.id);
+
+                        toggleFavorite({
+                          id: item.id,
+                          title: (item as any).title ?? '',
+                          href: safeHref((item as any).href),
+                          imageUrl: (item as any).imageUrl ?? null,
+                          subtitle: (item as any).subtitle ?? null,
+                          city: (Array.isArray((item as any).tags) ? (item as any).tags?.[0] : null) ?? null,
+                          priceText: (item as any).priceText ?? null,
+                          savingsText: (item as any).savingsText ?? null,
+                          rating: (item as any).rating ?? null,
+                          reviews: (item as any).reviews ?? null,
+                          tags: (item as any).tags ?? null,
+                        } as any);
                       }}
                       className={[
                         'absolute -right-[4px] top-2 inline-flex h-10 w-10 items-center justify-center',
