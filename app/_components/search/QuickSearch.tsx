@@ -253,6 +253,9 @@ function safeClearStoredQuery() {
   } catch {}
 }
 
+/* =========================
+   UI helpers (chips / filtro)
+========================= */
 function Chip({
   label,
   selected,
@@ -307,8 +310,7 @@ export function QuickSearchPanel({
   const debounced = useDebouncedValue(value, 120);
   const hasQuery = value.trim().length > 0;
 
-  const [filtersOpen, setFiltersOpen] = useState(true);
-
+  // ✅ estados locais (UI)
   const [priceBand, setPriceBand] = useState<string | null>(null);
   const [percentBand, setPercentBand] = useState<string | null>(null);
   const [topRatedSort, setTopRatedSort] = useState<'desc' | 'asc' | null>(null);
@@ -466,173 +468,113 @@ export function QuickSearchPanel({
           </button>
         </div>
 
-          {/* ✅ CATEGORIAS EM CARROSSEL, mantendo o card 1:1 do grid */}
-          <div className="mt-3">
-            <div className="text-[12px] font-semibold text-black/60">Categorias</div>
+        {/* ✅ CATEGORIAS (carrossel) */}
+        <div className="mt-3">
+          <div className="text-[12px] font-semibold text-black/60">Categorias</div>
 
-            <div
-              className="mt-2 flex gap-2 overflow-x-auto overflow-y-hidden scrollbar-none"
-              style={{
-                WebkitOverflowScrolling: 'touch',
-                scrollSnapType: 'x proximity',
-              }}
-            >
-              {filteredCats.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  className={[
-                    'touch-manipulation shrink-0',
-                    'rounded-md bg-white/90 border border-neutral-200/60',
-                    'px-2 py-2',
-                    'flex flex-col items-center gap-0',
-                    'hover:bg-black/5 transition-colors',
-                  ].join(' ')}
-                  style={{
-                    scrollSnapAlign: 'start',
-                    width: 96, // ✅ era 106 (reduziu 5px de cada lado)
-                  }}
-                  onClick={() => {
-                    setValue(c.title);
-                    setActive(0);
-                    inputRef.current?.focus();
-                  }}
-                >
-                  <CategoryIcon id={c.id} className="h-5 w-5" />
-                  <span className="w-full px-1 text-center text-[11px] font-semibold leading-[1.15] text-neutral-800 line-clamp-2">
-                    {c.title}
-                  </span>
-                  <span className="mt-[0px] text-[11px] text-neutral-500">
-                    {typeof c.count === 'number' ? c.count : ''}
-                  </span>
-                </button>
+          <div
+            className="mt-2 flex gap-2 overflow-x-auto overflow-y-hidden scrollbar-none"
+            style={{ WebkitOverflowScrolling: 'touch', scrollSnapType: 'x proximity' }}
+          >
+            {filteredCats.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                className="touch-manipulation shrink-0 rounded-md bg-white/90 border border-neutral-200/60 px-2 py-2 flex flex-col items-center gap-0 hover:bg-black/5 transition-colors"
+                style={{ scrollSnapAlign: 'start', width: 96 }}
+                onClick={() => {
+                  setValue(c.title);
+                  setActive(0);
+                  inputRef.current?.focus();
+                }}
+              >
+                <CategoryIcon id={c.id} className="h-5 w-5" />
+                <span className="w-full px-1 text-center text-[11px] font-semibold leading-[1.15] text-neutral-800 line-clamp-2">
+                  {c.title}
+                </span>
+                <span className="mt-[0px] text-[11px] text-neutral-500">
+                  {typeof c.count === 'number' ? c.count : ''}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* ✅ FILTRO SEM “CAIXINHA” — SEM ABRE/FECHA — SEM X */}
+        <div className="mt-4">
+          <div className="text-[13px] font-extrabold text-red-600">
+            Preço e percentual médio de economia
+          </div>
+          <div className="mt-1 text-[11px] leading-[1.25] text-black/55">
+            A economia média por assinatura nos estabelecimentos conveniados. Este valor é uma
+            estimativa fornecida pelos próprios estabelecimentos e varia de acordo com as escolhas
+            do consumidor.
+          </div>
+
+          <div className="mt-3">
+            <FilterSectionTitle>Preço médio de economia:</FilterSectionTitle>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {[
+                'Até R$25',
+                'R$25 - R$50',
+                'R$50 - R$75',
+                'R$100 - R$150',
+                'R$150 - R$200',
+                'R$200 - R$250',
+                'R$250 - R$300',
+                'R$300 - R$400',
+                'Acima de R$400',
+              ].map((lab) => (
+                <Chip
+                  key={lab}
+                  label={lab}
+                  selected={priceBand === lab}
+                  onClick={() => setPriceBand((prev) => (prev === lab ? null : lab))}
+                />
               ))}
             </div>
           </div>
 
-        {/* filtro (sem mudanças) */}
-        <div className="mt-3">
-          {filtersOpen ? (
-            <div className="rounded-xl bg-white/95 ring-1 ring-black/10 shadow-sm px-3 py-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-[13px] font-extrabold text-red-600">
-                    Preço e percentual médio de economia
-                  </div>
-                  <div className="mt-1 text-[11px] leading-[1.25] text-black/55">
-                    A economia média por assinatura nos estabelecimentos conveniados. Este valor é
-                    uma estimativa fornecida pelos próprios estabelecimentos e varia de acordo com
-                    as escolhas do consumidor.
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setFiltersOpen(false)}
-                  aria-label="Fechar filtro"
-                  className="shrink-0 touch-manipulation rounded-md p-2 text-black/55 hover:text-black"
-                >
-                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none">
-                    <path
-                      d="M7 7l10 10M17 7 7 17"
-                      stroke="currentColor"
-                      strokeWidth="2.2"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                </button>
-              </div>
-
-              <div className="mt-3">
-                <FilterSectionTitle>Preço médio de economia:</FilterSectionTitle>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {[
-                    'Até R$25',
-                    'R$25 - R$50',
-                    'R$50 - R$75',
-                    'R$100 - R$150',
-                    'R$150 - R$200',
-                    'R$200 - R$250',
-                    'R$250 - R$300',
-                    'R$300 - R$400',
-                    'Acima de R$400',
-                  ].map((lab) => (
-                    <Chip
-                      key={lab}
-                      label={lab}
-                      selected={priceBand === lab}
-                      onClick={() => setPriceBand((prev) => (prev === lab ? null : lab))}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              <div className="mt-3">
-                <FilterSectionTitle>Percentual médio de economia:</FilterSectionTitle>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {[
-                    'Até 10%',
-                    '10% - 15%',
-                    '15% - 20%',
-                    '20% - 25%',
-                    '25% - 30%',
-                    '30% - 35%',
-                    '35% - 40%',
-                    '40% - 45%',
-                    '45% - 50%',
-                    'Acima de 50%',
-                  ].map((lab) => (
-                    <Chip
-                      key={lab}
-                      label={lab}
-                      selected={percentBand === lab}
-                      onClick={() => setPercentBand((prev) => (prev === lab ? null : lab))}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              <div className="mt-3">
-                <FilterSectionTitle>Melhores avaliados:</FilterSectionTitle>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <Chip
-                    label="Maior para o menor"
-                    selected={topRatedSort === 'desc'}
-                    onClick={() => setTopRatedSort((prev) => (prev === 'desc' ? null : 'desc'))}
-                  />
-                  <Chip
-                    label="Menor para maior"
-                    selected={topRatedSort === 'asc'}
-                    onClick={() => setTopRatedSort((prev) => (prev === 'asc' ? null : 'asc'))}
-                  />
-                </div>
-              </div>
+          <div className="mt-3">
+            <FilterSectionTitle>Percentual médio de economia:</FilterSectionTitle>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {[
+                'Até 10%',
+                '10% - 15%',
+                '15% - 20%',
+                '20% - 25%',
+                '25% - 30%',
+                '30% - 35%',
+                '35% - 40%',
+                '40% - 45%',
+                '45% - 50%',
+                'Acima de 50%',
+              ].map((lab) => (
+                <Chip
+                  key={lab}
+                  label={lab}
+                  selected={percentBand === lab}
+                  onClick={() => setPercentBand((prev) => (prev === lab ? null : lab))}
+                />
+              ))}
             </div>
-          ) : (
-            <div className="rounded-xl bg-white/95 ring-1 ring-black/10 shadow-sm px-3 py-2">
-              <button
-                type="button"
-                onClick={() => setFiltersOpen(true)}
-                className="w-full touch-manipulation flex items-center justify-between gap-3"
-                aria-label="Abrir filtro"
-              >
-                <div className="min-w-0">
-                  <div className="text-[12px] font-extrabold text-red-600">Filtro</div>
-                  <div className="text-[11px] text-black/55">3 opções de filtro</div>
-                </div>
+          </div>
 
-                <svg viewBox="0 0 24 24" className="h-5 w-5 text-black/55" fill="none" aria-hidden="true">
-                  <path
-                    d="M9 6l6 6-6 6"
-                    stroke="currentColor"
-                    strokeWidth="2.2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </button>
+          <div className="mt-3">
+            <FilterSectionTitle>Melhores avaliados:</FilterSectionTitle>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Chip
+                label="Maior para o menor"
+                selected={topRatedSort === 'desc'}
+                onClick={() => setTopRatedSort((prev) => (prev === 'desc' ? null : 'desc'))}
+              />
+              <Chip
+                label="Menor para maior"
+                selected={topRatedSort === 'asc'}
+                onClick={() => setTopRatedSort((prev) => (prev === 'asc' ? null : 'asc'))}
+              />
             </div>
-          )}
+          </div>
         </div>
       </div>
 
