@@ -274,7 +274,7 @@ function Chip({
         'ring-1 transition-colors',
         selected
           ? 'bg-emerald-600 text-white ring-emerald-600'
-          : 'bg-neutral-100 text-neutral-700 ring-black/10 hover:bg-neutral-200',
+          : 'bg-white text-neutral-700 ring-black/10 hover:bg-neutral-50',
       ].join(' ')}
     >
       {label}
@@ -392,7 +392,6 @@ export function QuickSearchPanel({
         <div className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-black/15" />
 
         <div className="flex items-center gap-2">
-          {/* ✅ VOLTA PADRÃO (branco) */}
           <div className="flex items-center gap-2 rounded-md bg-white/90 shadow-sm ring-1 ring-black/10 px-3 py-2 flex-1">
             <span className="shrink-0 opacity-60" aria-hidden="true">
               <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none">
@@ -468,7 +467,6 @@ export function QuickSearchPanel({
           </button>
         </div>
 
-        {/* ✅ CATEGORIAS (carrossel) — VOLTA CARD PADRÃO */}
         <div className="mt-3">
           <div className="text-[12px] font-semibold text-black/60">Categorias</div>
 
@@ -485,7 +483,6 @@ export function QuickSearchPanel({
                   'rounded-md',
                   'bg-white/90',
                   'shadow-sm',
-                  'ring-1 ring-black/10',
                   'px-2 py-2',
                   'flex flex-col items-center gap-0',
                   'transition-colors',
@@ -511,17 +508,16 @@ export function QuickSearchPanel({
           </div>
         </div>
 
-        {/* ✅ FILTRO (branco / quase branco) no padrão dos demais menus */}
-        <div className="mt-4 rounded-md bg-white/90 shadow-sm ring-1 ring-black/10 px-4 py-4">
-          <div className="text-[13px] font-extrabold text-red-600">Preço e percentual médio de economia</div>
+        <div className="mt-4 px-0 py-0">
+          <div className="text-[13px] font-bold text-red-600">Preço e percentual médio de economia</div>
           <div className="mt-1 text-[11px] leading-[1.25] text-black/55">
             A economia média por assinatura nos estabelecimentos conveniados. Este valor é uma estimativa fornecida
             pelos próprios estabelecimentos e varia de acordo com as escolhas do consumidor.
           </div>
 
-          <div className="mt-3">
+          <div className="mt-4">
             <FilterSectionTitle>Preço médio de economia:</FilterSectionTitle>
-            <div className="mt-2 flex flex-wrap gap-2">
+            <div className="mt-3 flex flex-wrap gap-2">
               {[
                 'Até R$25',
                 'R$25 - R$50',
@@ -543,9 +539,9 @@ export function QuickSearchPanel({
             </div>
           </div>
 
-          <div className="mt-3">
+          <div className="mt-4">
             <FilterSectionTitle>Percentual médio de economia:</FilterSectionTitle>
-            <div className="mt-2 flex flex-wrap gap-2">
+            <div className="mt-3 flex flex-wrap gap-2">
               {[
                 'Até 10%',
                 '10% - 15%',
@@ -568,9 +564,9 @@ export function QuickSearchPanel({
             </div>
           </div>
 
-          <div className="mt-3">
+          <div className="mt-4">
             <FilterSectionTitle>Melhores avaliados:</FilterSectionTitle>
-            <div className="mt-2 flex flex-wrap gap-2">
+            <div className="mt-3 flex flex-wrap gap-2">
               <Chip
                 label="Maior para o menor"
                 selected={topRatedSort === 'desc'}
@@ -621,20 +617,13 @@ export function QuickSearchPanel({
                         <div className="h-10 w-10 overflow-hidden rounded-lg bg-black/5 shrink-0">
                           {o.imageUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={o.imageUrl}
-                              alt=""
-                              className="h-full w-full object-cover"
-                              loading="lazy"
-                            />
+                            <img src={o.imageUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
                           ) : null}
                         </div>
 
                         <div className="min-w-0 flex-1">
                           <div className="truncate text-[14px] font-semibold text-black">{o.title}</div>
-                          <div className="truncate text-[12px] text-black/60">
-                            {o.subtitle || o.city || ''}
-                          </div>
+                          <div className="truncate text-[12px] text-black/60">{o.subtitle || o.city || ''}</div>
                         </div>
 
                         {o.priceText ? (
@@ -675,14 +664,9 @@ export default function QuickSearch({
     <div className={className}>
       <div className="px-0 py-3">
         <div className="flex items-stretch gap-2">
-          <button
-            type="button"
-            onClick={openSheet}
-            className="flex-1 touch-manipulation"
-            aria-label="Abrir busca"
-          >
-            {/* ✅ mantém como estava */}
-            <div className="h-[44px] flex items-center rounded-md ring-1 ring-black/10 px-3">
+          <button type="button" onClick={openSheet} className="flex-1 touch-manipulation" aria-label="Abrir busca">
+            {/* ✅ AJUSTE: campo "da frente" branco */}
+            <div className="h-[44px] flex items-center rounded-md bg-white shadow-sm ring-1 ring-black/10 px-3">
               <div className="flex-1 text-left text-[14px] leading-none text-black/45">{placeholder}</div>
             </div>
           </button>
