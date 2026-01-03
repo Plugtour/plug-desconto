@@ -112,9 +112,9 @@ export default function MenuCarouselModal({
               paddingRight: SIDE_GUTTER_PX,
             }}
           >
-            {/* BOTÃO FECHAR — alinhado à direita */}
-            <div className="relative pt-1 flex justify-end">
-              <div className="w-full flex justify-end pr-0">
+            {/* BOTÃO FECHAR — alinhado à esquerda */}
+            <div className="relative pt-1 flex justify-start">
+              <div className="w-full flex justify-start pl-0">
                 <button
                   type="button"
                   onClick={(e) => {
