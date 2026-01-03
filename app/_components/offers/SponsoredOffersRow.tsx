@@ -7,8 +7,8 @@ import Link from 'next/link';
 import type { SponsoredOffer } from '../../../_data/sponsoredOffers';
 import OfferEconomyLine from './OfferEconomyLine';
 
-// ✅ Modal 2 (direita -> esquerda)
-import RightDrawerModal from '../modals/RightDrawerModal';
+// ✅ Modal 2 (por enquanto idêntico ao Modal 1)
+import MenuCarouselModalRight from '../modals/MenuCarouselModalRight';
 
 // ✅ store global de favoritos
 import { getFavorites, onFavoritesChange, toggleFavorite } from '../favorites/favoritesStore';
@@ -358,10 +358,7 @@ export default function SponsoredOffersRow({ items, className, title = 'Patrocin
 
         {/* Economia / preço */}
         <div className="mt-2">
-          <OfferEconomyLine
-            savingsText={(selectedItem as any).savingsText ?? null}
-            priceText={(selectedItem as any).priceText ?? null}
-          />
+          <OfferEconomyLine savingsText={(selectedItem as any).savingsText ?? null} priceText={(selectedItem as any).priceText ?? null} />
         </div>
 
         {/* Avaliações */}
@@ -395,17 +392,22 @@ export default function SponsoredOffersRow({ items, className, title = 'Patrocin
     );
   }, [selectedItem, favIds]);
 
+  const modalTitle = selectedItem ? ((selectedItem as any).tags?.[1] ?? 'Detalhes') : 'Detalhes';
+  const modalSubtitle = selectedItem ? ((selectedItem as any).tags?.[0] ?? null) : null;
+
   return (
     <section className={['w-full', className || ''].join(' ')}>
-      {/* ✅ Modal 2 */}
-      <RightDrawerModal
-        open={modalOpen}
-        onClose={closeModal}
-        title={selectedItem ? ((selectedItem as any).tags?.[1] ?? 'Detalhes') : 'Detalhes'}
-        subtitle={selectedItem ? ((selectedItem as any).tags?.[0] ?? null) : null}
-      >
+      {/* ✅ Modal 2 (substitui RightDrawerModal) */}
+      <MenuCarouselModalRight open={modalOpen} onClose={closeModal} hideHeader>
+        {/* Cabeçalho equivalente ao title/subtitle do RightDrawerModal */}
+        <div className="px-4 pt-3 pb-2">
+          <div className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-black/15" />
+          <div className="text-[14px] font-semibold text-black">{modalTitle}</div>
+          {modalSubtitle ? <div className="mt-1 text-[13px] text-black/60">{modalSubtitle}</div> : null}
+        </div>
+
         {modalContent}
-      </RightDrawerModal>
+      </MenuCarouselModalRight>
 
       <div className="mb-1 px-4 text-[12px] font-medium text-zinc-500">{title}</div>
 
@@ -543,9 +545,7 @@ export default function SponsoredOffersRow({ items, className, title = 'Patrocin
                     >
                       <HeartIcon
                         filled={isFav}
-                        className={['h-9 w-9 transition', isFav ? 'text-red-500' : 'text-zinc-300 hover:text-zinc-400'].join(
-                          ' '
-                        )}
+                        className={['h-9 w-9 transition', isFav ? 'text-red-500' : 'text-zinc-300 hover:text-zinc-400'].join(' ')}
                       />
                     </button>
                   </div>
@@ -592,9 +592,7 @@ export default function SponsoredOffersRow({ items, className, title = 'Patrocin
           style={{ touchAction: 'pan-y' }}
           aria-label={expanded ? 'Ver menos patrocinados' : 'Ver mais patrocinados'}
         >
-          <div className="text-[15px] font-semibold text-emerald-700 hover:text-emerald-800">
-            {expanded ? 'Ver menos' : 'Ver mais'}
-          </div>
+          <div className="text-[15px] font-semibold text-emerald-700 hover:text-emerald-800">{expanded ? 'Ver menos' : 'Ver mais'}</div>
 
           <div className="text-zinc-400">
             <DoubleChevronOpen dir={expanded ? 'up' : 'down'} className="h-10 w-10" />

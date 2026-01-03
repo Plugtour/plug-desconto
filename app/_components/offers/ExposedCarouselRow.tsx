@@ -4,8 +4,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 
-// ✅ Modal 2 (direita -> esquerda)
-import RightDrawerModal from '../modals/RightDrawerModal';
+// ✅ Modal 2 (por enquanto idêntico ao Modal 1)
+import MenuCarouselModalRight from '../modals/MenuCarouselModalRight';
 
 // ✅ store global de favoritos
 import { getFavorites, onFavoritesChange, toggleFavorite } from '../favorites/favoritesStore';
@@ -232,9 +232,7 @@ export default function ExposedCarouselRow({
         </div>
 
         {/* Economia */}
-        {savings ? (
-          <div className="mt-2 text-[12px] font-medium text-zinc-900 leading-[1.2]">{savings}</div>
-        ) : null}
+        {savings ? <div className="mt-2 text-[12px] font-medium text-zinc-900 leading-[1.2]">{savings}</div> : null}
 
         {/* Avaliações */}
         <div className="mt-2">
@@ -269,10 +267,17 @@ export default function ExposedCarouselRow({
 
   return (
     <section className={className}>
-      {/* ✅ Modal 2 */}
-      <RightDrawerModal open={drawerOpen} onClose={closeModal} title="Detalhes" subtitle={categoryLabel}>
+      {/* ✅ Modal 2 (substitui RightDrawerModal) */}
+      <MenuCarouselModalRight open={drawerOpen} onClose={closeModal} hideHeader>
+        {/* Cabeçalho equivalente ao title/subtitle do RightDrawerModal */}
+        <div className="px-4 pt-3 pb-2">
+          <div className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-black/15" />
+          <div className="text-[14px] font-semibold text-black">Detalhes</div>
+          <div className="mt-1 text-[13px] text-black/60">{categoryLabel}</div>
+        </div>
+
         {modalContent}
-      </RightDrawerModal>
+      </MenuCarouselModalRight>
 
       {/* Cabeçalho */}
       <div className="px-4 mb-3 flex items-center justify-between">
@@ -349,9 +354,7 @@ export default function ExposedCarouselRow({
 
               {/* TEXTO */}
               <div className="bg-zinc-200 px-4 py-3">
-                <div className="min-h-[36px] text-[13px] font-extrabold leading-[1.25] text-zinc-900 line-clamp-2">
-                  {item.title}
-                </div>
+                <div className="min-h-[36px] text-[13px] font-extrabold leading-[1.25] text-zinc-900 line-clamp-2">{item.title}</div>
 
                 <div className="mt-3">
                   <div className="text-[12px] font-normal text-zinc-600 leading-[1.2]">{categoryLabel}</div>

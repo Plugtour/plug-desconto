@@ -1,4 +1,5 @@
 // lib/api.ts
+
 import { headers } from 'next/headers';
 
 async function readHeader(name: string) {
@@ -37,14 +38,9 @@ async function getBaseUrl() {
 
   if (env) return env;
 
-  const host =
-    (await readHeader('x-forwarded-host')) ??
-    (await readHeader('host')) ??
-    'localhost:3000';
+  const host = (await readHeader('x-forwarded-host')) ?? (await readHeader('host')) ?? 'localhost:3000';
 
-  const proto =
-    (await readHeader('x-forwarded-proto')) ??
-    'http';
+  const proto = (await readHeader('x-forwarded-proto')) ?? 'http';
 
   return `${proto}://${host}`;
 }
@@ -64,7 +60,8 @@ export async function apiGetOffers(category?: string) {
   const base = await getBaseUrl();
   const url = new URL('/api/offers', base);
 
-  if (category) url.searchParams.set('category', category);
+  // ✅ Corrigido: a API espera "categoryId", não "category"
+  if (category) url.searchParams.set('categoryId', category);
 
   const res = await fetch(url.toString(), {
     cache: 'no-store',
@@ -75,7 +72,6 @@ export async function apiGetOffers(category?: string) {
   }
 
   const json = (await res.json()) as {
-    ok: boolean;
     total: number;
     items: ApiOffer[];
   };
@@ -98,7 +94,6 @@ export async function apiGetOffer(slugOrId: string) {
   }
 
   const json = (await res.json()) as {
-    ok: boolean;
     item: ApiOffer;
   };
 

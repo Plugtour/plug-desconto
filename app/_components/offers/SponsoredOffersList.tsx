@@ -5,7 +5,9 @@ import React, { useEffect, useMemo, useRef, useState, useLayoutEffect } from 're
 import Link from 'next/link';
 import type { SponsoredOffer } from '../../../_data/sponsoredOffers';
 import OfferEconomyLine from './OfferEconomyLine';
-import RightDrawerModal from '@/app/_components/modals/RightDrawerModal';
+
+// ✅ Modal 2 (cópia idêntica do Modal 1 — por enquanto)
+import MenuCarouselModalRight from '@/app/_components/modals/MenuCarouselModalRight';
 
 import {
   getFavorites,
@@ -127,8 +129,17 @@ function TempImagePlaceholder() {
           strokeWidth="2"
           strokeLinejoin="round"
         />
-        <path d="M8 11.5l2.2 2.2L14.2 9.7 20 15.5" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
-        <path d="M9 9.2a.9.9 0 1 0 0-1.8.9.9 0 0 0 0 1.8Z" stroke="currentColor" strokeWidth="2" />
+        <path
+          d="M8 11.5l2.2 2.2L14.2 9.7 20 15.5"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M9 9.2a.9.9 0 1 0 0-1.8.9.9 0 0 0 0 1.8Z"
+          stroke="currentColor"
+          strokeWidth="2"
+        />
       </svg>
     </div>
   );
@@ -165,7 +176,12 @@ function FilterIcon({
     case 'todos':
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none" aria-hidden="true">
-          <path d="M6.5 7.5h11M6.5 12h11M6.5 16.5h11" stroke={c} strokeWidth="2" strokeLinecap="round" />
+          <path
+            d="M6.5 7.5h11M6.5 12h11M6.5 16.5h11"
+            stroke={c}
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
         </svg>
       );
     case 'melhores':
@@ -204,7 +220,13 @@ function FilterIcon({
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none" aria-hidden="true">
           <circle cx="12" cy="12" r="9" stroke={c} strokeWidth="2" />
-          <path d="M12 7v5l3 2" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          <path
+            d="M12 7v5l3 2"
+            stroke={c}
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </svg>
       );
     case 'perto':
@@ -216,7 +238,11 @@ function FilterIcon({
             strokeWidth="2"
             strokeLinejoin="round"
           />
-          <path d="M12 11.2a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4z" stroke={c} strokeWidth="2" />
+          <path
+            d="M12 11.2a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4z"
+            stroke={c}
+            strokeWidth="2"
+          />
         </svg>
       );
     case 'delivery':
@@ -258,7 +284,9 @@ function FilterChip({
         'inline-flex items-center gap-2',
         'border transition-colors',
         'touch-manipulation select-none',
-        isActive ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-zinc-300 bg-zinc-100 text-zinc-700 hover:bg-zinc-200',
+        isActive
+          ? 'border-emerald-700 bg-emerald-700 text-white'
+          : 'border-zinc-300 bg-zinc-100 text-zinc-700 hover:bg-zinc-200',
       ].join(' ')}
     >
       <span className="inline-flex items-center justify-center">
@@ -306,8 +334,7 @@ export default function SponsoredOffersList({
   ========================= */
   const [favoritesVersion, setFavoritesVersion] = useState(0);
 
-  useEffect(() => {
-    // garante que ao abrir a tela já reflita o storage
+  useLayoutEffect(() => {
     const sync = () => setFavoritesVersion((v) => v + 1);
     sync();
     const off = onFavoritesChange(sync);
@@ -407,7 +434,10 @@ export default function SponsoredOffersList({
     setVisibleCount(Math.min(initialCount, total));
   }, [active, initialCount, total]);
 
-  const visibleItems = useMemo(() => filteredItems.slice(0, visibleCount), [filteredItems, visibleCount]);
+  const visibleItems = useMemo(
+    () => filteredItems.slice(0, visibleCount),
+    [filteredItems, visibleCount]
+  );
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const lockRef = useRef(false);
@@ -566,7 +596,12 @@ export default function SponsoredOffersList({
                     <div className="h-[106px] w-[106px] flex-none overflow-hidden rounded-md bg-zinc-200">
                       {imageUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={imageUrl} alt={o.title} className="h-full w-full object-cover" loading="lazy" />
+                        <img
+                          src={imageUrl}
+                          alt={o.title}
+                          className="h-full w-full object-cover"
+                          loading="lazy"
+                        />
                       ) : (
                         <TempImagePlaceholder />
                       )}
@@ -608,7 +643,10 @@ export default function SponsoredOffersList({
                   >
                     <HeartIcon
                       filled={isFav}
-                      className={['h-9 w-9 transition', isFav ? 'text-red-500' : 'text-zinc-300 hover:text-zinc-400'].join(' ')}
+                      className={[
+                        'h-9 w-9 transition',
+                        isFav ? 'text-red-500' : 'text-zinc-300 hover:text-zinc-400',
+                      ].join(' ')}
                     />
                   </button>
                 </div>
@@ -644,9 +682,10 @@ export default function SponsoredOffersList({
 
   return (
     <section className={['w-full', className || ''].join(' ')}>
-      <RightDrawerModal open={modalOpen} onClose={closeModal} hideHeader>
+      {/* ✅ TROCA AQUI: antes era RightDrawerModal */}
+      <MenuCarouselModalRight open={modalOpen} onClose={closeModal} hideHeader>
         {modalContent}
-      </RightDrawerModal>
+      </MenuCarouselModalRight>
 
       {showTitle ? <div className="mb-1 px-4 text-[12px] font-medium text-zinc-500">{title}</div> : null}
 
@@ -664,11 +703,19 @@ export default function SponsoredOffersList({
               Todos
             </FilterChip>
 
-            <FilterChip iconKind="melhores" isActive={active === 'melhores'} onClick={() => setActivePreserveScroll('melhores')}>
+            <FilterChip
+              iconKind="melhores"
+              isActive={active === 'melhores'}
+              onClick={() => setActivePreserveScroll('melhores')}
+            >
               Melhores avaliados
             </FilterChip>
 
-            <FilterChip iconKind="descontos" isActive={active === 'descontos'} onClick={() => setActivePreserveScroll('descontos')}>
+            <FilterChip
+              iconKind="descontos"
+              isActive={active === 'descontos'}
+              onClick={() => setActivePreserveScroll('descontos')}
+            >
               Maiores descontos
             </FilterChip>
 
@@ -676,15 +723,27 @@ export default function SponsoredOffersList({
               Novo
             </FilterChip>
 
-            <FilterChip iconKind="aberto" isActive={active === 'aberto'} onClick={() => setActivePreserveScroll('aberto')}>
+            <FilterChip
+              iconKind="aberto"
+              isActive={active === 'aberto'}
+              onClick={() => setActivePreserveScroll('aberto')}
+            >
               Aberto agora
             </FilterChip>
 
-            <FilterChip iconKind="perto" isActive={active === 'perto'} onClick={() => setActivePreserveScroll('perto')}>
+            <FilterChip
+              iconKind="perto"
+              isActive={active === 'perto'}
+              onClick={() => setActivePreserveScroll('perto')}
+            >
               Perto de mim
             </FilterChip>
 
-            <FilterChip iconKind="delivery" isActive={active === 'delivery'} onClick={() => setActivePreserveScroll('delivery')}>
+            <FilterChip
+              iconKind="delivery"
+              isActive={active === 'delivery'}
+              onClick={() => setActivePreserveScroll('delivery')}
+            >
               Delivery
             </FilterChip>
           </div>
@@ -804,12 +863,17 @@ export default function SponsoredOffersList({
                     >
                       <HeartIcon
                         filled={isFav}
-                        className={['h-9 w-9 transition', isFav ? 'text-red-500' : 'text-zinc-300 hover:text-zinc-400'].join(' ')}
+                        className={[
+                          'h-9 w-9 transition',
+                          isFav ? 'text-red-500' : 'text-zinc-300 hover:text-zinc-400',
+                        ].join(' ')}
                       />
                     </button>
                   </div>
 
-                  {idx < visibleItems.length - 1 ? <div className="mx-2 border-b border-dotted border-zinc-300" /> : null}
+                  {idx < visibleItems.length - 1 ? (
+                    <div className="mx-2 border-b border-dotted border-zinc-300" />
+                  ) : null}
                 </div>
               );
             })}

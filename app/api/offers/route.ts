@@ -1,13 +1,9 @@
 // app/api/offers/route.ts
+
 import { NextResponse } from 'next/server';
 import { getTenantFromRequest } from '@/lib/tenant';
 import type { Offer } from '@/lib/offers';
-import {
-  getOffersByTenant,
-  getOffersByCity,
-  getOffersByCityAndCategory,
-  normalizeCat,
-} from '@/lib/offers';
+import { getOffersByTenant, getOffersByCity, getOffersByCityAndCategory, normalizeCat } from '@/lib/offers';
 
 function normalizeCity(value: string) {
   return value
@@ -53,9 +49,7 @@ export async function GET(request: Request) {
       }
     } else {
       const tenantKey =
-        typeof tenant === 'string'
-          ? tenant
-          : (tenant?.city as string) || (tenant?.tenant as string) || '';
+        typeof tenant === 'string' ? tenant : (tenant?.city as string) || (tenant?.tenant as string) || '';
 
       items = tenantKey ? getOffersByTenant(tenantKey) : [];
     }
@@ -63,7 +57,7 @@ export async function GET(request: Request) {
     // Normaliza categoryId se vier diferente
     if (categoryParam) {
       const cat = normalizeCat(categoryParam);
-      items = items.filter((o) => normalizeCat(String(o.categoryId ?? '')) === cat);
+      items = items.filter((o) => normalizeCat(String((o as any).categoryId ?? '')) === cat);
     }
 
     return NextResponse.json({ items, total: items.length }, { status: 200 });

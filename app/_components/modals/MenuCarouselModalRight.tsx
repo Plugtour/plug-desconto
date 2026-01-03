@@ -19,7 +19,7 @@ type Props = {
   hideHeader?: boolean;
 };
 
-export default function MenuCarouselModal({
+export default function MenuCarouselModalRight({
   open,
   onClose,
   categoryName = null,

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 type Props = {
   open: boolean;
@@ -8,9 +8,37 @@ type Props = {
   children?: React.ReactNode;
 };
 
+const EXIT_MS = 320; // precisa cobrir o duration-300 do modal
+
 export default function ModalOverlay({ open, onClose, children }: Props) {
+  const [mounted, setMounted] = useState(open);
+  const tRef = useRef<number | null>(null);
+
+  // Mantém montado durante o fechamento para o slide completar
   useEffect(() => {
-    if (!open) return;
+    if (open) {
+      if (tRef.current) window.clearTimeout(tRef.current);
+      tRef.current = null;
+      setMounted(true);
+      return;
+    }
+
+    if (!mounted) return;
+
+    tRef.current = window.setTimeout(() => {
+      setMounted(false);
+      tRef.current = null;
+    }, EXIT_MS);
+
+    return () => {
+      if (tRef.current) window.clearTimeout(tRef.current);
+      tRef.current = null;
+    };
+  }, [open, mounted]);
+
+  // ESC para fechar (enquanto estiver montado)
+  useEffect(() => {
+    if (!mounted) return;
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -18,15 +46,20 @@ export default function ModalOverlay({ open, onClose, children }: Props) {
 
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+  }, [mounted, onClose]);
 
-  if (!open) return null;
+  if (!mounted) return null;
 
   return (
     <div className="fixed inset-0 z-[9999]">
       {/* BACKDROP REAL (captura clique) */}
       <div
-        className="absolute inset-0 bg-black/35 backdrop-blur-[4px]"
+        className={[
+          'absolute inset-0',
+          'bg-black/35 backdrop-blur-[4px]',
+          'transition-opacity duration-300',
+          open ? 'opacity-100' : 'opacity-0',
+        ].join(' ')}
         onClick={onClose}
       />
 
