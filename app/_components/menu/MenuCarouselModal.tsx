@@ -158,9 +158,12 @@ export default function MenuCarouselModal({
 
               {/* ✅ Conteúdo reutilizável + rolagem segura */}
               <div
-                className={['h-full', 'flex flex-col', hideHeader ? 'px-4 pt-3 pb-5 overflow-auto' : 'overflow-auto'].join(
-                  ' '
-                )}
+                className={[
+                  'h-full',
+                  'flex flex-col',
+                  // ✅ ÚNICO AJUSTE: remove padding automático quando hideHeader=true
+                  hideHeader ? 'overflow-auto' : 'overflow-auto',
+                ].join(' ')}
               >
                 {children ?? <div className="px-4 pb-6" />}
               </div>

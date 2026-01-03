@@ -310,7 +310,6 @@ export function QuickSearchPanel({
   const debounced = useDebouncedValue(value, 120);
   const hasQuery = value.trim().length > 0;
 
-  // ✅ estados locais (UI)
   const [priceBand, setPriceBand] = useState<string | null>(null);
   const [percentBand, setPercentBand] = useState<string | null>(null);
   const [topRatedSort, setTopRatedSort] = useState<'desc' | 'asc' | null>(null);
@@ -393,6 +392,7 @@ export function QuickSearchPanel({
         <div className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-black/15" />
 
         <div className="flex items-center gap-2">
+          {/* ✅ VOLTA PADRÃO (branco) */}
           <div className="flex items-center gap-2 rounded-md bg-white/90 shadow-sm ring-1 ring-black/10 px-3 py-2 flex-1">
             <span className="shrink-0 opacity-60" aria-hidden="true">
               <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none">
@@ -468,7 +468,7 @@ export function QuickSearchPanel({
           </button>
         </div>
 
-        {/* ✅ CATEGORIAS (carrossel) */}
+        {/* ✅ CATEGORIAS (carrossel) — VOLTA CARD PADRÃO */}
         <div className="mt-3">
           <div className="text-[12px] font-semibold text-black/60">Categorias</div>
 
@@ -480,7 +480,18 @@ export function QuickSearchPanel({
               <button
                 key={c.id}
                 type="button"
-                className="touch-manipulation shrink-0 rounded-md bg-white/90 border border-neutral-200/60 px-2 py-2 flex flex-col items-center gap-0 hover:bg-black/5 transition-colors"
+                className={[
+                  'touch-manipulation shrink-0',
+                  'rounded-md',
+                  'bg-white/90',
+                  'shadow-sm',
+                  'ring-1 ring-black/10',
+                  'px-2 py-2',
+                  'flex flex-col items-center gap-0',
+                  'transition-colors',
+                  'hover:bg-white/95',
+                  'active:scale-[0.99]',
+                ].join(' ')}
                 style={{ scrollSnapAlign: 'start', width: 96 }}
                 onClick={() => {
                   setValue(c.title);
@@ -500,15 +511,12 @@ export function QuickSearchPanel({
           </div>
         </div>
 
-        {/* ✅ FILTRO SEM “CAIXINHA” — SEM ABRE/FECHA — SEM X */}
-        <div className="mt-4">
-          <div className="text-[13px] font-extrabold text-red-600">
-            Preço e percentual médio de economia
-          </div>
+        {/* ✅ FILTRO (branco / quase branco) no padrão dos demais menus */}
+        <div className="mt-4 rounded-md bg-white/90 shadow-sm ring-1 ring-black/10 px-4 py-4">
+          <div className="text-[13px] font-extrabold text-red-600">Preço e percentual médio de economia</div>
           <div className="mt-1 text-[11px] leading-[1.25] text-black/55">
-            A economia média por assinatura nos estabelecimentos conveniados. Este valor é uma
-            estimativa fornecida pelos próprios estabelecimentos e varia de acordo com as escolhas
-            do consumidor.
+            A economia média por assinatura nos estabelecimentos conveniados. Este valor é uma estimativa fornecida
+            pelos próprios estabelecimentos e varia de acordo com as escolhas do consumidor.
           </div>
 
           <div className="mt-3">
@@ -590,7 +598,7 @@ export function QuickSearchPanel({
                   <SadFaceIcon className="h-4 w-4 text-black/50" />
                 </div>
               ) : (
-                <div className="mt-2 overflow-hidden rounded-xl bg-white/90 ring-1 ring-black/10">
+                <div className="mt-2 overflow-hidden rounded-xl ring-1 ring-black/10 bg-white/90 shadow-sm">
                   {results.map((o, idx) => {
                     const isActive = idx === active;
                     const href = buildOfferHref(o);
@@ -601,6 +609,7 @@ export function QuickSearchPanel({
                         href={href}
                         className={[
                           'flex items-center gap-3 px-3 py-2.5 transition-colors',
+                          'border-b border-black/10 last:border-b-0',
                           isActive ? 'bg-black/5' : 'hover:bg-black/5',
                         ].join(' ')}
                         onMouseEnter={() => setActive(idx)}
@@ -672,7 +681,8 @@ export default function QuickSearch({
             className="flex-1 touch-manipulation"
             aria-label="Abrir busca"
           >
-            <div className="h-[44px] flex items-center rounded-md bg-white/95 shadow-sm ring-1 ring-black/10 px-3">
+            {/* ✅ mantém como estava */}
+            <div className="h-[44px] flex items-center rounded-md ring-1 ring-black/10 px-3">
               <div className="flex-1 text-left text-[14px] leading-none text-black/45">{placeholder}</div>
             </div>
           </button>
