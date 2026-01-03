@@ -24,22 +24,24 @@ export default function ModalOverlay({ open, onClose, children }: Props) {
   return (
     <div
       className={[
-        'fixed inset-0 z-[210]',
+        'fixed inset-0 z-[9999]', // ✅ acima de qualquer header/menu
         'transition-opacity duration-200',
         open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none',
       ].join(' ')}
       aria-hidden={!open}
     >
-      {/* fundo escuro (fecha ao tocar) */}
+      {/* ✅ backdrop (fecha ao clicar) */}
       <button
         type="button"
         aria-label="Fechar"
         onClick={onClose}
-        className="absolute inset-0 bg-black/35"
+        className="absolute inset-0 bg-black/35 backdrop-blur-[4px]"
       />
 
-      {/* conteúdo */}
-      <div className="absolute inset-0">{children}</div>
+      {/* ✅ camada do conteúdo NÃO pode bloquear clique no backdrop */}
+      <div className="absolute inset-0 pointer-events-none">
+        {children}
+      </div>
     </div>
   );
 }

@@ -3,7 +3,9 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import SideDrawer from './SideDrawer';
+
+// ✅ Modal 2 (direita -> esquerda)
+import RightDrawerModal from '../modals/RightDrawerModal';
 
 // ✅ store global de favoritos
 import { getFavorites, onFavoritesChange, toggleFavorite } from '../favorites/favoritesStore';
@@ -121,13 +123,16 @@ export default function ExposedCarouselRow({
   const list = useMemo(() => items ?? [], [items]);
   if (!list.length) return null;
 
-  void categoryCount; // (mantém prop disponível; hoje não usada)
+  void categoryCount;
 
   const [favIds, setFavIds] = useState<Record<string, boolean>>({});
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [hideViewRank, setHideViewRank] = useState(false);
+
+  // ✅ Modal 2
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<ExposedCarouselItem | null>(null);
 
   useEffect(() => {
     const sync = () => setFavIds(buildFavMapFromStore());
@@ -159,9 +164,115 @@ export default function ExposedCarouselRow({
     return () => scroller.removeEventListener('scroll', onScroll);
   }, []);
 
+  const openModal = (item: ExposedCarouselItem) => {
+    setSelectedItem(item);
+    setDrawerOpen(true);
+  };
+
+  const closeModal = () => {
+    setDrawerOpen(false);
+    setSelectedItem(null);
+  };
+
+  const modalContent = useMemo(() => {
+    if (!selectedItem) return <div className="px-4 pb-6" />;
+
+    const id = String(selectedItem.id ?? '');
+    const isFav = !!favIds[id];
+
+    const rating = Number(selectedItem.rating ?? 4.8);
+    const reviews = Number(selectedItem.reviews ?? 0);
+    const savings = selectedItem.savingsText ?? null;
+    const imageUrl = selectedItem.imageUrl ?? null;
+    const hrefSafe = safeHref(selectedItem.href);
+
+    return (
+      <div className="px-4 pb-6">
+        {/* Imagem */}
+        <div className="overflow-hidden rounded-md bg-zinc-200">
+          <div className="aspect-[16/10] w-full">
+            {imageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={imageUrl} alt={selectedItem.title} className="h-full w-full object-cover" loading="lazy" />
+            ) : (
+              <div className="h-full w-full bg-zinc-300" />
+            )}
+          </div>
+        </div>
+
+        {/* Título + Favoritar */}
+        <div className="mt-3 flex items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="text-[14px] font-extrabold leading-snug text-zinc-900">{selectedItem.title}</div>
+            <div className="mt-1 text-[12px] text-zinc-500">{categoryLabel}</div>
+          </div>
+
+          <button
+            type="button"
+            aria-label={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+            onClick={() => {
+              toggleFavorite?.({
+                id,
+                title: selectedItem.title ?? '',
+                imageUrl: imageUrl ?? null,
+                href: hrefSafe,
+                savingsText: selectedItem.savingsText ?? null,
+                rating: selectedItem.rating ?? null,
+                reviews: selectedItem.reviews ?? null,
+                categoryLabel,
+              } as any);
+            }}
+            className="shrink-0 inline-flex h-10 w-10 items-center justify-center rounded-md bg-white/80 ring-1 ring-black/10 active:scale-[0.99]"
+          >
+            <HeartIcon
+              filled={isFav}
+              className={['h-7 w-7', isFav ? 'text-red-500' : 'text-zinc-300 hover:text-zinc-400'].join(' ')}
+            />
+          </button>
+        </div>
+
+        {/* Economia */}
+        {savings ? (
+          <div className="mt-2 text-[12px] font-medium text-zinc-900 leading-[1.2]">{savings}</div>
+        ) : null}
+
+        {/* Avaliações */}
+        <div className="mt-2">
+          <StarsRow rating={rating} />
+          <div className="-mt-0.5 text-[12px] text-zinc-500">
+            <span className="font-semibold text-zinc-700">{Number(rating).toFixed(1)}</span> de{' '}
+            <span className="font-semibold text-zinc-700">{reviews}</span>
+          </div>
+        </div>
+
+        {/* Ações */}
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <Link
+            href={hrefSafe}
+            onClick={() => setDrawerOpen(false)}
+            className="rounded-md bg-emerald-600 px-3 py-2 text-center text-[13px] font-semibold text-white shadow-sm hover:bg-emerald-700"
+          >
+            Ir para oferta
+          </Link>
+
+          <button
+            type="button"
+            onClick={closeModal}
+            className="rounded-md bg-white px-3 py-2 text-[13px] font-semibold text-black ring-1 ring-black/10 hover:bg-black/5"
+          >
+            Fechar
+          </button>
+        </div>
+      </div>
+    );
+  }, [selectedItem, favIds, categoryLabel]);
+
   return (
     <section className={className}>
-      <SideDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+      {/* ✅ Modal 2 */}
+      <RightDrawerModal open={drawerOpen} onClose={closeModal} title="Detalhes" subtitle={categoryLabel}>
+        {modalContent}
+      </RightDrawerModal>
 
       {/* Cabeçalho */}
       <div className="px-4 mb-3 flex items-center justify-between">
@@ -192,9 +303,9 @@ export default function ExposedCarouselRow({
             <div
               key={item.id}
               className="relative min-w-[228px] max-w-[228px] flex-shrink-0 rounded-lg overflow-hidden"
-              onClick={() => setDrawerOpen(true)}
+              onClick={() => openModal(item)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') setDrawerOpen(true);
+                if (e.key === 'Enter' || e.key === ' ') openModal(item);
               }}
               role="button"
               tabIndex={0}

@@ -2,9 +2,13 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
+
 import type { SponsoredOffer } from '../../../_data/sponsoredOffers';
-import SideDrawer from './SideDrawer';
 import OfferEconomyLine from './OfferEconomyLine';
+
+// ✅ Modal 2 (direita -> esquerda)
+import RightDrawerModal from '../modals/RightDrawerModal';
 
 // ✅ store global de favoritos
 import { getFavorites, onFavoritesChange, toggleFavorite } from '../favorites/favoritesStore';
@@ -143,7 +147,9 @@ export default function SponsoredOffersRow({ items, className, title = 'Patrocin
   const heightAnimRef = useRef<Animation | null>(null);
   const [animating, setAnimating] = useState(false);
 
+  // ✅ Modal 2
   const [modalOpen, setModalOpen] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<SponsoredOffer | null>(null);
 
   const SCROLL_OFFSET = 90;
 
@@ -171,13 +177,16 @@ export default function SponsoredOffersRow({ items, className, title = 'Patrocin
     });
   }
 
-  function openModal() {
+  function openModal(item: SponsoredOffer) {
     scrollToFirstCard('auto');
+    setSelectedItem(item);
     setModalOpen(true);
   }
 
   function closeModal() {
     setModalOpen(false);
+    setSelectedItem(null);
+
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         scrollToFirstCard('auto');
@@ -286,9 +295,117 @@ export default function SponsoredOffersRow({ items, className, title = 'Patrocin
 
   if (!shown.length) return null;
 
+  // ===== Conteúdo do modal =====
+  const modalContent = useMemo(() => {
+    if (!selectedItem) return <div className="px-4 pb-6" />;
+
+    const id = String(selectedItem.id ?? '');
+    const isFav = !!favIds[id];
+
+    const tagsLine = buildTags(selectedItem);
+    const rating = Number((selectedItem as any).rating ?? 4.8);
+    const reviews = Number((selectedItem as any).reviews ?? 0);
+    const imageUrl = (selectedItem as any).imageUrl ?? null;
+    const hrefSafe = safeHref((selectedItem as any).href);
+
+    return (
+      <div className="px-4 pb-6">
+        {/* Imagem */}
+        <div className="overflow-hidden rounded-md bg-zinc-200">
+          <div className="aspect-[16/10] w-full">
+            {imageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={imageUrl} alt={(selectedItem as any).title} className="h-full w-full object-cover" loading="lazy" />
+            ) : (
+              <div className="h-full w-full bg-zinc-300" />
+            )}
+          </div>
+        </div>
+
+        {/* Título + Favoritar */}
+        <div className="mt-3 flex items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="text-[14px] font-extrabold leading-snug text-zinc-900">{(selectedItem as any).title}</div>
+            {tagsLine ? <div className="mt-1 text-[12px] text-zinc-500">{tagsLine}</div> : null}
+          </div>
+
+          <button
+            type="button"
+            aria-label={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+            onClick={() => {
+              toggleFavorite?.({
+                id,
+                title: (selectedItem as any).title ?? '',
+                href: hrefSafe,
+                imageUrl: imageUrl ?? null,
+                subtitle: (selectedItem as any).subtitle ?? null,
+                city: (Array.isArray((selectedItem as any).tags) ? (selectedItem as any).tags?.[0] : null) ?? null,
+                priceText: (selectedItem as any).priceText ?? null,
+                savingsText: (selectedItem as any).savingsText ?? null,
+                rating: (selectedItem as any).rating ?? null,
+                reviews: (selectedItem as any).reviews ?? null,
+                tags: (selectedItem as any).tags ?? null,
+              } as any);
+            }}
+            className="shrink-0 inline-flex h-10 w-10 items-center justify-center rounded-md bg-white/80 ring-1 ring-black/10 active:scale-[0.99]"
+          >
+            <HeartIcon
+              filled={isFav}
+              className={['h-7 w-7', isFav ? 'text-red-500' : 'text-zinc-300 hover:text-zinc-400'].join(' ')}
+            />
+          </button>
+        </div>
+
+        {/* Economia / preço */}
+        <div className="mt-2">
+          <OfferEconomyLine
+            savingsText={(selectedItem as any).savingsText ?? null}
+            priceText={(selectedItem as any).priceText ?? null}
+          />
+        </div>
+
+        {/* Avaliações */}
+        <div className="mt-2">
+          <StarsRow rating={rating} />
+          <div className="-mt-0.5 text-[12px] text-zinc-500">
+            <span className="font-semibold text-zinc-700">{Number(rating).toFixed(1)}</span> de{' '}
+            <span className="font-semibold text-zinc-700">{reviews}</span> avaliações
+          </div>
+        </div>
+
+        {/* Ações */}
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <Link
+            href={hrefSafe}
+            onClick={() => setModalOpen(false)}
+            className="rounded-md bg-emerald-600 px-3 py-2 text-center text-[13px] font-semibold text-white shadow-sm hover:bg-emerald-700"
+          >
+            Ir para oferta
+          </Link>
+
+          <button
+            type="button"
+            onClick={closeModal}
+            className="rounded-md bg-white px-3 py-2 text-[13px] font-semibold text-black ring-1 ring-black/10 hover:bg-black/5"
+          >
+            Fechar
+          </button>
+        </div>
+      </div>
+    );
+  }, [selectedItem, favIds]);
+
   return (
     <section className={['w-full', className || ''].join(' ')}>
-      <SideDrawer open={modalOpen} onClose={closeModal} />
+      {/* ✅ Modal 2 */}
+      <RightDrawerModal
+        open={modalOpen}
+        onClose={closeModal}
+        title={selectedItem ? ((selectedItem as any).tags?.[1] ?? 'Detalhes') : 'Detalhes'}
+        subtitle={selectedItem ? ((selectedItem as any).tags?.[0] ?? null) : null}
+      >
+        {modalContent}
+      </RightDrawerModal>
 
       <div className="mb-1 px-4 text-[12px] font-medium text-zinc-500">{title}</div>
 
@@ -314,7 +431,7 @@ export default function SponsoredOffersRow({ items, className, title = 'Patrocin
 
               const handleCardClick = () => {
                 if (idx === 0) {
-                  openModal();
+                  openModal(item);
                   return;
                 }
 
@@ -323,7 +440,7 @@ export default function SponsoredOffersRow({ items, className, title = 'Patrocin
                   return;
                 }
 
-                openModal();
+                openModal(item);
               };
 
               const disableHeart = !expanded && idx >= 1;

@@ -2,12 +2,18 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState, useLayoutEffect } from 'react';
+import Link from 'next/link';
 import type { SponsoredOffer } from '../../../_data/sponsoredOffers';
-import SideDrawer from './SideDrawer';
 import OfferEconomyLine from './OfferEconomyLine';
+import RightDrawerModal from '@/app/_components/modals/RightDrawerModal';
 
-// ✅ store global de favoritos
-import { getFavorites, onFavoritesChange, toggleFavorite } from '../favorites/favoritesStore';
+import {
+  getFavorites,
+  onFavoritesChange,
+  isFavorite,
+  toggleFavorite,
+  type FavoriteItem,
+} from '@/app/_components/favorites/favoritesStore';
 
 type FilterCategory = {
   id: string;
@@ -85,7 +91,7 @@ function buildTags(item: SponsoredOffer) {
 }
 
 /* =========================
-   CORAÇÃO
+   CORAÇÃO (vasado → preenchido)
 ========================= */
 function HeartIcon({ filled, className }: { filled: boolean; className?: string }) {
   return (
@@ -121,26 +127,162 @@ function TempImagePlaceholder() {
           strokeWidth="2"
           strokeLinejoin="round"
         />
-        <path
-          d="M8 11.5l2.2 2.2L14.2 9.7 20 15.5"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinejoin="round"
-        />
+        <path d="M8 11.5l2.2 2.2L14.2 9.7 20 15.5" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
         <path d="M9 9.2a.9.9 0 1 0 0-1.8.9.9 0 0 0 0 1.8Z" stroke="currentColor" strokeWidth="2" />
       </svg>
     </div>
   );
 }
 
-function buildFavMapFromStore(): Record<string, boolean> {
-  const list = getFavorites?.() ?? [];
-  const map: Record<string, boolean> = {};
-  for (const it of list as any[]) {
-    const id = String((it as any)?.id ?? '');
-    if (id) map[id] = true;
+/* =========================
+   ✅ ICONES SVG DO FILTRO
+========================= */
+function FilterIcon({
+  kind,
+  isActive,
+}: {
+  kind: 'todos' | 'melhores' | 'descontos' | 'novo' | 'aberto' | 'perto' | 'delivery';
+  isActive: boolean;
+}) {
+  const cls = 'h-[19.8px] w-[19.8px]';
+  const c = isActive
+    ? 'currentColor'
+    : kind === 'todos'
+      ? '#0F172A'
+      : kind === 'melhores'
+        ? '#FACC15'
+        : kind === 'descontos'
+          ? '#059669'
+          : kind === 'novo'
+            ? '#3B82F6'
+            : kind === 'aberto'
+              ? '#2563EB'
+              : kind === 'perto'
+                ? '#EF4444'
+                : '#8B5CF6';
+
+  switch (kind) {
+    case 'todos':
+      return (
+        <svg viewBox="0 0 24 24" className={cls} fill="none" aria-hidden="true">
+          <path d="M6.5 7.5h11M6.5 12h11M6.5 16.5h11" stroke={c} strokeWidth="2" strokeLinecap="round" />
+        </svg>
+      );
+    case 'melhores':
+      return (
+        <svg viewBox="0 0 24 24" className={cls} fill="none" aria-hidden="true">
+          <path
+            d="M12 3.6l2.5 5.3 5.8.5-4.4 3.8 1.4 5.7L12 16.1 6.7 18.9l1.4-5.7-4.4-3.8 5.8-.5L12 3.6z"
+            fill={c}
+          />
+          <path
+            d="M12 3.6l2.5 5.3 5.8.5-4.4 3.8 1.4 5.7L12 16.1 6.7 18.9l1.4-5.7-4.4-3.8 5.8-.5L12 3.6z"
+            stroke={isActive ? 'currentColor' : '#CA8A04'}
+            strokeWidth="1.2"
+            strokeLinejoin="round"
+          />
+        </svg>
+      );
+    case 'descontos':
+      return (
+        <svg viewBox="0 0 24 24" className={cls} fill="none" aria-hidden="true">
+          <path d="M6 3h7l5 5v13H6V3Z" stroke={c} strokeWidth="2" strokeLinejoin="round" />
+          <path d="M15.5 9 8.5 16" stroke={c} strokeWidth="2" strokeLinecap="round" />
+          <circle cx="9" cy="10" r="1.35" fill={c} />
+          <circle cx="15" cy="15" r="1.35" fill={c} />
+        </svg>
+      );
+    case 'novo':
+      return (
+        <svg viewBox="0 0 24 24" className={cls} fill="none" aria-hidden="true">
+          <path d="M12 3v18" stroke={c} strokeWidth="2" strokeLinecap="round" />
+          <path d="M3 12h18" stroke={c} strokeWidth="2" strokeLinecap="round" />
+          <circle cx="12" cy="12" r="8.5" stroke={c} strokeWidth="2" />
+        </svg>
+      );
+    case 'aberto':
+      return (
+        <svg viewBox="0 0 24 24" className={cls} fill="none" aria-hidden="true">
+          <circle cx="12" cy="12" r="9" stroke={c} strokeWidth="2" />
+          <path d="M12 7v5l3 2" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
+    case 'perto':
+      return (
+        <svg viewBox="0 0 24 24" className={cls} fill="none" aria-hidden="true">
+          <path
+            d="M12 21s7-4.5 7-10a7 7 0 1 0-14 0c0 5.5 7 10 7 10Z"
+            stroke={c}
+            strokeWidth="2"
+            strokeLinejoin="round"
+          />
+          <path d="M12 11.2a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4z" stroke={c} strokeWidth="2" />
+        </svg>
+      );
+    case 'delivery':
+      return (
+        <svg viewBox="0 0 24 24" className={cls} fill="none" aria-hidden="true">
+          <path d="M3 6h13v9H3z" stroke={c} strokeWidth="2" strokeLinejoin="round" />
+          <path d="M16 10h3l2 3v2h-5z" stroke={c} strokeWidth="2" strokeLinejoin="round" />
+          <path d="M7 18a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z" fill={c} />
+          <path d="M17 18a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z" fill={c} />
+        </svg>
+      );
+    default:
+      return null;
   }
-  return map;
+}
+
+/* =========================
+   CHIP (ativo em verde)
+========================= */
+function FilterChip({
+  isActive,
+  children,
+  onClick,
+  iconKind,
+}: {
+  isActive: boolean;
+  children: React.ReactNode;
+  onClick: () => void;
+  iconKind: 'todos' | 'melhores' | 'descontos' | 'novo' | 'aberto' | 'perto' | 'delivery';
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={[
+        'shrink-0 rounded-full',
+        'px-4 py-2',
+        'min-h-[44px]',
+        'inline-flex items-center gap-2',
+        'border transition-colors',
+        'touch-manipulation select-none',
+        isActive ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-zinc-300 bg-zinc-100 text-zinc-700 hover:bg-zinc-200',
+      ].join(' ')}
+    >
+      <span className="inline-flex items-center justify-center">
+        <FilterIcon kind={iconKind} isActive={isActive} />
+      </span>
+      <span className="whitespace-nowrap text-[13px] font-semibold">{children}</span>
+    </button>
+  );
+}
+
+/* =========================
+   LOADING (leve)
+========================= */
+function LoadingRow({ text = 'Carregando...' }: { text?: string }) {
+  return (
+    <div className="px-3 py-3">
+      <div className="flex items-center gap-2 text-[12px] font-medium text-zinc-500">
+        <span className="inline-flex h-4 w-4 items-center justify-center">
+          <span className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-500" />
+        </span>
+        {text}
+      </div>
+    </div>
+  );
 }
 
 type FilterKey = 'todos' | 'melhores' | 'descontos' | 'novo' | 'aberto' | 'perto' | 'delivery';
@@ -153,32 +295,62 @@ export default function SponsoredOffersList({
   step = 5,
   categories = [],
 }: Props) {
-  // ✅ favoritos vêm do store
-  const [favIds, setFavIds] = useState<Record<string, boolean>>({});
   const [modalOpen, setModalOpen] = useState(false);
+  const [selected, setSelected] = useState<SponsoredOffer | null>(null);
 
   const [active, setActive] = useState<FilterKey>('todos');
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
-  function openModal() {
+  /* =========================
+     ✅ FAVORITOS (store real)
+  ========================= */
+  const [favoritesVersion, setFavoritesVersion] = useState(0);
+
+  useEffect(() => {
+    // garante que ao abrir a tela já reflita o storage
+    const sync = () => setFavoritesVersion((v) => v + 1);
+    sync();
+    const off = onFavoritesChange(sync);
+    return () => off();
+  }, []);
+
+  const isFavId = (id: any) => isFavorite(String(id ?? '').trim());
+
+  const toggleFavFromOffer = (offer: SponsoredOffer) => {
+    const o: any = offer as any;
+
+    const fav: FavoriteItem = {
+      id: String(o.id ?? '').trim(),
+      title: String(o.title ?? '').trim(),
+      href: safeHref(o.href),
+
+      imageUrl: o.imageUrl ?? null,
+      subtitle: o.subtitle ?? null,
+      city: o.city ?? null,
+      priceText: o.priceText ?? null,
+
+      savingsText: o.savingsText ?? null,
+      rating: o.rating ?? null,
+      reviews: o.reviews ?? null,
+      tags: o.tags ?? null,
+      categoryLabel: o.categoryLabel ?? null,
+
+      categoryId: o.categoryId ?? null,
+    };
+
+    toggleFavorite(fav);
+    // não precisa setState local; o store vai emitir e o effect acima força re-render
+  };
+
+  function openModal(item?: SponsoredOffer) {
+    if (item) setSelected(item);
     setModalOpen(true);
   }
   function closeModal() {
     setModalOpen(false);
   }
 
-  useEffect(() => {
-    const sync = () => setFavIds(buildFavMapFromStore());
-    sync();
-
-    const off = onFavoritesChange?.(sync);
-    return () => {
-      if (typeof off === 'function') off();
-    };
-  }, []);
-
-  // ✅ antes estava um useMemo sem variável (não fazia nada)
-  const categoriesUnique = useMemo(() => {
+  useMemo(() => {
     const seen = new Set<string>();
     const out: FilterCategory[] = [];
     for (const c of categories) {
@@ -190,7 +362,6 @@ export default function SponsoredOffersList({
     }
     return out;
   }, [categories]);
-  void categoriesUnique; // (mantém sem alterar seu uso futuro)
 
   const filteredItems = useMemo(() => {
     const list = Array.isArray(items) ? [...items] : [];
@@ -325,6 +496,9 @@ export default function SponsoredOffersList({
     };
   }, []);
 
+  /* =========================
+     ✅ preservar scroll
+  ========================= */
   const restoreScrollRef = useRef<number | null>(null);
   const restoreRafsRef = useRef<number[]>([]);
 
@@ -333,7 +507,6 @@ export default function SponsoredOffersList({
     restoreScrollRef.current = window.scrollY || 0;
     setActive(next);
   };
-  void setActivePreserveScroll; // (mantém seu helper disponível)
 
   useLayoutEffect(() => {
     const y = restoreScrollRef.current;
@@ -357,13 +530,126 @@ export default function SponsoredOffersList({
     };
   }, [active, total]);
 
+  /* =========================
+     MODAL CONTENT
+  ========================= */
+  const modalContent = useMemo(() => {
+    // força recalcular quando favoritos mudarem
+    void favoritesVersion;
+
+    const item = selected;
+    if (!item) return <div className="px-4 pb-6" />;
+
+    const o: any = item as any;
+
+    const tagsLine = buildTags(item);
+    const rating = o.rating ?? 4.8;
+    const reviews = o.reviews ?? 0;
+    const imageUrl = o.imageUrl ?? null;
+    const isFav = isFavId(o.id);
+    const hrefSafe = safeHref(o.href);
+
+    return (
+      <div className="h-full flex flex-col">
+        <div className="px-4 pt-3 pb-4">
+          <div className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-black/15" />
+          <div className="text-[14px] font-semibold text-black">Detalhes</div>
+          <div className="mt-1 text-[13px] text-black/60">Veja mais informações deste item.</div>
+        </div>
+
+        <div className="px-4 pb-5 flex-1 overflow-hidden">
+          <div className="h-full overflow-auto">
+            <div className="relative rounded-xl bg-white/90 ring-1 ring-black/10 overflow-hidden">
+              <div className="relative">
+                <div className="p-3">
+                  <div className="flex gap-3">
+                    <div className="h-[106px] w-[106px] flex-none overflow-hidden rounded-md bg-zinc-200">
+                      {imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={imageUrl} alt={o.title} className="h-full w-full object-cover" loading="lazy" />
+                      ) : (
+                        <TempImagePlaceholder />
+                      )}
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="pr-[41px] text-[12px] font-extrabold leading-snug text-zinc-900 line-clamp-2">
+                        {o.title}
+                      </div>
+
+                      <div className="mt-[4px]">
+                        <div className="text-[12px] text-zinc-500 line-clamp-1">{tagsLine}</div>
+                        <OfferEconomyLine savingsText={o.savingsText ?? null} priceText={o.priceText ?? null} />
+                      </div>
+
+                      <div className="mt-1.5 flex items-end justify-between">
+                        <div>
+                          <StarsRow rating={Number(rating)} />
+                          <div className="-mt-0.5 text-[12px] text-zinc-500">
+                            <span className="font-semibold text-zinc-700">{Number(rating).toFixed(1)}</span> de{' '}
+                            <span className="font-semibold text-zinc-700">{reviews}</span> avaliações
+                          </div>
+                        </div>
+
+                        <span className="text-[14px] font-semibold text-green-600">Ver mais</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    aria-label={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      toggleFavFromOffer(item);
+                    }}
+                    className="absolute -right-[4px] top-1 inline-flex h-10 w-10 items-center justify-center"
+                  >
+                    <HeartIcon
+                      filled={isFav}
+                      className={['h-9 w-9 transition', isFav ? 'text-red-500' : 'text-zinc-300 hover:text-zinc-400'].join(' ')}
+                    />
+                  </button>
+                </div>
+
+                <div className="mx-2 border-b border-dotted border-zinc-300" />
+              </div>
+
+              <div className="p-3 grid grid-cols-2 gap-2">
+                <Link
+                  href={hrefSafe}
+                  onClick={() => setModalOpen(false)}
+                  className="rounded-md bg-emerald-600 px-3 py-2 text-center text-[13px] font-semibold text-white shadow-sm hover:bg-emerald-700"
+                >
+                  Ir para oferta
+                </Link>
+
+                <button
+                  type="button"
+                  onClick={closeModal}
+                  className="rounded-md bg-white px-3 py-2 text-center text-[13px] font-semibold text-black ring-1 ring-black/10 hover:bg-black/5"
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
+
+            <div className="h-4" />
+          </div>
+        </div>
+      </div>
+    );
+  }, [selected, favoritesVersion]);
+
   return (
     <section className={['w-full', className || ''].join(' ')}>
-      <SideDrawer open={modalOpen} onClose={closeModal} />
+      <RightDrawerModal open={modalOpen} onClose={closeModal} hideHeader>
+        {modalContent}
+      </RightDrawerModal>
 
       {showTitle ? <div className="mb-1 px-4 text-[12px] font-medium text-zinc-500">{title}</div> : null}
 
-      {/* sticky filtros (mantido como no seu exemplo) */}
       <div
         ref={filterStickyRef}
         className={[
@@ -374,7 +660,33 @@ export default function SponsoredOffersList({
       >
         <div className="px-3 pt-2">
           <div className="no-scrollbar flex gap-2 overflow-x-auto pb-2 pt-0">
-            {/* ... seus chips aqui (mantém no seu projeto) */}
+            <FilterChip iconKind="todos" isActive={active === 'todos'} onClick={() => setActivePreserveScroll('todos')}>
+              Todos
+            </FilterChip>
+
+            <FilterChip iconKind="melhores" isActive={active === 'melhores'} onClick={() => setActivePreserveScroll('melhores')}>
+              Melhores avaliados
+            </FilterChip>
+
+            <FilterChip iconKind="descontos" isActive={active === 'descontos'} onClick={() => setActivePreserveScroll('descontos')}>
+              Maiores descontos
+            </FilterChip>
+
+            <FilterChip iconKind="novo" isActive={active === 'novo'} onClick={() => setActivePreserveScroll('novo')}>
+              Novo
+            </FilterChip>
+
+            <FilterChip iconKind="aberto" isActive={active === 'aberto'} onClick={() => setActivePreserveScroll('aberto')}>
+              Aberto agora
+            </FilterChip>
+
+            <FilterChip iconKind="perto" isActive={active === 'perto'} onClick={() => setActivePreserveScroll('perto')}>
+              Perto de mim
+            </FilterChip>
+
+            <FilterChip iconKind="delivery" isActive={active === 'delivery'} onClick={() => setActivePreserveScroll('delivery')}>
+              Delivery
+            </FilterChip>
           </div>
         </div>
 
@@ -405,18 +717,21 @@ export default function SponsoredOffersList({
         ) : (
           <>
             {visibleItems.map((item, idx) => {
-              const id = String((item as any).id ?? '');
-              const isFav = !!favIds[id];
+              // força atualizar corações quando favoritos mudarem
+              void favoritesVersion;
 
+              const o: any = item as any;
+
+              const isFav = isFavId(o.id);
               const tagsLine = buildTags(item);
-              const rating = (item as any).rating ?? 4.8;
-              const reviews = (item as any).reviews ?? 0;
-              const imageUrl = (item as any).imageUrl ?? null;
+              const rating = o.rating ?? 4.8;
+              const reviews = o.reviews ?? 0;
+              const imageUrl = o.imageUrl ?? null;
 
-              const handleCardClick = () => openModal();
+              const handleCardClick = () => openModal(item);
 
               return (
-                <div key={id} className="relative">
+                <div key={o.id} className="relative">
                   <div
                     role="button"
                     tabIndex={0}
@@ -430,12 +745,7 @@ export default function SponsoredOffersList({
                       <div className="h-[106px] w-[106px] flex-none overflow-hidden rounded-md bg-zinc-200">
                         {imageUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={imageUrl}
-                            alt={(item as any).title}
-                            className="h-full w-full object-cover"
-                            loading="lazy"
-                          />
+                          <img src={imageUrl} alt={o.title} className="h-full w-full object-cover" loading="lazy" />
                         ) : (
                           <TempImagePlaceholder />
                         )}
@@ -443,16 +753,13 @@ export default function SponsoredOffersList({
 
                       <div className="min-w-0 flex-1">
                         <div className="pr-[41px] text-[12px] font-extrabold leading-snug text-zinc-900 line-clamp-2">
-                          {(item as any).title}
+                          {o.title}
                         </div>
 
                         <div className="mt-[4px]">
                           <div className="text-[12px] text-zinc-500 line-clamp-1">{tagsLine}</div>
 
-                          <OfferEconomyLine
-                            savingsText={(item as any).savingsText ?? null}
-                            priceText={(item as any).priceText ?? null}
-                          />
+                          <OfferEconomyLine savingsText={o.savingsText ?? null} priceText={o.priceText ?? null} />
                         </div>
 
                         <div className="mt-1.5 flex items-end justify-between">
@@ -485,33 +792,19 @@ export default function SponsoredOffersList({
                       </div>
                     </div>
 
-                    {/* ✅ coração grava no store (href sempre string) */}
                     <button
                       type="button"
                       aria-label={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-
-                        toggleFavorite?.({
-                          id,
-                          title: (item as any).title ?? '',
-                          imageUrl: imageUrl ?? null,
-                          href: safeHref((item as any).href),
-                          savingsText: (item as any).savingsText ?? null,
-                          priceText: (item as any).priceText ?? null,
-                          rating: (item as any).rating ?? null,
-                          reviews: (item as any).reviews ?? null,
-                          tags: (item as any).tags ?? null,
-                        } as any);
+                        toggleFavFromOffer(item);
                       }}
                       className="absolute -right-[4px] top-1 inline-flex h-10 w-10 items-center justify-center"
                     >
                       <HeartIcon
                         filled={isFav}
-                        className={['h-9 w-9 transition', isFav ? 'text-red-500' : 'text-zinc-300 hover:text-zinc-400'].join(
-                          ' '
-                        )}
+                        className={['h-9 w-9 transition', isFav ? 'text-red-500' : 'text-zinc-300 hover:text-zinc-400'].join(' ')}
                       />
                     </button>
                   </div>
@@ -521,16 +814,7 @@ export default function SponsoredOffersList({
               );
             })}
 
-            {isLoadingMore ? (
-              <div className="px-3 py-3">
-                <div className="flex items-center gap-2 text-[12px] font-medium text-zinc-500">
-                  <span className="inline-flex h-4 w-4 items-center justify-center">
-                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-500" />
-                  </span>
-                  Carregando...
-                </div>
-              </div>
-            ) : null}
+            {isLoadingMore ? <LoadingRow /> : null}
 
             {visibleCount < total ? (
               <div ref={sentinelRef} className="py-4">
