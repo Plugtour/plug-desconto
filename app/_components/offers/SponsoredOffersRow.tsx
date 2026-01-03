@@ -151,6 +151,10 @@ export default function SponsoredOffersRow({ items, className, title = 'Patrocin
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<SponsoredOffer | null>(null);
 
+  // ✅ Abas + Slider (conteúdo do modal)
+  const [tab, setTab] = useState<'detalhes' | 'avaliacoes' | 'endereco'>('detalhes');
+  const [mediaIdx, setMediaIdx] = useState(0);
+
   const SCROLL_OFFSET = 90;
 
   useEffect(() => {
@@ -162,6 +166,13 @@ export default function SponsoredOffersRow({ items, className, title = 'Patrocin
       if (typeof off === 'function') off();
     };
   }, []);
+
+  // reset do modal ao trocar item
+  useEffect(() => {
+    if (!modalOpen) return;
+    setTab('detalhes');
+    setMediaIdx(0);
+  }, [modalOpen, selectedItem?.id]);
 
   function scrollToFirstCard(behavior: ScrollBehavior = 'auto') {
     const el = wrapperRef.current;
@@ -295,7 +306,7 @@ export default function SponsoredOffersRow({ items, className, title = 'Patrocin
 
   if (!shown.length) return null;
 
-  // ===== Conteúdo do modal =====
+  // ===== Conteúdo do modal (AGORA no padrão do print) =====
   const modalContent = useMemo(() => {
     if (!selectedItem) return <div className="px-4 pb-6" />;
 
@@ -308,104 +319,314 @@ export default function SponsoredOffersRow({ items, className, title = 'Patrocin
     const imageUrl = (selectedItem as any).imageUrl ?? null;
     const hrefSafe = safeHref((selectedItem as any).href);
 
+    // Slider: por enquanto usamos a imagem do item (1 foto)
+    // (quando você tiver mais imagens, você pode passar um array e trocar aqui)
+    const media = imageUrl ? [{ src: imageUrl, alt: (selectedItem as any).title }] : [];
+    const active = media[mediaIdx];
+
+    function prevMedia() {
+      if (!media.length) return;
+      setMediaIdx((i) => (i - 1 + media.length) % media.length);
+    }
+    function nextMedia() {
+      if (!media.length) return;
+      setMediaIdx((i) => (i + 1) % media.length);
+    }
+
+    // Conteúdo “Detalhes” (placeholder seguro — você ajusta depois com texto real do parceiro)
+    const detailsText =
+      (selectedItem as any).detailsHtml ??
+      (selectedItem as any).subtitle ??
+      'Informações do desconto e condições aparecerão aqui.';
+
+    // Calendário / Horários / Excetos (placeholder seguro)
+    const calendar =
+      (selectedItem as any).calendar ?? {
+        days: [
+          { key: 'seg', label: 'seg' },
+          { key: 'ter', label: 'ter' },
+          { key: 'qua', label: 'qua' },
+          { key: 'qui', label: 'qui' },
+          { key: 'sex', label: 'sex' },
+          { key: 'sáb', label: 'sáb' },
+          { key: 'dom', label: 'dom' },
+        ],
+        dayRow: [true, true, true, true, true, true, false],
+        nightRow: [true, true, true, true, true, false, false],
+      };
+
+    const times =
+      (selectedItem as any).times ??
+      [
+        { time: '11:00', offLabel: '50% off', enabled: true },
+        { time: '12:00', offLabel: '50% off', enabled: true },
+        { time: '13:00', offLabel: '50% off', enabled: true },
+        { time: '14:00', offLabel: '50% off', enabled: true },
+      ];
+
+    const exceptions =
+      (selectedItem as any).exceptions ??
+      ['Não válido em feriados.', 'Sujeito à disponibilidade do estabelecimento.'];
+
+    const addressText =
+      (selectedItem as any).address?.text ??
+      (selectedItem as any).addressText ??
+      'Endereço do parceiro aparecerá aqui.';
+
     return (
       <div className="px-4 pb-6">
-        {/* Imagem */}
-        <div className="overflow-hidden rounded-md bg-zinc-200">
-          <div className="aspect-[16/10] w-full">
-            {imageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={imageUrl} alt={(selectedItem as any).title} className="h-full w-full object-cover" loading="lazy" />
-            ) : (
-              <div className="h-full w-full bg-zinc-300" />
+        {/* HEADER (título + X + abas) */}
+        <div className="pt-3 pb-2">
+          <div className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-black/15" />
+
+          <div className="relative">
+            <div className="pr-10 text-[20px] font-extrabold tracking-[-.2px] text-zinc-800">
+              {(selectedItem as any).title}
+            </div>
+
+            <button
+              type="button"
+              onClick={closeModal}
+              className="absolute right-0 top-0 grid h-10 w-10 place-items-center rounded-full hover:bg-black/5"
+              aria-label="Fechar"
+            >
+              <span className="text-[26px] leading-none text-red-600">×</span>
+            </button>
+          </div>
+
+          <div className="mt-2 border-b border-dotted border-black/20" />
+
+          <div className="mt-3 flex gap-2">
+            <TabButton active={tab === 'detalhes'} onClick={() => setTab('detalhes')}>
+              Detalhes
+            </TabButton>
+            <TabButton active={tab === 'avaliacoes'} onClick={() => setTab('avaliacoes')}>
+              Avaliações
+            </TabButton>
+            <TabButton active={tab === 'endereco'} onClick={() => setTab('endereco')}>
+              Endereço
+            </TabButton>
+          </div>
+        </div>
+
+        {/* BODY SCROLL (como no print) */}
+        <div className="relative max-h-[78vh] overflow-y-auto pb-24 pt-3">
+          {/* SLIDER */}
+          <div className="relative overflow-hidden rounded-[14px] bg-zinc-100">
+            <div className="aspect-[16/9] w-full">
+              {active?.src ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={active.src} alt={active.alt ?? ''} className="h-full w-full object-cover" />
+              ) : (
+                <div className="h-full w-full bg-zinc-200" />
+              )}
+            </div>
+
+            {/* setas + bolinhas (se tiver mais de 1 imagem) */}
+            {media.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={prevMedia}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 grid h-9 w-9 place-items-center rounded-full bg-black/35 text-white"
+                  aria-label="Anterior"
+                >
+                  ‹
+                </button>
+                <button
+                  type="button"
+                  onClick={nextMedia}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 grid h-9 w-9 place-items-center rounded-full bg-black/35 text-white"
+                  aria-label="Próximo"
+                >
+                  ›
+                </button>
+
+                <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1.5">
+                  {media.map((_, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => setMediaIdx(i)}
+                      className={['h-2 w-2 rounded-full', i === mediaIdx ? 'bg-white' : 'bg-white/55'].join(' ')}
+                      aria-label={`Imagem ${i + 1}`}
+                    />
+                  ))}
+                </div>
+              </>
             )}
           </div>
-        </div>
 
-        {/* Título + Favoritar */}
-        <div className="mt-3 flex items-start gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="text-[14px] font-extrabold leading-snug text-zinc-900">{(selectedItem as any).title}</div>
-            {tagsLine ? <div className="mt-1 text-[12px] text-zinc-500">{tagsLine}</div> : null}
+          {/* HEADLINE + FAVORITO */}
+          <div className="mt-3 flex items-start gap-3">
+            <div className="flex-1 text-[15px] font-semibold leading-snug text-zinc-700">
+              {(selectedItem as any).headline ?? tagsLine ?? '—'}
+            </div>
+
+            <button
+              type="button"
+              aria-label={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+              onClick={() => {
+                toggleFavorite?.({
+                  id,
+                  title: (selectedItem as any).title ?? '',
+                  href: hrefSafe,
+                  imageUrl: imageUrl ?? null,
+                  subtitle: (selectedItem as any).subtitle ?? null,
+                  city: (Array.isArray((selectedItem as any).tags) ? (selectedItem as any).tags?.[0] : null) ?? null,
+                  priceText: (selectedItem as any).priceText ?? null,
+                  savingsText: (selectedItem as any).savingsText ?? null,
+                  rating: (selectedItem as any).rating ?? null,
+                  reviews: (selectedItem as any).reviews ?? null,
+                  tags: (selectedItem as any).tags ?? null,
+                } as any);
+              }}
+              className="mt-0.5 grid h-9 w-9 place-items-center rounded-full hover:bg-black/5"
+            >
+              <HeartMini filled={isFav} />
+            </button>
           </div>
 
-          <button
-            type="button"
-            aria-label={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
-            onClick={() => {
-              toggleFavorite?.({
-                id,
-                title: (selectedItem as any).title ?? '',
-                href: hrefSafe,
-                imageUrl: imageUrl ?? null,
-                subtitle: (selectedItem as any).subtitle ?? null,
-                city: (Array.isArray((selectedItem as any).tags) ? (selectedItem as any).tags?.[0] : null) ?? null,
-                priceText: (selectedItem as any).priceText ?? null,
-                savingsText: (selectedItem as any).savingsText ?? null,
-                rating: (selectedItem as any).rating ?? null,
-                reviews: (selectedItem as any).reviews ?? null,
-                tags: (selectedItem as any).tags ?? null,
-              } as any);
-            }}
-            className="shrink-0 inline-flex h-10 w-10 items-center justify-center rounded-md bg-white/80 ring-1 ring-black/10 active:scale-[0.99]"
-          >
-            <HeartIcon
-              filled={isFav}
-              className={['h-7 w-7', isFav ? 'text-red-500' : 'text-zinc-300 hover:text-zinc-400'].join(' ')}
-            />
-          </button>
-        </div>
+          <div className="my-3 border-b border-dotted border-black/20" />
 
-        {/* Economia / preço */}
-        <div className="mt-2">
-          <OfferEconomyLine savingsText={(selectedItem as any).savingsText ?? null} priceText={(selectedItem as any).priceText ?? null} />
-        </div>
+          {/* CONTEÚDO POR ABA */}
+          {tab === 'detalhes' && (
+            <>
+              <SectionTitle>Detalhes:</SectionTitle>
 
-        {/* Avaliações */}
-        <div className="mt-2">
-          <StarsRow rating={rating} />
-          <div className="-mt-0.5 text-[12px] text-zinc-500">
-            <span className="font-semibold text-zinc-700">{Number(rating).toFixed(1)}</span> de{' '}
-            <span className="font-semibold text-zinc-700">{reviews}</span> avaliações
+              <div className="mt-1 text-[13px] leading-relaxed text-zinc-600">{detailsText}</div>
+
+              {/* Economia / preço (mantém seu componente) */}
+              <div className="mt-3">
+                <OfferEconomyLine
+                  savingsText={(selectedItem as any).savingsText ?? null}
+                  priceText={(selectedItem as any).priceText ?? null}
+                />
+              </div>
+
+              {/* CALENDÁRIO */}
+              {calendar ? (
+                <div className="mt-4">
+                  <CalendarBlock cal={calendar} />
+                </div>
+              ) : null}
+
+              {/* HORÁRIOS */}
+              {times?.length ? (
+                <>
+                  <div className="mt-4 flex items-center gap-2">
+                    <SectionTitle>Horários:</SectionTitle>
+                    <span className="text-[14px]">⚠️</span>
+                  </div>
+
+                  <div className="mt-2 flex gap-2 overflow-x-auto pb-2">
+                    {times.map((t: any, i: number) => (
+                      <TimeCard key={i} {...t} />
+                    ))}
+                  </div>
+                </>
+              ) : null}
+
+              {/* EXCETOS */}
+              {exceptions?.length ? (
+                <>
+                  <SectionTitle className="mt-4">Excetos:</SectionTitle>
+                  <div className="mt-1 text-[13px] leading-relaxed text-zinc-600">
+                    {exceptions.map((x: string, i: number) => (
+                      <div key={i}>{x}</div>
+                    ))}
+                  </div>
+                </>
+              ) : null}
+
+              {/* ACCORDIONS (barras) */}
+              <div className="mt-4 space-y-2">
+                <Accordion title="Quanto posso economizar:" />
+                <Accordion title="Regras:" />
+              </div>
+
+              {/* CTA (opcional no print – mantendo) */}
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <Link
+                  href={hrefSafe}
+                  onClick={() => setModalOpen(false)}
+                  className="rounded-md bg-emerald-600 px-3 py-2 text-center text-[13px] font-semibold text-white shadow-sm hover:bg-emerald-700"
+                >
+                  Ir para oferta
+                </Link>
+
+                <button
+                  type="button"
+                  onClick={closeModal}
+                  className="rounded-md bg-white px-3 py-2 text-[13px] font-semibold text-black ring-1 ring-black/10 hover:bg-black/5"
+                >
+                  Fechar
+                </button>
+              </div>
+            </>
+          )}
+
+          {tab === 'avaliacoes' && (
+            <div className="pt-2">
+              <SectionTitle>Avaliações</SectionTitle>
+
+              <div className="mt-2">
+                <StarsRow rating={rating} />
+                <div className="-mt-0.5 text-[12px] text-zinc-500">
+                  <span className="font-semibold text-zinc-700">{Number(rating).toFixed(1)}</span> de{' '}
+                  <span className="font-semibold text-zinc-700">{reviews}</span> avaliações
+                </div>
+              </div>
+
+              <div className="mt-3 rounded-[12px] border border-black/10 bg-zinc-50 p-3 text-[13px] text-zinc-600">
+                Aqui entra a lista de avaliações (título, nome, texto curto).
+              </div>
+            </div>
+          )}
+
+          {tab === 'endereco' && (
+            <div className="pt-2">
+              <SectionTitle>Endereço</SectionTitle>
+              <div className="mt-2 rounded-[12px] border border-black/10 p-3 text-[13px] text-zinc-700">
+                {addressText}
+              </div>
+            </div>
+          )}
+
+          {/* balão “Fale com...” (mini) */}
+          <div className="pointer-events-none fixed bottom-[122px] left-1/2 z-[60] w-[430px] max-w-full -translate-x-1/2 px-4">
+            <div className="pointer-events-auto ml-auto w-[160px] rounded-[10px] border border-black/10 bg-white p-2 text-[11px] text-zinc-700 shadow">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <div className="font-semibold leading-tight">Fale com</div>
+                  <div className="leading-tight">{(selectedItem as any).title ?? 'Anunciante'}</div>
+                </div>
+                <button className="text-zinc-400 hover:text-zinc-600" type="button" aria-label="Fechar">
+                  ×
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
 
-        {/* Ações */}
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <Link
-            href={hrefSafe}
-            onClick={() => setModalOpen(false)}
-            className="rounded-md bg-emerald-600 px-3 py-2 text-center text-[13px] font-semibold text-white shadow-sm hover:bg-emerald-700"
+          {/* botão WhatsApp */}
+          <a
+            href="#"
+            className="fixed bottom-[74px] left-1/2 z-[70] w-[430px] max-w-full -translate-x-1/2 px-4"
+            aria-label="WhatsApp"
           >
-            Ir para oferta
-          </Link>
-
-          <button
-            type="button"
-            onClick={closeModal}
-            className="rounded-md bg-white px-3 py-2 text-[13px] font-semibold text-black ring-1 ring-black/10 hover:bg-black/5"
-          >
-            Fechar
-          </button>
+            <div className="ml-auto grid h-14 w-14 place-items-center rounded-full bg-green-500 shadow-lg">
+              <span className="text-[26px] text-white">🟢</span>
+            </div>
+          </a>
         </div>
       </div>
     );
-  }, [selectedItem, favIds]);
-
-  const modalTitle = selectedItem ? ((selectedItem as any).tags?.[1] ?? 'Detalhes') : 'Detalhes';
-  const modalSubtitle = selectedItem ? ((selectedItem as any).tags?.[0] ?? null) : null;
+  }, [selectedItem, favIds, tab, mediaIdx]);
 
   return (
     <section className={['w-full', className || ''].join(' ')}>
-      {/* ✅ Modal 2 (substitui RightDrawerModal) */}
+      {/* ✅ Modal 2 (mantido) */}
       <MenuCarouselModalRight open={modalOpen} onClose={closeModal} hideHeader>
-        {/* Cabeçalho equivalente ao title/subtitle do RightDrawerModal */}
-        <div className="px-4 pt-3 pb-2">
-          <div className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-black/15" />
-          <div className="text-[14px] font-semibold text-black">{modalTitle}</div>
-          {modalSubtitle ? <div className="mt-1 text-[13px] text-black/60">{modalSubtitle}</div> : null}
-        </div>
-
         {modalContent}
       </MenuCarouselModalRight>
 
@@ -477,10 +698,7 @@ export default function SponsoredOffersRow({ items, className, title = 'Patrocin
                         <div className="mt-[4px]">
                           <div className="text-[12px] text-zinc-500 line-clamp-1">{tagsLine}</div>
 
-                          <OfferEconomyLine
-                            savingsText={(item as any).savingsText ?? null}
-                            priceText={(item as any).priceText ?? null}
-                          />
+                          <OfferEconomyLine savingsText={(item as any).savingsText ?? null} priceText={(item as any).priceText ?? null} />
                         </div>
 
                         <div className="mt-1.5 flex items-end justify-between">
@@ -600,5 +818,134 @@ export default function SponsoredOffersRow({ items, className, title = 'Patrocin
         </button>
       </div>
     </section>
+  );
+}
+
+/* =========================
+   UI helpers do Modal (abas / seções / calendário / horários)
+========================= */
+
+function TabButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={[
+        'h-9 flex-1 rounded-[10px] text-[13px] font-semibold',
+        'border border-black/10',
+        active ? 'bg-zinc-800 text-white' : 'bg-zinc-200 text-zinc-700',
+      ].join(' ')}
+    >
+      {children}
+    </button>
+  );
+}
+
+function SectionTitle({
+  children,
+  className = '',
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return <div className={['text-[15px] font-extrabold text-zinc-800', className].join(' ')}>{children}</div>;
+}
+
+function HeartMini({ filled }: { filled: boolean }) {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M12 21s-7.5-4.6-10-9.3C.3 8.1 2.3 5 5.7 5c1.8 0 3.2.9 4.3 2.3C11.1 5.9 12.5 5 14.3 5c3.4 0 5.4 3.1 3.7 6.7C19.5 16.4 12 21 12 21z"
+        fill={filled ? '#ef4444' : 'none'}
+        stroke={filled ? '#ef4444' : 'rgba(0,0,0,.25)'}
+        strokeWidth="1.6"
+      />
+    </svg>
+  );
+}
+
+function CalendarBlock({
+  cal,
+}: {
+  cal: {
+    days: Array<{ key: 'seg' | 'ter' | 'qua' | 'qui' | 'sex' | 'sáb' | 'dom'; label: string }>;
+    dayRow: boolean[];
+    nightRow: boolean[];
+  };
+}) {
+  const days = cal.days?.slice(0, 7) ?? [];
+  const dayRow = (cal.dayRow ?? []).slice(0, 7);
+  const nightRow = (cal.nightRow ?? []).slice(0, 7);
+
+  return (
+    <div className="rounded-[12px] border border-black/10 p-2">
+      <div className="grid grid-cols-8 gap-1 text-center text-[12px] font-semibold text-zinc-700">
+        <div />
+        {days.map((d) => (
+          <div key={d.key} className="rounded bg-zinc-200 py-1">
+            {d.label}
+          </div>
+        ))}
+
+        <div className="rounded bg-zinc-200 py-1">Dia</div>
+        {dayRow.map((ok, i) => (
+          <Cell key={`d-${i}`} ok={ok} />
+        ))}
+
+        <div className="rounded bg-zinc-200 py-1">Noite</div>
+        {nightRow.map((ok, i) => (
+          <Cell key={`n-${i}`} ok={ok} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Cell({ ok }: { ok: boolean }) {
+  return (
+    <div className="grid place-items-center rounded bg-zinc-100 py-1">
+      <span className={ok ? 'text-emerald-600' : 'text-red-500'}>{ok ? '✓' : '✕'}</span>
+    </div>
+  );
+}
+
+function TimeCard({
+  time,
+  offLabel,
+  enabled = true,
+}: {
+  time: string;
+  offLabel: string;
+  enabled?: boolean;
+}) {
+  return (
+    <div
+      className={[
+        'min-w-[78px] rounded-[10px] border border-black/10 bg-white p-2 text-center',
+        enabled ? '' : 'opacity-45',
+      ].join(' ')}
+    >
+      <div className="text-[11px] font-semibold text-zinc-700">{time}</div>
+      <div className="text-[11px] font-extrabold text-red-500">{offLabel}</div>
+      <button type="button" className="mt-1 w-full rounded-[8px] bg-zinc-100 py-1 text-[11px] font-semibold text-zinc-700">
+        Utilizar
+      </button>
+    </div>
+  );
+}
+
+function Accordion({ title }: { title: string }) {
+  return (
+    <div className="rounded-[10px] border border-black/10 bg-zinc-100 px-3 py-2">
+      <div className="text-[13px] font-extrabold text-zinc-700">{title}</div>
+    </div>
   );
 }
