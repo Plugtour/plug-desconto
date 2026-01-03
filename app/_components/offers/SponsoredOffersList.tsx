@@ -112,6 +112,20 @@ function HeartIcon({ filled, className }: { filled: boolean; className?: string 
 }
 
 /* =========================
+   ✅ FAVORITOS: map (igual ao arquivo que funciona)
+   - Isso força a hidratação do store via getFavorites()
+========================= */
+function buildFavMapFromStore(): Record<string, boolean> {
+  const list = getFavorites?.() ?? [];
+  const map: Record<string, boolean> = {};
+  for (const it of list as any[]) {
+    const id = String((it as any)?.id ?? '').trim();
+    if (id) map[id] = true;
+  }
+  return map;
+}
+
+/* =========================
    PLACEHOLDER (SVG centralizado)
 ========================= */
 function TempImagePlaceholder() {
@@ -135,11 +149,7 @@ function TempImagePlaceholder() {
           strokeWidth="2"
           strokeLinejoin="round"
         />
-        <path
-          d="M9 9.2a.9.9 0 1 0 0-1.8.9.9 0 0 0 0 1.8Z"
-          stroke="currentColor"
-          strokeWidth="2"
-        />
+        <path d="M9 9.2a.9.9 0 1 0 0-1.8.9.9 0 0 0 0 1.8Z" stroke="currentColor" strokeWidth="2" />
       </svg>
     </div>
   );
@@ -176,12 +186,7 @@ function FilterIcon({
     case 'todos':
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none" aria-hidden="true">
-          <path
-            d="M6.5 7.5h11M6.5 12h11M6.5 16.5h11"
-            stroke={c}
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
+          <path d="M6.5 7.5h11M6.5 12h11M6.5 16.5h11" stroke={c} strokeWidth="2" strokeLinecap="round" />
         </svg>
       );
     case 'melhores':
@@ -220,13 +225,7 @@ function FilterIcon({
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none" aria-hidden="true">
           <circle cx="12" cy="12" r="9" stroke={c} strokeWidth="2" />
-          <path
-            d="M12 7v5l3 2"
-            stroke={c}
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
+          <path d="M12 7v5l3 2" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       );
     case 'perto':
@@ -238,11 +237,7 @@ function FilterIcon({
             strokeWidth="2"
             strokeLinejoin="round"
           />
-          <path
-            d="M12 11.2a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4z"
-            stroke={c}
-            strokeWidth="2"
-          />
+          <path d="M12 11.2a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4z" stroke={c} strokeWidth="2" />
         </svg>
       );
     case 'delivery':
@@ -284,9 +279,7 @@ function FilterChip({
         'inline-flex items-center gap-2',
         'border transition-colors',
         'touch-manipulation select-none',
-        isActive
-          ? 'border-emerald-700 bg-emerald-700 text-white'
-          : 'border-zinc-300 bg-zinc-100 text-zinc-700 hover:bg-zinc-200',
+        isActive ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-zinc-300 bg-zinc-100 text-zinc-700 hover:bg-zinc-200',
       ].join(' ')}
     >
       <span className="inline-flex items-center justify-center">
@@ -334,14 +327,30 @@ export default function SponsoredOffersList({
   ========================= */
   const [favoritesVersion, setFavoritesVersion] = useState(0);
 
+  // ✅ NOVO: mapa de ids para renderizar o coração SEM depender do isFavorite “cru”
+  const [favIds, setFavIds] = useState<Record<string, boolean>>({});
+
   useLayoutEffect(() => {
-    const sync = () => setFavoritesVersion((v) => v + 1);
+    const sync = () => {
+      // ✅ importante: força a hidratação do store (localStorage -> memória)
+      try {
+        setFavIds(buildFavMapFromStore());
+      } catch {
+        setFavIds({});
+      }
+      setFavoritesVersion((v) => v + 1);
+    };
+
     sync();
+
     const off = onFavoritesChange(sync);
-    return () => off();
+    return () => {
+      if (typeof off === 'function') off();
+    };
   }, []);
 
-  const isFavId = (id: any) => isFavorite(String(id ?? '').trim());
+  // Mantive sua função, mas agora a UI lê do favIds (mais confiável pós-F5)
+  const isFavId = (id: any) => !!favIds[String(id ?? '').trim()];
 
   const toggleFavFromOffer = (offer: SponsoredOffer) => {
     const o: any = offer as any;
@@ -366,7 +375,7 @@ export default function SponsoredOffersList({
     };
 
     toggleFavorite(fav);
-    // não precisa setState local; o store vai emitir e o effect acima força re-render
+    // store emite mudança; o effect acima recalcula favIds e re-renderiza
   };
 
   function openModal(item?: SponsoredOffer) {
@@ -434,10 +443,7 @@ export default function SponsoredOffersList({
     setVisibleCount(Math.min(initialCount, total));
   }, [active, initialCount, total]);
 
-  const visibleItems = useMemo(
-    () => filteredItems.slice(0, visibleCount),
-    [filteredItems, visibleCount]
-  );
+  const visibleItems = useMemo(() => filteredItems.slice(0, visibleCount), [filteredItems, visibleCount]);
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const lockRef = useRef(false);
@@ -596,21 +602,14 @@ export default function SponsoredOffersList({
                     <div className="h-[106px] w-[106px] flex-none overflow-hidden rounded-md bg-zinc-200">
                       {imageUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={imageUrl}
-                          alt={o.title}
-                          className="h-full w-full object-cover"
-                          loading="lazy"
-                        />
+                        <img src={imageUrl} alt={o.title} className="h-full w-full object-cover" loading="lazy" />
                       ) : (
                         <TempImagePlaceholder />
                       )}
                     </div>
 
                     <div className="min-w-0 flex-1">
-                      <div className="pr-[41px] text-[12px] font-extrabold leading-snug text-zinc-900 line-clamp-2">
-                        {o.title}
-                      </div>
+                      <div className="pr-[41px] text-[12px] font-extrabold leading-snug text-zinc-900 line-clamp-2">{o.title}</div>
 
                       <div className="mt-[4px]">
                         <div className="text-[12px] text-zinc-500 line-clamp-1">{tagsLine}</div>
@@ -643,10 +642,7 @@ export default function SponsoredOffersList({
                   >
                     <HeartIcon
                       filled={isFav}
-                      className={[
-                        'h-9 w-9 transition',
-                        isFav ? 'text-red-500' : 'text-zinc-300 hover:text-zinc-400',
-                      ].join(' ')}
+                      className={['h-9 w-9 transition', isFav ? 'text-red-500' : 'text-zinc-300 hover:text-zinc-400'].join(' ')}
                     />
                   </button>
                 </div>
@@ -678,11 +674,10 @@ export default function SponsoredOffersList({
         </div>
       </div>
     );
-  }, [selected, favoritesVersion]);
+  }, [selected, favoritesVersion, favIds]);
 
   return (
     <section className={['w-full', className || ''].join(' ')}>
-      {/* ✅ TROCA AQUI: antes era RightDrawerModal */}
       <MenuCarouselModalRight open={modalOpen} onClose={closeModal} hideHeader>
         {modalContent}
       </MenuCarouselModalRight>
@@ -703,19 +698,11 @@ export default function SponsoredOffersList({
               Todos
             </FilterChip>
 
-            <FilterChip
-              iconKind="melhores"
-              isActive={active === 'melhores'}
-              onClick={() => setActivePreserveScroll('melhores')}
-            >
+            <FilterChip iconKind="melhores" isActive={active === 'melhores'} onClick={() => setActivePreserveScroll('melhores')}>
               Melhores avaliados
             </FilterChip>
 
-            <FilterChip
-              iconKind="descontos"
-              isActive={active === 'descontos'}
-              onClick={() => setActivePreserveScroll('descontos')}
-            >
+            <FilterChip iconKind="descontos" isActive={active === 'descontos'} onClick={() => setActivePreserveScroll('descontos')}>
               Maiores descontos
             </FilterChip>
 
@@ -723,27 +710,15 @@ export default function SponsoredOffersList({
               Novo
             </FilterChip>
 
-            <FilterChip
-              iconKind="aberto"
-              isActive={active === 'aberto'}
-              onClick={() => setActivePreserveScroll('aberto')}
-            >
+            <FilterChip iconKind="aberto" isActive={active === 'aberto'} onClick={() => setActivePreserveScroll('aberto')}>
               Aberto agora
             </FilterChip>
 
-            <FilterChip
-              iconKind="perto"
-              isActive={active === 'perto'}
-              onClick={() => setActivePreserveScroll('perto')}
-            >
+            <FilterChip iconKind="perto" isActive={active === 'perto'} onClick={() => setActivePreserveScroll('perto')}>
               Perto de mim
             </FilterChip>
 
-            <FilterChip
-              iconKind="delivery"
-              isActive={active === 'delivery'}
-              onClick={() => setActivePreserveScroll('delivery')}
-            >
+            <FilterChip iconKind="delivery" isActive={active === 'delivery'} onClick={() => setActivePreserveScroll('delivery')}>
               Delivery
             </FilterChip>
           </div>
@@ -770,13 +745,12 @@ export default function SponsoredOffersList({
 
       <div ref={listTopRef} className="no-anchor" style={{ scrollMarginTop: FILTER_TOP }} />
 
-      <div className="px-3 no-anchor" style={needsStickySpacer ? { minHeight: spacerHeight } : {}}>
+      <div className="px-3 no-anchor" style={total <= 6 ? { minHeight: `90vh` } : {}}>
         {total === 0 ? (
           <div className="px-1 py-4 text-[12px] font-medium text-zinc-500">Nenhum item encontrado para este filtro.</div>
         ) : (
           <>
             {visibleItems.map((item, idx) => {
-              // força atualizar corações quando favoritos mudarem
               void favoritesVersion;
 
               const o: any = item as any;
@@ -811,13 +785,10 @@ export default function SponsoredOffersList({
                       </div>
 
                       <div className="min-w-0 flex-1">
-                        <div className="pr-[41px] text-[12px] font-extrabold leading-snug text-zinc-900 line-clamp-2">
-                          {o.title}
-                        </div>
+                        <div className="pr-[41px] text-[12px] font-extrabold leading-snug text-zinc-900 line-clamp-2">{o.title}</div>
 
                         <div className="mt-[4px]">
                           <div className="text-[12px] text-zinc-500 line-clamp-1">{tagsLine}</div>
-
                           <OfferEconomyLine savingsText={o.savingsText ?? null} priceText={o.priceText ?? null} />
                         </div>
 
@@ -863,17 +834,12 @@ export default function SponsoredOffersList({
                     >
                       <HeartIcon
                         filled={isFav}
-                        className={[
-                          'h-9 w-9 transition',
-                          isFav ? 'text-red-500' : 'text-zinc-300 hover:text-zinc-400',
-                        ].join(' ')}
+                        className={['h-9 w-9 transition', isFav ? 'text-red-500' : 'text-zinc-300 hover:text-zinc-400'].join(' ')}
                       />
                     </button>
                   </div>
 
-                  {idx < visibleItems.length - 1 ? (
-                    <div className="mx-2 border-b border-dotted border-zinc-300" />
-                  ) : null}
+                  {idx < visibleItems.length - 1 ? <div className="mx-2 border-b border-dotted border-zinc-300" /> : null}
                 </div>
               );
             })}
