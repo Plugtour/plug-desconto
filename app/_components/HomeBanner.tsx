@@ -4,6 +4,9 @@ import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 're
 import Link from 'next/link';
 import { BANNERS, type BannerItem } from '@/_data/banners';
 
+// ✅ favoritesStore
+import { getFavorites, onFavoritesChange, toggleFavorite } from './favorites/favoritesStore';
+
 type Props = { className?: string };
 
 const DURATION_MS = 6500;
@@ -16,13 +19,7 @@ function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
 
-function DoubleChevronOpen({
-  dir,
-  className,
-}: {
-  dir: 'left' | 'right';
-  className?: string;
-}) {
+function DoubleChevronOpen({ dir, className }: { dir: 'left' | 'right'; className?: string }) {
   const flip = dir === 'left';
   return (
     <svg viewBox="0 0 28 28" className={className} aria-hidden="true" fill="none">
@@ -40,13 +37,7 @@ function DoubleChevronOpen({
   );
 }
 
-function HeartIcon({
-  className,
-  active = false,
-}: {
-  className?: string;
-  active?: boolean;
-}) {
+function HeartIcon({ className, active = false }: { className?: string; active?: boolean }) {
   return (
     <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
       <path
@@ -63,12 +54,7 @@ function HeartIcon({
 function PlaneIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" className={className} fill="none" aria-hidden="true">
-      <path
-        d="M21.8 2.2 9.1 14.9"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      />
+      <path d="M21.8 2.2 9.1 14.9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
       <path
         d="M21.8 2.2 14.2 21.6c-.2.6-.9.6-1.2.1l-3.7-6.6-6.6-3.7c-.5-.3-.5-1 .1-1.2L21.8 2.2z"
         stroke="currentColor"
@@ -109,6 +95,17 @@ function withWebp(url: string) {
   return `${url}${sep}fm=webp`;
 }
 
+// ✅ helper: map rápido de favoritos
+function buildFavMapFromStore(): Record<string, boolean> {
+  const list = getFavorites?.() ?? [];
+  const map: Record<string, boolean> = {};
+  for (const it of list as any[]) {
+    const id = String((it as any)?.id ?? '').trim();
+    if (id) map[id] = true;
+  }
+  return map;
+}
+
 export default function HomeBanner({ className }: Props) {
   const items = useMemo(() => BANNERS.slice(0, 3), []);
   const count = items.length;
@@ -122,15 +119,15 @@ export default function HomeBanner({ className }: Props) {
   const [snapping, setSnapping] = useState(false);
   const slideTimerRef = useRef<number | null>(null);
 
-  // fade (setas + autoplay)
+  // fade
   const [isFading, setIsFading] = useState(false);
   const [fadeTo, setFadeTo] = useState<number | null>(null);
   const fadeTimerRef = useRef<number | null>(null);
 
-  // pausa do usuário (ícone)
+  // pausa
   const [userPaused, setUserPaused] = useState(false);
 
-  // swipe refs (deadzone)
+  // swipe refs
   const startXRef = useRef<number | null>(null);
   const startYRef = useRef<number | null>(null);
   const draggingRef = useRef(false);
@@ -140,11 +137,11 @@ export default function HomeBanner({ className }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const widthRef = useRef<number>(1);
 
-  // favorites
-  const [favorites, setFavorites] = useState<Record<string, boolean>>({});
+  // ✅ favoritesStore state
+  const [favIds, setFavIds] = useState<Record<string, boolean>>({});
   const [heartPop, setHeartPop] = useState(false);
 
-  // autoplay (timeout + tempo restante)
+  // autoplay
   const timeoutRef = useRef<number | null>(null);
   const startedAtRef = useRef<number>(0);
   const remainingRef = useRef<number>(DURATION_MS);
@@ -160,6 +157,17 @@ export default function HomeBanner({ className }: Props) {
   const nextItem = items[nextIndex];
 
   const autoplayPaused = userPaused || isDragging || isSlideAnimating || isFading;
+
+  // ✅ sync favorites do store
+  useEffect(() => {
+    const sync = () => setFavIds(buildFavMapFromStore());
+    sync();
+
+    const off = onFavoritesChange?.(sync);
+    return () => {
+      if (typeof off === 'function') off();
+    };
+  }, []);
 
   // medir largura
   useEffect(() => {
@@ -202,30 +210,26 @@ export default function HomeBanner({ className }: Props) {
     });
   }, [prevItem?.imageUrl, current?.imageUrl, nextItem?.imageUrl, fadeTo, items]);
 
-  // favoritos localStorage
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem('plugdesconto:favorites');
-      if (raw) setFavorites(JSON.parse(raw));
-    } catch {}
-  }, []);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('plugdesconto:favorites', JSON.stringify(favorites));
-    } catch {}
-  }, [favorites]);
-
-  const isFav = !!favorites[current?.id ?? ''];
+  const currentId = String((current as any)?.id ?? '').trim();
+  const isFav = !!(currentId && favIds[currentId]);
 
   function toggleFav() {
-    const id = current?.id;
+    const id = String((current as any)?.id ?? '').trim();
     if (!id) return;
 
-    const willBeFav = !favorites[id];
-    setFavorites((prev) => ({ ...prev, [id]: !prev[id] }));
+    const res = toggleFavorite?.({
+      id,
+      title: (current as any)?.title ?? 'Oferta',
+      href: (current as any)?.href ?? '/',
+      imageUrl: (current as any)?.imageUrl ?? null,
+      subtitle: (current as any)?.subtitle ?? null,
+      // categoryLabel opcional, se quiser
+      categoryLabel: (current as any)?.tag ?? null,
+    } as any);
 
-    if (willBeFav) {
+    // pop só quando vira favorito
+    const becameFav = !!(res && typeof res === 'object' && (res as any).active === true);
+    if (becameFav) {
       setHeartPop(false);
       requestAnimationFrame(() => setHeartPop(true));
       window.setTimeout(() => setHeartPop(false), 380);
@@ -253,25 +257,22 @@ export default function HomeBanner({ className }: Props) {
     }, Math.max(0, remainingRef.current));
   }
 
-  // ✅ (AQUI) reset da barra ANTES do paint, e arma só no frame seguinte
+  // reset barra
   useLayoutEffect(() => {
     if (count <= 1) return;
 
-    // zera relógio
     clearAutoplayTimer();
     remainingRef.current = DURATION_MS;
     startedAtRef.current = performance.now();
 
-    // desarma antes de pintar (evita 1 frame “cheio”)
     setBarArmed(false);
     setBarKey((k) => k + 1);
 
-    // arma depois do paint
     requestAnimationFrame(() => setBarArmed(true));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, count]);
 
-  // pause/retomar sem resetar o tempo
+  // pause/retomar
   useEffect(() => {
     if (count <= 1) return;
 
@@ -281,13 +282,11 @@ export default function HomeBanner({ className }: Props) {
     }
 
     resumeAutoplayClock();
-
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoplayPaused, count]);
 
   function finishSlideTransition(dir: 'next' | 'prev') {
-    const newActive =
-      dir === 'next' ? (active + 1) % count : (active - 1 + count) % count;
+    const newActive = dir === 'next' ? (active + 1) % count : (active - 1 + count) % count;
 
     setSnapping(true);
     setActive(newActive);
@@ -356,15 +355,15 @@ export default function HomeBanner({ className }: Props) {
     try {
       const url =
         typeof window !== 'undefined'
-          ? current?.href
-            ? new URL(current.href, window.location.origin).toString()
+          ? (current as any)?.href
+            ? new URL((current as any).href, window.location.origin).toString()
             : window.location.href
           : '';
 
       if (navigator.share) {
         await navigator.share({
-          title: current?.title ?? 'Plug Desconto',
-          text: current?.subtitle ?? '',
+          title: (current as any)?.title ?? 'Plug Desconto',
+          text: (current as any)?.subtitle ?? '',
           url,
         });
         return;
@@ -379,9 +378,7 @@ export default function HomeBanner({ className }: Props) {
   function shouldIgnoreGesture(target: EventTarget | null) {
     const el = target as HTMLElement | null;
     if (!el) return false;
-    return !!el.closest(
-      '[data-banner-control], button, a, input, textarea, select, [role="button"]'
-    );
+    return !!el.closest('[data-banner-control], button, a, input, textarea, select, [role="button"]');
   }
 
   function onPointerDown(e: React.PointerEvent) {
@@ -456,8 +453,7 @@ export default function HomeBanner({ className }: Props) {
 
   if (!current) return null;
 
-  const slideTransitionClass =
-    !isDragging && !snapping ? `transition-transform duration-[${SLIDE_MS}ms]` : '';
+  const slideTransitionClass = !isDragging && !snapping ? `transition-transform duration-[${SLIDE_MS}ms]` : '';
 
   const stop = (e: React.SyntheticEvent) => e.stopPropagation();
 
@@ -466,51 +462,38 @@ export default function HomeBanner({ className }: Props) {
   const SHADOW_SOFT = '0 2px 16px rgba(0,0,0,0.82)';
 
   function SlideContent({ item }: { item: BannerItem }) {
-    const contentAlign = alignClasses(item.align);
-    const centerLiftClass = item.align === 'center' ? '-translate-y-[15px]' : '';
+    const contentAlign = alignClasses((item as any).align);
+    const centerLiftClass = (item as any).align === 'center' ? '-translate-y-[15px]' : '';
 
     const titleClass = [
       'text-[25px] font-extrabold leading-[1.05] text-white',
-      item.align === 'left' || item.align === 'right'
-        ? 'max-w-[220px] whitespace-normal'
-        : '',
-      item.align === 'center' ? 'whitespace-nowrap' : '',
+      (item as any).align === 'left' || (item as any).align === 'right' ? 'max-w-[220px] whitespace-normal' : '',
+      (item as any).align === 'center' ? 'whitespace-nowrap' : '',
     ].join(' ');
 
     return (
       <div className="absolute inset-0 z-[35] px-14 pb-4 pt-6 -translate-y-[0px]">
-        <div
-          className={[
-            `flex h-full w-full flex-col justify-end gap-1 ${contentAlign}`,
-            centerLiftClass,
-          ].join(' ')}
-        >
-          <div
-            className="text-[11px] font-semibold tracking-wide"
-            style={{ color: '#7CFFB2', textShadow: SHADOW_SOFT }}
-          >
-            {item.tag}
+        <div className={[`flex h-full w-full flex-col justify-end gap-1 ${contentAlign}`, centerLiftClass].join(' ')}>
+          <div className="text-[11px] font-semibold tracking-wide" style={{ color: '#7CFFB2', textShadow: SHADOW_SOFT }}>
+            {(item as any).tag}
           </div>
 
           <div className={titleClass} style={{ textShadow: SHADOW_STRONG }}>
-            {item.title}
+            {(item as any).title}
           </div>
 
           <div className="text-[16px] font-semibold text-white" style={{ textShadow: SHADOW_MED }}>
-            {item.subtitle}
+            {(item as any).subtitle}
           </div>
 
-          <div
-            className="text-[15px] font-semibold -mt-[8px]"
-            style={{ color: '#7CCBFF', textShadow: SHADOW_SOFT }}
-          >
-            {item.highlight}
+          <div className="text-[15px] font-semibold -mt-[8px]" style={{ color: '#7CCBFF', textShadow: SHADOW_SOFT }}>
+            {(item as any).highlight}
           </div>
 
-          {item.href ? (
+          {(item as any).href ? (
             <div className="mt-2">
               <Link
-                href={item.href}
+                href={(item as any).href}
                 className="inline-flex text-[15px] font-semibold text-white -translate-y-[10px]"
                 style={{ textShadow: SHADOW_MED }}
               >
@@ -524,7 +507,6 @@ export default function HomeBanner({ className }: Props) {
   }
 
   const fadeItem = fadeTo != null ? items[fadeTo] : null;
-
   const elapsedMs = clamp(DURATION_MS - remainingRef.current, 0, DURATION_MS);
 
   return (
@@ -543,10 +525,10 @@ export default function HomeBanner({ className }: Props) {
             <>
               <div className="absolute inset-0">
                 <picture>
-                  <source srcSet={withWebp(current.imageUrl)} type="image/webp" />
+                  <source srcSet={withWebp((current as any).imageUrl)} type="image/webp" />
                   <img
-                    src={current.imageUrl}
-                    alt={current.title}
+                    src={(current as any).imageUrl}
+                    alt={(current as any).title}
                     className="absolute inset-0 h-full w-full object-cover"
                     loading="lazy"
                     draggable={false}
@@ -556,19 +538,14 @@ export default function HomeBanner({ className }: Props) {
               </div>
 
               <div
-                className={[
-                  'absolute inset-0',
-                  'transition-opacity',
-                  `duration-[${FADE_MS}ms]`,
-                  'opacity-100',
-                ].join(' ')}
+                className={['absolute inset-0', 'transition-opacity', `duration-[${FADE_MS}ms]`, 'opacity-100'].join(' ')}
                 style={{ opacity: 1 }}
               >
                 <picture>
-                  <source srcSet={withWebp(fadeItem.imageUrl)} type="image/webp" />
+                  <source srcSet={withWebp((fadeItem as any).imageUrl)} type="image/webp" />
                   <img
-                    src={fadeItem.imageUrl}
-                    alt={fadeItem.title}
+                    src={(fadeItem as any).imageUrl}
+                    alt={(fadeItem as any).title}
                     className="absolute inset-0 h-full w-full object-cover"
                     loading="lazy"
                     draggable={false}
@@ -576,11 +553,8 @@ export default function HomeBanner({ className }: Props) {
                   />
                 </picture>
 
-                <div
-                  className="absolute inset-0"
-                  style={{ animation: `fadeIn ${FADE_MS}ms ease-out both` }}
-                >
-                  <SlideContent item={fadeItem} />
+                <div className="absolute inset-0" style={{ animation: `fadeIn ${FADE_MS}ms ease-out both` }}>
+                  <SlideContent item={fadeItem as any} />
                 </div>
               </div>
             </>
@@ -595,17 +569,17 @@ export default function HomeBanner({ className }: Props) {
                 }}
               >
                 <picture>
-                  <source srcSet={withWebp(prevItem.imageUrl)} type="image/webp" />
+                  <source srcSet={withWebp((prevItem as any).imageUrl)} type="image/webp" />
                   <img
-                    src={prevItem.imageUrl}
-                    alt={prevItem.title}
+                    src={(prevItem as any).imageUrl}
+                    alt={(prevItem as any).title}
                     className="absolute inset-0 h-full w-full object-cover"
                     loading="lazy"
                     draggable={false}
                     decoding="async"
                   />
                 </picture>
-                <SlideContent item={prevItem} />
+                <SlideContent item={prevItem as any} />
               </div>
 
               <div
@@ -617,39 +591,39 @@ export default function HomeBanner({ className }: Props) {
                 }}
               >
                 <picture>
-                  <source srcSet={withWebp(current.imageUrl)} type="image/webp" />
+                  <source srcSet={withWebp((current as any).imageUrl)} type="image/webp" />
                   <img
-                    src={current.imageUrl}
-                    alt={current.title}
+                    src={(current as any).imageUrl}
+                    alt={(current as any).title}
                     className="absolute inset-0 h-full w-full object-cover"
                     loading="lazy"
                     draggable={false}
                     decoding="async"
                   />
                 </picture>
-                <SlideContent item={current} />
+                <SlideContent item={current as any} />
               </div>
 
               <div
                 className={['absolute inset-0 will-change-transform', slideTransitionClass].join(' ')}
                 style={{
-                  transform: `translate3d(${(widthRef.current + dragX)}px, 0, 0)`,
+                  transform: `translate3d(${widthRef.current + dragX}px, 0, 0)`,
                   transitionTimingFunction: 'cubic-bezier(0.22, 0.8, 0.2, 1)',
                   backfaceVisibility: 'hidden',
                 }}
               >
                 <picture>
-                  <source srcSet={withWebp(nextItem.imageUrl)} type="image/webp" />
+                  <source srcSet={withWebp((nextItem as any).imageUrl)} type="image/webp" />
                   <img
-                    src={nextItem.imageUrl}
-                    alt={nextItem.title}
+                    src={(nextItem as any).imageUrl}
+                    alt={(nextItem as any).title}
                     className="absolute inset-0 h-full w-full object-cover"
                     loading="lazy"
                     draggable={false}
                     decoding="async"
                   />
                 </picture>
-                <SlideContent item={nextItem} />
+                <SlideContent item={nextItem as any} />
               </div>
             </>
           )}
@@ -674,12 +648,7 @@ export default function HomeBanner({ className }: Props) {
                         className="h-full bg-white will-change-transform"
                         style={
                           !barArmed
-                            ? {
-                                width: '100%',
-                                transformOrigin: 'left',
-                                transform: 'scaleX(0)',
-                                animationName: 'none',
-                              }
+                            ? { width: '100%', transformOrigin: 'left', transform: 'scaleX(0)', animationName: 'none' }
                             : {
                                 width: '100%',
                                 transformOrigin: 'left',

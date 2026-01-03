@@ -129,41 +129,46 @@ export default function FloatingHeader({
       {/* DIREITA — AÇÕES */}
       <div className="flex items-center gap-0">
         {/* FAVORITOS */}
-          <button
-            onClick={onOpenFavorites}
-            className="
-              relative
-              min-h-[44px] min-w-[44px]
-              inline-flex items-center justify-center
-              touch-manipulation select-none
-              active:scale-[0.99]
-            "
-            aria-label="Favoritos"
-          >
-            {/* BOLINHA (fica atrás) */}
-            {favoritesCount > 0 && (
-              <span
-                className="
-                  absolute
-                  top-[4px] right-[4px]
-                  min-w-[16px] h-4
-                  rounded-full bg-red-600
-                  text-[9px] font-medium text-white
-                  flex items-center justify-center
-                  px-1
-                  ring-1 ring-white/50
-                  z-11
-                "
-              >
-                {favoritesCount}
-              </span>
-            )}
 
-            {/* CORAÇÃO (fica na frente) */}
-            <span className="relative z-10">
-              <IconHeart />
+        <button
+          onClick={onOpenFavorites}
+          className="
+            relative
+            min-h-[44px] min-w-[44px]
+            inline-flex items-center justify-center
+            touch-manipulation select-none
+            active:scale-[0.99]
+          "
+          aria-label="Favoritos"
+        >
+          {/* BOLINHA (atrás e “invadindo” o coração) */}
+          {favoritesCount > 0 && (
+            <span
+              className="
+                absolute
+                top-[8px] right-[8px]
+                min-w-[16px] h-4
+                rounded-full
+                bg-red-600
+                text-[9px] font-medium text-white
+                flex items-center justify-center
+                px-1
+                ring-1 ring-white/50
+                z-[11]
+              "
+              style={{
+                transform: 'translate(25%, -35%)', // ✅ deixa parcialmente por trás do coração
+              }}
+            >
+              {favoritesCount}
             </span>
-          </button>
+          )}
+
+          {/* CORAÇÃO (na frente) */}
+          <span className="relative z-[2]">
+            <IconHeart />
+          </span>
+        </button>
 
         {/* BUSCA (LUCIDE) */}
         <button
