@@ -9,7 +9,6 @@ type Props = {
 };
 
 export default function ModalOverlay({ open, onClose, children }: Props) {
-  // ESC fecha
   useEffect(() => {
     if (!open) return;
 
@@ -21,25 +20,22 @@ export default function ModalOverlay({ open, onClose, children }: Props) {
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose]);
 
+  if (!open) return null;
+
   return (
-    <div
-      className={[
-        'fixed inset-0 z-[9999]', // ✅ acima de qualquer header/menu
-        'transition-opacity duration-200',
-        open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none',
-      ].join(' ')}
-      aria-hidden={!open}
-    >
-      {/* ✅ backdrop (fecha ao clicar) */}
-      <button
-        type="button"
-        aria-label="Fechar"
-        onClick={onClose}
+    <div className="fixed inset-0 z-[9999]">
+      {/* BACKDROP REAL (captura clique) */}
+      <div
         className="absolute inset-0 bg-black/35 backdrop-blur-[4px]"
+        onClick={onClose}
       />
 
-      {/* ✅ camada do conteúdo NÃO pode bloquear clique no backdrop */}
-      <div className="absolute inset-0 pointer-events-none">
+      {/* CONTEÚDO (acima do backdrop) */}
+      <div
+        className="absolute inset-0 z-[1]"
+        onClick={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
         {children}
       </div>
     </div>
