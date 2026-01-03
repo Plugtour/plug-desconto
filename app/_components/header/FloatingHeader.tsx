@@ -147,12 +147,12 @@ export default function FloatingHeader({
                   absolute
                   top-[4px] right-[4px]
                   min-w-[16px] h-4
-                  rounded-full bg-red-500
+                  rounded-full bg-red-600
                   text-[9px] font-medium text-white
                   flex items-center justify-center
                   px-1
-                  ring-1 ring-black/1
-                  z-0
+                  ring-1 ring-white/50
+                  z-11
                 "
               >
                 {favoritesCount}
