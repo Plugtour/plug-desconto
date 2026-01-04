@@ -7,23 +7,16 @@ import Link from 'next/link';
 import type { SponsoredOffer } from '../../../_data/sponsoredOffers';
 import OfferEconomyLine from './OfferEconomyLine';
 
-// ✅ Modal 2 (por enquanto idêntico ao Modal 1)
 import MenuCarouselModalRight from '../modals/MenuCarouselModalRight';
+import ProductDetailContent, { type ProductModalData } from '@/app/_components/product/ProductDetailContent';
 
-// ✅ store global de favoritos
 import { getFavorites, onFavoritesChange, toggleFavorite } from '../favorites/favoritesStore';
 
-/* =========================
-   HELPERS
-========================= */
 function safeHref(v: any) {
   const s = typeof v === 'string' ? v.trim() : '';
   return s.length ? s : '/';
 }
 
-/* =========================
-   ESTRELAS (preenchimento proporcional, coladas)
-========================= */
 function Star({ fillPct }: { fillPct: number }) {
   const id = React.useId();
   const pct = Math.max(0, Math.min(100, fillPct));
@@ -64,9 +57,6 @@ function StarsRow({ rating }: { rating: number }) {
   );
 }
 
-/* =========================
-   TAGS — Cidade | Categoria | Tipo
-========================= */
 function buildTags(item: SponsoredOffer) {
   if (Array.isArray((item as any).tags) && (item as any).tags.length === 3) {
     return (item as any).tags.join(' | ');
@@ -74,9 +64,6 @@ function buildTags(item: SponsoredOffer) {
   return '';
 }
 
-/* =========================
-   CORAÇÃO (vasado → preenchido)
-========================= */
 function HeartIcon({ filled, className }: { filled: boolean; className?: string }) {
   return (
     <svg
@@ -93,12 +80,8 @@ function HeartIcon({ filled, className }: { filled: boolean; className?: string 
   );
 }
 
-/* =========================
-   SETA DUPLA (mesma do menu)
-========================= */
 function DoubleChevronOpen({ dir, className }: { dir: 'up' | 'down'; className?: string }) {
   const rotate = dir === 'down' ? 'rotate(90 14 14)' : 'rotate(-90 14 14)';
-
   return (
     <svg viewBox="0 0 28 28" className={className} aria-hidden="true" fill="none">
       <g transform={rotate} stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round">
@@ -125,17 +108,13 @@ type Props = {
   title?: string;
 };
 
-/* =========================
-   COMPONENTE PRINCIPAL
-========================= */
 export default function SponsoredOffersRow({ items, className, title = 'Patrocinado' }: Props) {
   const shown = useMemo(() => items.slice(0, 5), [items]);
 
   const [favIds, setFavIds] = useState<Record<string, boolean>>({});
   const [expanded, setExpanded] = useState(false);
 
-  // ✅ medidas (mantidas)
-  const CARD_ROW_HEIGHT = 119; // era 108
+  const CARD_ROW_HEIGHT = 119;
   const GRADIENT_TOP_OFFSET = 14;
   const COLLAPSED_HEIGHT = Math.round(CARD_ROW_HEIGHT * 1.5) + 5;
 
@@ -147,13 +126,8 @@ export default function SponsoredOffersRow({ items, className, title = 'Patrocin
   const heightAnimRef = useRef<Animation | null>(null);
   const [animating, setAnimating] = useState(false);
 
-  // ✅ Modal 2
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<SponsoredOffer | null>(null);
-
-  // ✅ Abas + Slider (conteúdo do modal)
-  const [tab, setTab] = useState<'detalhes' | 'avaliacoes' | 'endereco'>('detalhes');
-  const [mediaIdx, setMediaIdx] = useState(0);
 
   const SCROLL_OFFSET = 90;
 
@@ -166,13 +140,6 @@ export default function SponsoredOffersRow({ items, className, title = 'Patrocin
       if (typeof off === 'function') off();
     };
   }, []);
-
-  // reset do modal ao trocar item
-  useEffect(() => {
-    if (!modalOpen) return;
-    setTab('detalhes');
-    setMediaIdx(0);
-  }, [modalOpen, selectedItem?.id]);
 
   function scrollToFirstCard(behavior: ScrollBehavior = 'auto') {
     const el = wrapperRef.current;
@@ -306,326 +273,68 @@ export default function SponsoredOffersRow({ items, className, title = 'Patrocin
 
   if (!shown.length) return null;
 
-  // ===== Conteúdo do modal (AGORA no padrão do print) =====
   const modalContent = useMemo(() => {
-    if (!selectedItem) return <div className="px-4 pb-6" />;
+    if (!selectedItem) return <div className="p-2" />;
 
-    const id = String(selectedItem.id ?? '');
+    const o: any = selectedItem as any;
+    const id = String(o.id ?? '');
     const isFav = !!favIds[id];
 
     const tagsLine = buildTags(selectedItem);
-    const rating = Number((selectedItem as any).rating ?? 4.8);
-    const reviews = Number((selectedItem as any).reviews ?? 0);
-    const imageUrl = (selectedItem as any).imageUrl ?? null;
-    const hrefSafe = safeHref((selectedItem as any).href);
+    const rating = Number(o.rating ?? 4.8);
+    const reviews = Number(o.reviews ?? 0);
+    const imageUrl = o.imageUrl ?? null;
+    const hrefSafe = safeHref(o.href);
 
-    // Slider: por enquanto usamos a imagem do item (1 foto)
-    // (quando você tiver mais imagens, você pode passar um array e trocar aqui)
-    const media = imageUrl ? [{ src: imageUrl, alt: (selectedItem as any).title }] : [];
-    const active = media[mediaIdx];
+    const data: ProductModalData = {
+      id,
+      title: String(o.title ?? ''),
+      headline: String(o.headline ?? tagsLine ?? ''),
+      vendorName: String(o.vendorName ?? o.title ?? ''),
+      vendorAbout: String(o.vendorAbout ?? o.detailsHtml ?? o.subtitle ?? ''),
 
-    function prevMedia() {
-      if (!media.length) return;
-      setMediaIdx((i) => (i - 1 + media.length) % media.length);
-    }
-    function nextMedia() {
-      if (!media.length) return;
-      setMediaIdx((i) => (i + 1) % media.length);
-    }
+      media: imageUrl ? [{ src: imageUrl, alt: String(o.title ?? '') }] : [],
+      addressText: String(o.address?.text ?? o.addressText ?? ''),
 
-    // Conteúdo “Detalhes” (placeholder seguro — você ajusta depois com texto real do parceiro)
-    const detailsText =
-      (selectedItem as any).detailsHtml ??
-      (selectedItem as any).subtitle ??
-      'Informações do desconto e condições aparecerão aqui.';
+      rating,
+      reviews,
 
-    // Calendário / Horários / Excetos (placeholder seguro)
-    const calendar =
-      (selectedItem as any).calendar ?? {
-        days: [
-          { key: 'seg', label: 'seg' },
-          { key: 'ter', label: 'ter' },
-          { key: 'qua', label: 'qua' },
-          { key: 'qui', label: 'qui' },
-          { key: 'sex', label: 'sex' },
-          { key: 'sáb', label: 'sáb' },
-          { key: 'dom', label: 'dom' },
-        ],
-        dayRow: [true, true, true, true, true, true, false],
-        nightRow: [true, true, true, true, true, false, false],
-      };
+      savingsText: o.savingsText ?? null,
+      priceText: o.priceText ?? null,
 
-    const times =
-      (selectedItem as any).times ??
-      [
-        { time: '11:00', offLabel: '50% off', enabled: true },
-        { time: '12:00', offLabel: '50% off', enabled: true },
-        { time: '13:00', offLabel: '50% off', enabled: true },
-        { time: '14:00', offLabel: '50% off', enabled: true },
-      ];
-
-    const exceptions =
-      (selectedItem as any).exceptions ??
-      ['Não válido em feriados.', 'Sujeito à disponibilidade do estabelecimento.'];
-
-    const addressText =
-      (selectedItem as any).address?.text ??
-      (selectedItem as any).addressText ??
-      'Endereço do parceiro aparecerá aqui.';
+      calendar: o.calendar ?? null,
+      times: o.times ?? null,
+      exceptions: o.exceptions ?? null,
+    };
 
     return (
-      <div className="px-4 pb-6">
-        {/* HEADER (título + X + abas) */}
-        <div className="pt-3 pb-2">
-          <div className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-black/15" />
-
-          <div className="relative">
-            <div className="pr-10 text-[20px] font-extrabold tracking-[-.2px] text-zinc-800">
-              {(selectedItem as any).title}
-            </div>
-
-            <button
-              type="button"
-              onClick={closeModal}
-              className="absolute right-0 top-0 grid h-10 w-10 place-items-center rounded-full hover:bg-black/5"
-              aria-label="Fechar"
-            >
-              <span className="text-[26px] leading-none text-red-600">×</span>
-            </button>
-          </div>
-
-          <div className="mt-2 border-b border-dotted border-black/20" />
-
-          <div className="mt-3 flex gap-2">
-            <TabButton active={tab === 'detalhes'} onClick={() => setTab('detalhes')}>
-              Detalhes
-            </TabButton>
-            <TabButton active={tab === 'avaliacoes'} onClick={() => setTab('avaliacoes')}>
-              Avaliações
-            </TabButton>
-            <TabButton active={tab === 'endereco'} onClick={() => setTab('endereco')}>
-              Endereço
-            </TabButton>
-          </div>
-        </div>
-
-        {/* BODY SCROLL (como no print) */}
-        <div className="relative max-h-[78vh] overflow-y-auto pb-24 pt-3">
-          {/* SLIDER */}
-          <div className="relative overflow-hidden rounded-[14px] bg-zinc-100">
-            <div className="aspect-[16/9] w-full">
-              {active?.src ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={active.src} alt={active.alt ?? ''} className="h-full w-full object-cover" />
-              ) : (
-                <div className="h-full w-full bg-zinc-200" />
-              )}
-            </div>
-
-            {/* setas + bolinhas (se tiver mais de 1 imagem) */}
-            {media.length > 1 && (
-              <>
-                <button
-                  type="button"
-                  onClick={prevMedia}
-                  className="absolute left-2 top-1/2 -translate-y-1/2 grid h-9 w-9 place-items-center rounded-full bg-black/35 text-white"
-                  aria-label="Anterior"
-                >
-                  ‹
-                </button>
-                <button
-                  type="button"
-                  onClick={nextMedia}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 grid h-9 w-9 place-items-center rounded-full bg-black/35 text-white"
-                  aria-label="Próximo"
-                >
-                  ›
-                </button>
-
-                <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1.5">
-                  {media.map((_, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      onClick={() => setMediaIdx(i)}
-                      className={['h-2 w-2 rounded-full', i === mediaIdx ? 'bg-white' : 'bg-white/55'].join(' ')}
-                      aria-label={`Imagem ${i + 1}`}
-                    />
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* HEADLINE + FAVORITO */}
-          <div className="mt-3 flex items-start gap-3">
-            <div className="flex-1 text-[15px] font-semibold leading-snug text-zinc-700">
-              {(selectedItem as any).headline ?? tagsLine ?? '—'}
-            </div>
-
-            <button
-              type="button"
-              aria-label={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
-              onClick={() => {
-                toggleFavorite?.({
-                  id,
-                  title: (selectedItem as any).title ?? '',
-                  href: hrefSafe,
-                  imageUrl: imageUrl ?? null,
-                  subtitle: (selectedItem as any).subtitle ?? null,
-                  city: (Array.isArray((selectedItem as any).tags) ? (selectedItem as any).tags?.[0] : null) ?? null,
-                  priceText: (selectedItem as any).priceText ?? null,
-                  savingsText: (selectedItem as any).savingsText ?? null,
-                  rating: (selectedItem as any).rating ?? null,
-                  reviews: (selectedItem as any).reviews ?? null,
-                  tags: (selectedItem as any).tags ?? null,
-                } as any);
-              }}
-              className="mt-0.5 grid h-9 w-9 place-items-center rounded-full hover:bg-black/5"
-            >
-              <HeartMini filled={isFav} />
-            </button>
-          </div>
-
-          <div className="my-3 border-b border-dotted border-black/20" />
-
-          {/* CONTEÚDO POR ABA */}
-          {tab === 'detalhes' && (
-            <>
-              <SectionTitle>Detalhes:</SectionTitle>
-
-              <div className="mt-1 text-[13px] leading-relaxed text-zinc-600">{detailsText}</div>
-
-              {/* Economia / preço (mantém seu componente) */}
-              <div className="mt-3">
-                <OfferEconomyLine
-                  savingsText={(selectedItem as any).savingsText ?? null}
-                  priceText={(selectedItem as any).priceText ?? null}
-                />
-              </div>
-
-              {/* CALENDÁRIO */}
-              {calendar ? (
-                <div className="mt-4">
-                  <CalendarBlock cal={calendar} />
-                </div>
-              ) : null}
-
-              {/* HORÁRIOS */}
-              {times?.length ? (
-                <>
-                  <div className="mt-4 flex items-center gap-2">
-                    <SectionTitle>Horários:</SectionTitle>
-                    <span className="text-[14px]">⚠️</span>
-                  </div>
-
-                  <div className="mt-2 flex gap-2 overflow-x-auto pb-2">
-                    {times.map((t: any, i: number) => (
-                      <TimeCard key={i} {...t} />
-                    ))}
-                  </div>
-                </>
-              ) : null}
-
-              {/* EXCETOS */}
-              {exceptions?.length ? (
-                <>
-                  <SectionTitle className="mt-4">Excetos:</SectionTitle>
-                  <div className="mt-1 text-[13px] leading-relaxed text-zinc-600">
-                    {exceptions.map((x: string, i: number) => (
-                      <div key={i}>{x}</div>
-                    ))}
-                  </div>
-                </>
-              ) : null}
-
-              {/* ACCORDIONS (barras) */}
-              <div className="mt-4 space-y-2">
-                <Accordion title="Quanto posso economizar:" />
-                <Accordion title="Regras:" />
-              </div>
-
-              {/* CTA (opcional no print – mantendo) */}
-              <div className="mt-4 grid grid-cols-2 gap-2">
-                <Link
-                  href={hrefSafe}
-                  onClick={() => setModalOpen(false)}
-                  className="rounded-md bg-emerald-600 px-3 py-2 text-center text-[13px] font-semibold text-white shadow-sm hover:bg-emerald-700"
-                >
-                  Ir para oferta
-                </Link>
-
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  className="rounded-md bg-white px-3 py-2 text-[13px] font-semibold text-black ring-1 ring-black/10 hover:bg-black/5"
-                >
-                  Fechar
-                </button>
-              </div>
-            </>
-          )}
-
-          {tab === 'avaliacoes' && (
-            <div className="pt-2">
-              <SectionTitle>Avaliações</SectionTitle>
-
-              <div className="mt-2">
-                <StarsRow rating={rating} />
-                <div className="-mt-0.5 text-[12px] text-zinc-500">
-                  <span className="font-semibold text-zinc-700">{Number(rating).toFixed(1)}</span> de{' '}
-                  <span className="font-semibold text-zinc-700">{reviews}</span> avaliações
-                </div>
-              </div>
-
-              <div className="mt-3 rounded-[12px] border border-black/10 bg-zinc-50 p-3 text-[13px] text-zinc-600">
-                Aqui entra a lista de avaliações (título, nome, texto curto).
-              </div>
-            </div>
-          )}
-
-          {tab === 'endereco' && (
-            <div className="pt-2">
-              <SectionTitle>Endereço</SectionTitle>
-              <div className="mt-2 rounded-[12px] border border-black/10 p-3 text-[13px] text-zinc-700">
-                {addressText}
-              </div>
-            </div>
-          )}
-
-          {/* balão “Fale com...” (mini) */}
-          <div className="pointer-events-none fixed bottom-[122px] left-1/2 z-[60] w-[430px] max-w-full -translate-x-1/2 px-4">
-            <div className="pointer-events-auto ml-auto w-[160px] rounded-[10px] border border-black/10 bg-white p-2 text-[11px] text-zinc-700 shadow">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <div className="font-semibold leading-tight">Fale com</div>
-                  <div className="leading-tight">{(selectedItem as any).title ?? 'Anunciante'}</div>
-                </div>
-                <button className="text-zinc-400 hover:text-zinc-600" type="button" aria-label="Fechar">
-                  ×
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* botão WhatsApp */}
-          <a
-            href="#"
-            className="fixed bottom-[74px] left-1/2 z-[70] w-[430px] max-w-full -translate-x-1/2 px-4"
-            aria-label="WhatsApp"
-          >
-            <div className="ml-auto grid h-14 w-14 place-items-center rounded-full bg-green-500 shadow-lg">
-              <span className="text-[26px] text-white">🟢</span>
-            </div>
-          </a>
-        </div>
-      </div>
+      <ProductDetailContent
+        data={data}
+        isFavorite={isFav}
+        onToggleFavorite={() => {
+          toggleFavorite?.({
+            id,
+            title: o.title ?? '',
+            href: hrefSafe,
+            imageUrl: imageUrl ?? null,
+            subtitle: o.subtitle ?? null,
+            city: (Array.isArray(o.tags) ? o.tags?.[0] : null) ?? null,
+            priceText: o.priceText ?? null,
+            savingsText: o.savingsText ?? null,
+            rating: o.rating ?? null,
+            reviews: o.reviews ?? null,
+            tags: o.tags ?? null,
+          } as any);
+        }}
+        onClose={closeModal}
+        economySlot={<OfferEconomyLine savingsText={o.savingsText ?? null} priceText={o.priceText ?? null} />}
+        whatsappHref={o.whatsappHref ?? '#'}
+      />
     );
-  }, [selectedItem, favIds, tab, mediaIdx]);
+  }, [selectedItem, favIds]);
 
   return (
     <section className={['w-full', className || ''].join(' ')}>
-      {/* ✅ Modal 2 (mantido) */}
       <MenuCarouselModalRight open={modalOpen} onClose={closeModal} hideHeader>
         {modalContent}
       </MenuCarouselModalRight>
@@ -698,7 +407,10 @@ export default function SponsoredOffersRow({ items, className, title = 'Patrocin
                         <div className="mt-[4px]">
                           <div className="text-[12px] text-zinc-500 line-clamp-1">{tagsLine}</div>
 
-                          <OfferEconomyLine savingsText={(item as any).savingsText ?? null} priceText={(item as any).priceText ?? null} />
+                          <OfferEconomyLine
+                            savingsText={(item as any).savingsText ?? null}
+                            priceText={(item as any).priceText ?? null}
+                          />
                         </div>
 
                         <div className="mt-1.5 flex items-end justify-between">
@@ -731,7 +443,6 @@ export default function SponsoredOffersRow({ items, className, title = 'Patrocin
                       </div>
                     </div>
 
-                    {/* ✅ coração usa store (href sempre string) */}
                     <button
                       type="button"
                       aria-label={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
@@ -763,7 +474,10 @@ export default function SponsoredOffersRow({ items, className, title = 'Patrocin
                     >
                       <HeartIcon
                         filled={isFav}
-                        className={['h-9 w-9 transition', isFav ? 'text-red-500' : 'text-zinc-300 hover:text-zinc-400'].join(' ')}
+                        className={[
+                          'h-9 w-9 transition',
+                          isFav ? 'text-red-500' : 'text-zinc-300 hover:text-zinc-400',
+                        ].join(' ')}
                       />
                     </button>
                   </div>
@@ -810,7 +524,9 @@ export default function SponsoredOffersRow({ items, className, title = 'Patrocin
           style={{ touchAction: 'pan-y' }}
           aria-label={expanded ? 'Ver menos patrocinados' : 'Ver mais patrocinados'}
         >
-          <div className="text-[15px] font-semibold text-emerald-700 hover:text-emerald-800">{expanded ? 'Ver menos' : 'Ver mais'}</div>
+          <div className="text-[15px] font-semibold text-emerald-700 hover:text-emerald-800">
+            {expanded ? 'Ver menos' : 'Ver mais'}
+          </div>
 
           <div className="text-zinc-400">
             <DoubleChevronOpen dir={expanded ? 'up' : 'down'} className="h-10 w-10" />
@@ -818,134 +534,5 @@ export default function SponsoredOffersRow({ items, className, title = 'Patrocin
         </button>
       </div>
     </section>
-  );
-}
-
-/* =========================
-   UI helpers do Modal (abas / seções / calendário / horários)
-========================= */
-
-function TabButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={[
-        'h-9 flex-1 rounded-[10px] text-[13px] font-semibold',
-        'border border-black/10',
-        active ? 'bg-zinc-800 text-white' : 'bg-zinc-200 text-zinc-700',
-      ].join(' ')}
-    >
-      {children}
-    </button>
-  );
-}
-
-function SectionTitle({
-  children,
-  className = '',
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return <div className={['text-[15px] font-extrabold text-zinc-800', className].join(' ')}>{children}</div>;
-}
-
-function HeartMini({ filled }: { filled: boolean }) {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
-      <path
-        d="M12 21C12 21 4 15.36 4 9.5C4 7.02 6.02 5 8.5 5C10.04 5 11.4 5.81 12 7C12.6 5.81 13.96 5 15.5 5C17.98 5 20 7.02 20 9.5C20 15.36 12 21 12 21Z"
-        fill={filled ? '#ef4444' : 'none'}
-        stroke={filled ? '#ef4444' : 'rgba(0,0,0,.25)'}
-        strokeWidth="1.6"
-      />
-    </svg>
-  );
-}
-
-function CalendarBlock({
-  cal,
-}: {
-  cal: {
-    days: Array<{ key: 'seg' | 'ter' | 'qua' | 'qui' | 'sex' | 'sáb' | 'dom'; label: string }>;
-    dayRow: boolean[];
-    nightRow: boolean[];
-  };
-}) {
-  const days = cal.days?.slice(0, 7) ?? [];
-  const dayRow = (cal.dayRow ?? []).slice(0, 7);
-  const nightRow = (cal.nightRow ?? []).slice(0, 7);
-
-  return (
-    <div className="rounded-[12px] border border-black/10 p-2">
-      <div className="grid grid-cols-8 gap-1 text-center text-[12px] font-semibold text-zinc-700">
-        <div />
-        {days.map((d) => (
-          <div key={d.key} className="rounded bg-zinc-200 py-1">
-            {d.label}
-          </div>
-        ))}
-
-        <div className="rounded bg-zinc-200 py-1">Dia</div>
-        {dayRow.map((ok, i) => (
-          <Cell key={`d-${i}`} ok={ok} />
-        ))}
-
-        <div className="rounded bg-zinc-200 py-1">Noite</div>
-        {nightRow.map((ok, i) => (
-          <Cell key={`n-${i}`} ok={ok} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function Cell({ ok }: { ok: boolean }) {
-  return (
-    <div className="grid place-items-center rounded bg-zinc-100 py-1">
-      <span className={ok ? 'text-emerald-600' : 'text-red-500'}>{ok ? '✓' : '✕'}</span>
-    </div>
-  );
-}
-
-function TimeCard({
-  time,
-  offLabel,
-  enabled = true,
-}: {
-  time: string;
-  offLabel: string;
-  enabled?: boolean;
-}) {
-  return (
-    <div
-      className={[
-        'min-w-[78px] rounded-[10px] border border-black/10 bg-white p-2 text-center',
-        enabled ? '' : 'opacity-45',
-      ].join(' ')}
-    >
-      <div className="text-[11px] font-semibold text-zinc-700">{time}</div>
-      <div className="text-[11px] font-extrabold text-red-500">{offLabel}</div>
-      <button type="button" className="mt-1 w-full rounded-[8px] bg-zinc-100 py-1 text-[11px] font-semibold text-zinc-700">
-        Utilizar
-      </button>
-    </div>
-  );
-}
-
-function Accordion({ title }: { title: string }) {
-  return (
-    <div className="rounded-[10px] border border-black/10 bg-zinc-100 px-3 py-2">
-      <div className="text-[13px] font-extrabold text-zinc-700">{title}</div>
-    </div>
   );
 }
