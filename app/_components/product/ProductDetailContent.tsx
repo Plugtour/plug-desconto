@@ -62,9 +62,9 @@ const WHATSAPP_TMP_LINK = `https://wa.me/${WHATSAPP_TMP_NUMBER}`;
 const WA_BTN_BOTTOM_PX = 19;
 const WA_BTN_SIZE_PX = 64;
 
-// ✅ alvo do balão: canto inferior direito na “ponta da seta” (perto do topo/esquerda do botão)
-const BUBBLE_BOTTOM_PX = WA_BTN_BOTTOM_PX + WA_BTN_SIZE_PX - 6; // sobe o balão
-const BUBBLE_SHIFT_LEFT_PX = 46; // traz o canto inferior direito pra cima do botão
+// ✅ agora o balão “volta” e fica até a metade do redondo verde
+const BUBBLE_BOTTOM_PX = WA_BTN_BOTTOM_PX + Math.round(WA_BTN_SIZE_PX / 2) +25; // metade do botão
+const BUBBLE_SHIFT_LEFT_PX = 23; // mantém o canto inferior direito “na seta”
 
 export default function ProductDetailContent({
   data,
@@ -355,25 +355,22 @@ export default function ProductDetailContent({
           </div>
         ) : null}
 
-        {/* ✅ Balão WhatsApp (reposicionado) + ✅ X FORA do balão */}
+        {/* ✅ Balão WhatsApp + ✅ X sem fundo, acima do balão */}
         {bubbleOpen ? (
           <div
             className="pointer-events-none fixed left-1/2 z-[65] w-[430px] max-w-full -translate-x-1/2 px-3"
             style={{ bottom: BUBBLE_BOTTOM_PX }}
           >
-            {/* wrapper relativo pra posicionar o X fora */}
             <div
               className={[
                 'pointer-events-auto ml-auto relative',
-                'w-[172px]', // 25% menor
+                'w-[172px]',
                 'transition-[opacity,transform] ease-out',
                 `duration-[${BUBBLE_ANIM_MS}ms]`,
                 bubbleEntered ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-3 scale-[0.98]',
               ].join(' ')}
-              // ✅ desloca o balão para esquerda sem depender de class dinâmica
               style={{ marginRight: BUBBLE_SHIFT_LEFT_PX }}
             >
-              {/* balão clicável */}
               <a
                 href={WHATSAPP_TMP_LINK}
                 target="_blank"
@@ -389,7 +386,7 @@ export default function ProductDetailContent({
                 </div>
               </a>
 
-              {/* ✅ X fora do balão, do lado direito (como no print) */}
+              {/* ✅ X acima do balão, sem fundo */}
               <button
                 type="button"
                 onClick={(e) => {
@@ -400,12 +397,13 @@ export default function ProductDetailContent({
                 aria-label="Fechar balão"
                 className={[
                   'absolute',
-                  // joga pra fora do balão
-                  '-right-[44px]',
-                  'top-[6px]',
+                  // acima do balão
+                  '-top-[30px]',
+                  // do lado de fora, à direita
+                  '-right-[8px]',
                   // área de toque
                   'grid h-10 w-10 place-items-center',
-                  'rounded-full bg-white text-red-600 shadow-md',
+                  'text-red-600',
                   'active:scale-95',
                 ].join(' ')}
               >
@@ -434,7 +432,6 @@ export default function ProductDetailContent({
           <div className="ml-auto relative grid h-[64px] w-[64px] place-items-center rounded-full bg-green-500 shadow-lg">
             <WhatsAppIcon className="h-14 w-14 text-white" />
 
-            {/* ✅ (1) surge junto com o balão */}
             {bubbleOpen ? (
               <span
                 className="absolute -top-2 -right-2 grid h-6 w-6 place-items-center rounded-full bg-red-600 text-[12px] font-extrabold text-white ring-2 ring-white"
