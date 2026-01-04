@@ -73,9 +73,53 @@ const DETAILS_PREVIEW =
 
 const DETAILS_MORE =
   'Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. ' +
-  'Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. ' +
-  'Integer nec odio. Praesent libero. Sed cursus ante dapibus diam. Sed nisi. Nulla quis sem at nibh elementum imperdiet. ' +
-  'Duis sagittis ipsum. Praesent mauris. Fusce nec tellus sed augue semper porta. Mauris massa.';
+  'Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.';
+
+function pad2(n: number) {
+  return String(n).padStart(2, '0');
+}
+
+function buildHalfHourTimeCards(
+  startHH = 11,
+  startMM = 0,
+  endHH = 23,
+  endMM = 0
+): Array<{ time: string; offLabel: string; enabled: boolean }> {
+  const out: Array<{ time: string; offLabel: string; enabled: boolean }> = [];
+  let h = startHH;
+  let m = startMM;
+
+  const endTotal = endHH * 60 + endMM;
+
+  // Padrão ilustrativo parecido com o print (alguns com % off, outros com "-")
+  const pattern = [
+    { offLabel: '50% off', enabled: true },
+    { offLabel: '-', enabled: true },
+    { offLabel: '20% off', enabled: true },
+    { offLabel: '25% off', enabled: true },
+    { offLabel: '50% off', enabled: true },
+    { offLabel: '-', enabled: true },
+  ];
+
+  let i = 0;
+  while (h * 60 + m <= endTotal) {
+    const p = pattern[i % pattern.length];
+    out.push({
+      time: `${pad2(h)}:${pad2(m)}`,
+      offLabel: p.offLabel,
+      enabled: p.enabled,
+    });
+
+    m += 30;
+    if (m >= 60) {
+      m = 0;
+      h += 1;
+    }
+    i += 1;
+  }
+
+  return out;
+}
 
 export default function ProductDetailContent({
   data,
@@ -189,7 +233,7 @@ export default function ProductDetailContent({
 
     setDetailsExpanded((v) => !v);
 
-    // após o layout mudar, ajusta o scroll para manter “Detalhes:” na mesma posição visual
+    // mantém “Detalhes:” travado na altura visual
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         if (!scroller || !anchor || prevTop == null) return;
@@ -202,6 +246,27 @@ export default function ProductDetailContent({
       });
     });
   }
+
+  // ✅ Funcionamento (fallback ilustrativo)
+  const funcionamentoCal: NonNullable<ProductModalData['calendar']> = useMemo(() => {
+    if (data.calendar) return data.calendar;
+    return {
+      days: [
+        { key: 'seg', label: 'seg' },
+        { key: 'ter', label: 'ter' },
+        { key: 'qua', label: 'qua' },
+        { key: 'qui', label: 'qui' },
+        { key: 'sex', label: 'sex' },
+        { key: 'sáb', label: 'sáb' },
+        { key: 'dom', label: 'dom' },
+      ],
+      dayRow: [false, true, true, true, true, true, true],
+      nightRow: [false, true, true, true, false, false, true],
+    };
+  }, [data.calendar]);
+
+  // ✅ carrossel igual ao print (hora + % off + botão)
+  const funcionamentoTimeCards = useMemo(() => buildHalfHourTimeCards(11, 0, 23, 0), []);
 
   return (
     <div className="relative">
@@ -317,19 +382,49 @@ export default function ProductDetailContent({
                 aria-hidden={!detailsExpanded}
               >
                 <div ref={detailsMoreInnerRef} className="pt-2">
-                  {DETAILS_MORE}
+                  <div>{DETAILS_MORE}</div>
                 </div>
               </div>
 
-              {/* ✅ botão no fim do texto e desliza junto */}
+              {/* ✅ AJUSTE: área clicável maior (sem aumentar fonte) */}
               <button
                 type="button"
-                className="mt-1 block text-left text-[13px] font-semibold text-emerald-700 active:opacity-80"
                 onClick={toggleDetailsAnchored}
                 aria-label={detailsExpanded ? 'Ver menos detalhes' : 'Ver mais detalhes'}
+                className={[
+                  'mt-1',
+                  'block w-full text-left',
+                  'text-[13px] font-medium text-emerald-700',
+                  // ⬇️ área de toque maior
+                  'py-3',
+                  '-my-2',
+                  'leading-none',
+                  'touch-manipulation select-none',
+                  'active:opacity-80',
+                ].join(' ')}
               >
                 {detailsExpanded ? 'Ver menos' : 'Ver mais'}
               </button>
+
+              {/* ✅ Funcionamento e Horários sempre visíveis */}
+              <div className="mt-4">
+                <SectionTitle>Funcionamento:</SectionTitle>
+
+                <div className="mt-2">
+                  <CalendarBlock cal={funcionamentoCal} noOuterBorder />
+                </div>
+
+                <div className="mt-[25px] flex items-center gap-2">
+                  <SectionTitle>Horários:</SectionTitle>
+                  <span className="text-[16px]">⚠️</span>
+                </div>
+
+                <div className="mt-2 flex gap-2 overflow-x-auto pb-2">
+                  {funcionamentoTimeCards.map((t) => (
+                    <TimeCard key={t.time} time={t.time} offLabel={t.offLabel} enabled={t.enabled} />
+                  ))}
+                </div>
+              </div>
             </div>
           </>
         ) : null}
@@ -387,7 +482,6 @@ export default function ProductDetailContent({
                   closeBubbleOnly();
                 }}
               >
-                {/* ✅ 1ª linha fixa + resto embaixo */}
                 <div className="leading-tight">
                   <div>Fale com o estabelecimento:</div>
                   <div>
@@ -443,8 +537,6 @@ export default function ProductDetailContent({
             ) : null}
           </div>
         </a>
-
-        {/* ✅ REMOVIDO: botão "Utilizar" */}
       </div>
     </div>
   );
@@ -559,10 +651,77 @@ function Star({ fillPct, className }: { fillPct: number; className?: string }) {
   );
 }
 
-function AccordionBar({ title }: { title: string }) {
+function CalendarBlock({
+  cal,
+  noOuterBorder = false,
+}: {
+  cal: NonNullable<ProductModalData['calendar']>;
+  noOuterBorder?: boolean;
+}) {
+  const days =
+    cal.days?.length === 7
+      ? cal.days
+      : [
+          { key: 'seg', label: 'seg' },
+          { key: 'ter', label: 'ter' },
+          { key: 'qua', label: 'qua' },
+          { key: 'qui', label: 'qui' },
+          { key: 'sex', label: 'sex' },
+          { key: 'sáb', label: 'sáb' },
+          { key: 'dom', label: 'dom' },
+        ];
+
   return (
-    <div className="rounded-[4px] bg-zinc-600 px-3 py-2">
-      <div className="text-[13px] font-extrabold text-white">{title}</div>
+    <div className={noOuterBorder ? 'bg-transparent p-0' : 'rounded-[10px] border border-black/10 bg-zinc-100 p-2'}>
+      <div className="grid grid-cols-8 gap-1 text-center text-[12px] font-semibold text-zinc-700">
+        <div />
+
+        {days.map((d) => (
+          <div key={d.key} className="rounded bg-zinc-500/70 py-1 text-white">
+            {d.label}
+          </div>
+        ))}
+
+        <div className="rounded bg-zinc-500/70 py-1 text-white">Dia</div>
+        {(cal.dayRow ?? []).slice(0, 7).map((ok, i) => (
+          <Cell key={`d-${i}`} ok={ok} />
+        ))}
+
+        <div className="rounded bg-zinc-500/70 py-1 text-white">Noite</div>
+        {(cal.nightRow ?? []).slice(0, 7).map((ok, i) => (
+          <Cell key={`n-${i}`} ok={ok} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Cell({ ok }: { ok: boolean }) {
+  return (
+    <div className="grid place-items-center rounded bg-zinc-200 py-1">
+      <span className={ok ? 'text-emerald-600' : 'text-red-500'}>{ok ? '✓' : '✕'}</span>
+    </div>
+  );
+}
+
+/* ✅ card idêntico ao print (hora + % off + botão) */
+function TimeCard({ time, offLabel, enabled = true }: { time: string; offLabel: string; enabled?: boolean }) {
+  return (
+    <div
+      className={[
+        'min-w-[86px] rounded-[6px] border border-black/15 bg-zinc-100 p-2 text-center',
+        enabled ? '' : 'opacity-45',
+      ].join(' ')}
+    >
+      <div className="text-[11px] font-semibold text-zinc-700">{time}</div>
+      <div className="mt-0.5 text-[11px] font-extrabold text-red-500">{offLabel || '-'}</div>
+
+      <button
+        type="button"
+        className="mt-1 w-full rounded-[6px] bg-zinc-200 py-1 text-[11px] font-semibold text-zinc-800"
+      >
+        Utilizar
+      </button>
     </div>
   );
 }
