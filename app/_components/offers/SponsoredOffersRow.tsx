@@ -863,7 +863,7 @@ function HeartMini({ filled }: { filled: boolean }) {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
       <path
-        d="M12 21s-7.5-4.6-10-9.3C.3 8.1 2.3 5 5.7 5c1.8 0 3.2.9 4.3 2.3C11.1 5.9 12.5 5 14.3 5c3.4 0 5.4 3.1 3.7 6.7C19.5 16.4 12 21 12 21z"
+        d="M12 21C12 21 4 15.36 4 9.5C4 7.02 6.02 5 8.5 5C10.04 5 11.4 5.81 12 7C12.6 5.81 13.96 5 15.5 5C17.98 5 20 7.02 20 9.5C20 15.36 12 21 12 21Z"
         fill={filled ? '#ef4444' : 'none'}
         stroke={filled ? '#ef4444' : 'rgba(0,0,0,.25)'}
         strokeWidth="1.6"

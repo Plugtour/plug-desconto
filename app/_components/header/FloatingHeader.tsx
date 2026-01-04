@@ -94,8 +94,8 @@ export default function FloatingHeader({
         >
           {isLogged ? (
             <div className="min-w-0">
-              <div className="truncate text-[13px] font-semibold text-black">{userName}</div>
-              <div className="truncate text-[11px] font-medium text-emerald-700">Ver meu clube</div>
+              <div className="truncate text-[14px] font-semibold text-black">{userName}</div>
+              <div className="truncate text-[12px] font-medium text-emerald-700">Ver meu clube</div>
             </div>
           ) : (
             <div className="min-w-0">
@@ -121,13 +121,13 @@ export default function FloatingHeader({
           ].join(' ')}
           aria-label="Selecionar destinos"
         >
-          <IconMapPin className="h-7 w-7 opacity-60" />
-          <span className="text-[13px] font-medium">Destinos</span>
+          <IconMapPin className="h-6 w-6 opacity-60" />
+          <span className="text-[14px] font-medium">Destinos</span>
         </button>
       </div>
 
       {/* DIREITA — AÇÕES */}
-      <div className="flex items-center gap-0">
+      <div className="flex items-center gap-[0]">
         {/* FAVORITOS */}
 
         <button
