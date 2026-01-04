@@ -1,3 +1,7 @@
+/* ============================
+   ModalOverlay.tsx
+   (sem mudanças — respiro é nos modais)
+============================ */
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';

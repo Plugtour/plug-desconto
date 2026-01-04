@@ -63,8 +63,19 @@ const WA_BTN_BOTTOM_PX = 19;
 const WA_BTN_SIZE_PX = 64;
 
 // ✅ agora o balão “volta” e fica até a metade do redondo verde
-const BUBBLE_BOTTOM_PX = WA_BTN_BOTTOM_PX + Math.round(WA_BTN_SIZE_PX / 2) +25; // metade do botão
+const BUBBLE_BOTTOM_PX = WA_BTN_BOTTOM_PX + Math.round(WA_BTN_SIZE_PX / 2) + 25; // metade do botão
 const BUBBLE_SHIFT_LEFT_PX = 23; // mantém o canto inferior direito “na seta”
+
+// ✅ placeholder longo pra testar “Ver mais”
+const DETAILS_PREVIEW =
+  'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. ' +
+  'Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.';
+
+const DETAILS_MORE =
+  'Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. ' +
+  'Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. ' +
+  'Integer nec odio. Praesent libero. Sed cursus ante dapibus diam. Sed nisi. Nulla quis sem at nibh elementum imperdiet. ' +
+  'Duis sagittis ipsum. Praesent mauris. Fusce nec tellus sed augue semper porta. Mauris massa.';
 
 export default function ProductDetailContent({
   data,
@@ -85,6 +96,14 @@ export default function ProductDetailContent({
   const [bubbleOpen, setBubbleOpen] = useState(false);
   const [bubbleEntered, setBubbleEntered] = useState(false);
 
+  // ✅ “Ver mais” do Detalhes (abre/fecha deslizando)
+  const [detailsExpanded, setDetailsExpanded] = useState(false);
+  const detailsMoreInnerRef = useRef<HTMLDivElement | null>(null);
+  const [detailsMoreH, setDetailsMoreH] = useState(0);
+
+  // ✅ âncora: “Detalhes:” precisa ficar travado ao expandir/recolher
+  const detailsAnchorRef = useRef<HTMLDivElement | null>(null);
+
   const media = data.media ?? [];
   const canSlide = media.length > 1;
   const active = media[idx];
@@ -97,6 +116,9 @@ export default function ProductDetailContent({
     // reinicia balão
     setBubbleEntered(false);
     setBubbleOpen(false);
+
+    // reinicia “Ver mais”
+    setDetailsExpanded(false);
 
     const t = window.setTimeout(() => {
       setBubbleOpen(true);
@@ -126,24 +148,11 @@ export default function ProductDetailContent({
 
   const vendorName = (data.vendorName ?? '').trim() || data.title;
 
-  const aboutText = useMemo(() => {
-    const v = (data.vendorAbout ?? '').trim();
-    if (v) return v;
-    const fallback = (data.headline ?? '').trim();
-    return fallback || '—';
-  }, [data.vendorAbout, data.headline]);
-
   const progressPct = useMemo(() => {
     if (!canSlide) return 100;
     const pct = (tick / SLIDE_DURATION_MS) * 100;
     return Math.max(0, Math.min(100, pct));
   }, [tick, canSlide]);
-
-  function prev() {
-    if (!media.length) return;
-    setTick(0);
-    setIdx((i) => (i - 1 + media.length) % media.length);
-  }
 
   function next() {
     if (!media.length) return;
@@ -151,50 +160,80 @@ export default function ProductDetailContent({
     setIdx((i) => (i + 1) % media.length);
   }
 
-  // rolar sobre o HEADER deve rolar o BODY
-  function forwardWheelToBody(e: React.WheelEvent) {
-    const el = bodyRef.current;
-    if (!el) return;
-
-    const canScroll = el.scrollHeight > el.clientHeight + 1;
-    if (!canScroll) return;
-
-    e.preventDefault();
-    e.stopPropagation();
-
-    el.scrollBy({ top: e.deltaY, left: 0, behavior: 'auto' });
-  }
-
   function closeBubbleOnly() {
     setBubbleEntered(false);
     window.setTimeout(() => setBubbleOpen(false), BUBBLE_ANIM_MS);
   }
 
+  const ratingNum = Number.isFinite(Number(data.rating ?? 0)) ? Number(data.rating ?? 0) : 0;
+  const reviewsNum = Number(data.reviews ?? 0) || 0;
+
+  // mede altura do bloco “mais” (pra animar max-height)
+  useEffect(() => {
+    const inner = detailsMoreInnerRef.current;
+    if (!inner) return;
+
+    const measure = () => setDetailsMoreH(inner.scrollHeight || 0);
+    measure();
+
+    const ro = new ResizeObserver(() => measure());
+    ro.observe(inner);
+    return () => ro.disconnect();
+  }, []);
+
+  function toggleDetailsAnchored() {
+    const scroller = bodyRef.current;
+    const anchor = detailsAnchorRef.current;
+
+    const prevTop = anchor?.getBoundingClientRect().top ?? null;
+
+    setDetailsExpanded((v) => !v);
+
+    // após o layout mudar, ajusta o scroll para manter “Detalhes:” na mesma posição visual
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (!scroller || !anchor || prevTop == null) return;
+        const nextTop = anchor.getBoundingClientRect().top;
+        const delta = nextTop - prevTop;
+
+        if (Math.abs(delta) > 0.5) {
+          scroller.scrollBy({ top: delta, left: 0, behavior: 'auto' });
+        }
+      });
+    });
+  }
+
   return (
     <div className="relative">
-      {/* HEADER */}
-      <div className="px-3 pt-3 pb-2" onWheelCapture={forwardWheelToBody}>
-        <div className="text-[22px] font-extrabold tracking-[-.2px] leading-[22px] text-zinc-800">
-          {data.title}
+      {/* BODY (tudo rola junto) */}
+      <div ref={bodyRef} className="relative max-h-[78vh] overflow-y-auto px-3 pb-24 pt-3">
+        {/* Título + estrelas/avaliações */}
+        <div>
+          <div className="text-[22px] font-bold tracking-[-.2px] leading-[22px] text-zinc-600">{data.title}</div>
+
+          <div className="mt-2">
+            <StarsRow rating={ratingNum} sizeClass="h-[17px] w-[17px]" />
+            <div className="mt-0.5 text-[12px] text-zinc-500">
+              <span className="font-semibold text-zinc-700">{ratingNum.toFixed(1)}</span> de{' '}
+              <span className="font-semibold text-zinc-700">{reviewsNum}</span> avaliações
+            </div>
+          </div>
+
+          <div className="mt-[10px] flex gap-2">
+            <TabButton active={tab === 'detalhes'} onClick={() => setTab('detalhes')}>
+              Detalhes
+            </TabButton>
+            <TabButton active={tab === 'avaliacoes'} onClick={() => setTab('avaliacoes')}>
+              Avaliações
+            </TabButton>
+            <TabButton active={tab === 'endereco'} onClick={() => setTab('endereco')}>
+              Endereço
+            </TabButton>
+          </div>
         </div>
 
-        <div className="mt-[10px] flex gap-2">
-          <TabButton active={tab === 'detalhes'} onClick={() => setTab('detalhes')}>
-            Detalhes
-          </TabButton>
-          <TabButton active={tab === 'avaliacoes'} onClick={() => setTab('avaliacoes')}>
-            Avaliações
-          </TabButton>
-          <TabButton active={tab === 'endereco'} onClick={() => setTab('endereco')}>
-            Endereço
-          </TabButton>
-        </div>
-      </div>
-
-      {/* BODY */}
-      <div ref={bodyRef} className="relative max-h-[78vh] overflow-y-auto px-3 pb-24 pt-2">
-        {/* Banner */}
-        <div className="-mx-3">
+        {/* Banner alinhado */}
+        <div className="mt-3">
           <div className="relative overflow-hidden rounded-none bg-zinc-200">
             <div className="aspect-[16/9] w-full">
               {active?.src ? (
@@ -216,25 +255,6 @@ export default function ProductDetailContent({
 
             {canSlide ? (
               <>
-                <div className="flex items-start justify-between gap-2">
-                  <div className="leading-tight">
-                    Fale com o estabelecimento <span className="font-semibold">{vendorName}</span>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      closeBubbleOnly();
-                    }}
-                    aria-label="Fechar balão"
-                    className="grid h-10 w-10 place-items-center text-red-600"
-                  >
-                    <span className="text-[32px] leading-none">×</span>
-                  </button>
-                </div>
-
                 <button
                   type="button"
                   onClick={next}
@@ -265,7 +285,7 @@ export default function ProductDetailContent({
 
         {/* subtítulo */}
         <div className="mt-[15px]">
-          <div className="line-clamp-3 text-[16px] font-extrabold leading-snug text-zinc-500">
+          <div className="line-clamp-3 text-[16px] font-semibold leading-[19px] text-zinc-600">
             Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et
             dolore magna aliqua.
           </div>
@@ -276,52 +296,40 @@ export default function ProductDetailContent({
         {/* Conteúdo */}
         {tab === 'detalhes' ? (
           <>
-            <SectionTitle>Detalhes:</SectionTitle>
-
-            <div className="mt-2 text-[13px] leading-relaxed text-zinc-600">
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et
-              dolore magna aliqua.
+            {/* ✅ âncora travada */}
+            <div ref={detailsAnchorRef}>
+              <SectionTitle>Detalhes:</SectionTitle>
             </div>
 
-            <div className="mt-2 text-[13px] leading-relaxed text-zinc-600">{aboutText}</div>
+            <div className="mt-2 text-[13px] leading-[16px] text-zinc-600">
+              {/* preview (máximo 4 linhas) */}
+              <div className={detailsExpanded ? '' : 'line-clamp-4'}>{DETAILS_PREVIEW}</div>
 
-            {economySlot ? <div className="mt-3">{economySlot}</div> : null}
-
-            {data.calendar ? (
-              <div className="mt-4">
-                <CalendarBlock cal={data.calendar} />
+              {/* conteúdo extra (sempre abaixo do texto) */}
+              <div
+                className={[
+                  'overflow-hidden',
+                  'transition-[max-height,opacity,transform] ease-out',
+                  'duration-[520ms]',
+                  detailsExpanded ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-1',
+                ].join(' ')}
+                style={{ maxHeight: detailsExpanded ? detailsMoreH : 0 }}
+                aria-hidden={!detailsExpanded}
+              >
+                <div ref={detailsMoreInnerRef} className="pt-2">
+                  {DETAILS_MORE}
+                </div>
               </div>
-            ) : null}
 
-            {data.times?.length ? (
-              <>
-                <div className="mt-4 flex items-center gap-2">
-                  <SectionTitle>Horários:</SectionTitle>
-                  <span className="text-[16px]">⚠️</span>
-                </div>
-
-                <div className="mt-2 flex gap-2 overflow-x-auto pb-2">
-                  {data.times.map((t, i) => (
-                    <TimeCard key={i} {...t} />
-                  ))}
-                </div>
-              </>
-            ) : null}
-
-            {data.exceptions?.length ? (
-              <>
-                <SectionTitle className="mt-4">Excetos:</SectionTitle>
-                <div className="mt-1 text-[13px] leading-relaxed text-zinc-600">
-                  {data.exceptions.map((x, i) => (
-                    <div key={i}>{x}</div>
-                  ))}
-                </div>
-              </>
-            ) : null}
-
-            <div className="mt-4 space-y-2 pb-2">
-              <AccordionBar title="Quanto posso economizar:" />
-              <AccordionBar title="Regras:" />
+              {/* ✅ botão no fim do texto e desliza junto */}
+              <button
+                type="button"
+                className="mt-1 block text-left text-[13px] font-semibold text-emerald-700 active:opacity-80"
+                onClick={toggleDetailsAnchored}
+                aria-label={detailsExpanded ? 'Ver menos detalhes' : 'Ver mais detalhes'}
+              >
+                {detailsExpanded ? 'Ver menos' : 'Ver mais'}
+              </button>
             </div>
           </>
         ) : null}
@@ -331,12 +339,10 @@ export default function ProductDetailContent({
             <SectionTitle>Avaliações</SectionTitle>
 
             <div className="mt-2">
-              <StarsRow rating={Number.isFinite(Number(data.rating ?? 0)) ? Number(data.rating ?? 0) : 0} />
+              <StarsRow rating={ratingNum} sizeClass="h-[17px] w-[17px]" />
               <div className="-mt-0.5 text-[12px] text-zinc-500">
-                <span className="font-semibold text-zinc-700">
-                  {Number.isFinite(Number(data.rating ?? 0)) ? Number(data.rating ?? 0).toFixed(1) : '0.0'}
-                </span>{' '}
-                de <span className="font-semibold text-zinc-700">{Number(data.reviews ?? 0) || 0}</span> avaliações
+                <span className="font-semibold text-zinc-700">{ratingNum.toFixed(1)}</span> de{' '}
+                <span className="font-semibold text-zinc-700">{reviewsNum}</span> avaliações
               </div>
             </div>
 
@@ -355,7 +361,7 @@ export default function ProductDetailContent({
           </div>
         ) : null}
 
-        {/* ✅ Balão WhatsApp + ✅ X sem fundo, acima do balão */}
+        {/* ✅ Balão WhatsApp + X (largura -30px) */}
         {bubbleOpen ? (
           <div
             className="pointer-events-none fixed left-1/2 z-[65] w-[430px] max-w-full -translate-x-1/2 px-3"
@@ -364,7 +370,7 @@ export default function ProductDetailContent({
             <div
               className={[
                 'pointer-events-auto ml-auto relative',
-                'w-[172px]',
+                'w-[142px]', // 172 - 30 = 142
                 'transition-[opacity,transform] ease-out',
                 `duration-[${BUBBLE_ANIM_MS}ms]`,
                 bubbleEntered ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-3 scale-[0.98]',
@@ -381,12 +387,15 @@ export default function ProductDetailContent({
                   closeBubbleOnly();
                 }}
               >
+                {/* ✅ 1ª linha fixa + resto embaixo */}
                 <div className="leading-tight">
-                  Fale com o estabelecimento <span className="font-semibold">{vendorName}</span>
+                  <div>Fale com o estabelecimento:</div>
+                  <div>
+                    <span className="font-semibold">{vendorName}</span>
+                  </div>
                 </div>
               </a>
 
-              {/* ✅ X acima do balão, sem fundo */}
               <button
                 type="button"
                 onClick={(e) => {
@@ -397,30 +406,22 @@ export default function ProductDetailContent({
                 aria-label="Fechar balão"
                 className={[
                   'absolute',
-                  // acima do balão
                   '-top-[30px]',
-                  // do lado de fora, à direita
                   '-right-[8px]',
-                  // área de toque
                   'grid h-10 w-10 place-items-center',
                   'text-red-600',
                   'active:scale-95',
                 ].join(' ')}
               >
                 <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-                  <path
-                    d="M6 6L18 18M18 6L6 18"
-                    stroke="currentColor"
-                    strokeWidth="3"
-                    strokeLinecap="round"
-                  />
+                  <path d="M6 6L18 18M18 6L6 18" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
                 </svg>
               </button>
             </div>
           </div>
         ) : null}
 
-        {/* ✅ Botão WhatsApp */}
+        {/* Botão WhatsApp */}
         <a
           href={whatsappHref || '#'}
           className="fixed bottom-[19px] left-1/2 z-[70] w-[430px] max-w-full -translate-x-1/2 px-3"
@@ -443,14 +444,7 @@ export default function ProductDetailContent({
           </div>
         </a>
 
-        {/* Fechar */}
-        <button
-          type="button"
-          onClick={onClose}
-          className="mt-6 w-full rounded-[12px] bg-white py-3 text-[13px] font-semibold text-zinc-900 ring-1 ring-black/10 hover:bg-black/5"
-        >
-          Utilizar
-        </button>
+        {/* ✅ REMOVIDO: botão "Utilizar" */}
       </div>
     </div>
   );
@@ -525,7 +519,7 @@ function WhatsAppIcon({ className }: { className?: string }) {
   );
 }
 
-function StarsRow({ rating }: { rating: number }) {
+function StarsRow({ rating, sizeClass = 'h-[17px] w-[17px]' }: { rating: number; sizeClass?: string }) {
   const r = Math.max(0, Math.min(5, Number.isFinite(rating) ? rating : 0));
   return (
     <div className="flex items-center">
@@ -533,7 +527,7 @@ function StarsRow({ rating }: { rating: number }) {
         const fill = r <= i ? 0 : r >= i + 1 ? 100 : Math.round((r - i) * 100);
         return (
           <span key={i} className={i === 0 ? '' : '-ml-[3px]'}>
-            <Star fillPct={fill} />
+            <Star fillPct={fill} className={sizeClass} />
           </span>
         );
       })}
@@ -541,12 +535,12 @@ function StarsRow({ rating }: { rating: number }) {
   );
 }
 
-function Star({ fillPct }: { fillPct: number }) {
+function Star({ fillPct, className }: { fillPct: number; className?: string }) {
   const id = React.useId();
   const pct = Math.max(0, Math.min(100, fillPct));
 
   return (
-    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" aria-hidden="true">
+    <svg viewBox="0 0 24 24" className={className ?? 'h-[17px] w-[17px]'} aria-hidden="true">
       <path
         d="M12 3.6l2.5 5.3 5.8.5-4.4 3.8 1.4 5.7L12 16.1 6.7 18.9l1.4-5.7-4.4-3.8 5.8-.5L12 3.6z"
         className="fill-zinc-300"
@@ -562,74 +556,6 @@ function Star({ fillPct }: { fillPct: number }) {
         clipPath={`url(#${id})`}
       />
     </svg>
-  );
-}
-
-function CalendarBlock({ cal }: { cal: NonNullable<ProductModalData['calendar']> }) {
-  const days =
-    cal.days?.length === 7
-      ? cal.days
-      : [
-          { key: 'seg', label: 'seg' },
-          { key: 'ter', label: 'ter' },
-          { key: 'qua', label: 'qua' },
-          { key: 'qui', label: 'qui' },
-          { key: 'sex', label: 'sex' },
-          { key: 'sáb', label: 'sáb' },
-          { key: 'dom', label: 'dom' },
-        ];
-
-  return (
-    <div className="rounded-[10px] border border-black/10 bg-zinc-100 p-2">
-      <div className="grid grid-cols-8 gap-1 text-center text-[12px] font-semibold text-zinc-700">
-        <div />
-
-        {days.map((d) => (
-          <div key={d.key} className="rounded bg-zinc-500/70 py-1 text-white">
-            {d.label}
-          </div>
-        ))}
-
-        <div className="rounded bg-zinc-500/70 py-1 text-white">Dia</div>
-        {(cal.dayRow ?? []).slice(0, 7).map((ok, i) => (
-          <Cell key={`d-${i}`} ok={ok} />
-        ))}
-
-        <div className="rounded bg-zinc-500/70 py-1 text-white">Noite</div>
-        {(cal.nightRow ?? []).slice(0, 7).map((ok, i) => (
-          <Cell key={`n-${i}`} ok={ok} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function Cell({ ok }: { ok: boolean }) {
-  return (
-    <div className="grid place-items-center rounded bg-zinc-200 py-1">
-      <span className={ok ? 'text-emerald-600' : 'text-red-500'}>{ok ? '✓' : '✕'}</span>
-    </div>
-  );
-}
-
-function TimeCard({ time, offLabel, enabled = true }: { time: string; offLabel: string; enabled?: boolean }) {
-  return (
-    <div
-      className={[
-        'min-w-[86px] rounded-[6px] border border-black/15 bg-zinc-100 p-2 text-center',
-        enabled ? '' : 'opacity-45',
-      ].join(' ')}
-    >
-      <div className="text-[11px] font-semibold text-zinc-700">{time}</div>
-      <div className="mt-0.5 text-[11px] font-extrabold text-red-500">{offLabel || '-'}</div>
-
-      <button
-        type="button"
-        className="mt-1 w-full rounded-[6px] bg-zinc-200 py-1 text-[11px] font-semibold text-zinc-800"
-      >
-        Utilizar
-      </button>
-    </div>
   );
 }
 

@@ -1,3 +1,7 @@
+/* ============================
+   MenuCarouselModalRight.tsx
+   ✅ respiro lateral +10px em cada lado
+============================ */
 // app/_components/modals/MenuCarouselModalRight.tsx
 'use client';
 
@@ -58,8 +62,8 @@ export default function MenuCarouselModalRight({
   const MODAL_TOP_OFFSET = 'calc(env(safe-area-inset-top) + 20px + 6px)';
   const GAP_BETWEEN_BUTTON_AND_MODAL = 6;
 
-  // ✅ modal NÃO encosta no celular
-  const SIDE_GUTTER_PX = 4;
+  // ✅ antes: 4 → agora: 10  ( +6px por lado )
+  const SIDE_GUTTER_PX = 10;
 
   const countText = typeof categoryCount === 'number' ? `${categoryCount} produtos` : '';
 
@@ -139,8 +143,7 @@ export default function MenuCarouselModalRight({
                 </div>
               )}
 
-              {/* ✅ FIX: quando hideHeader=true, NÃO pode existir scroll aqui
-                  (senão cria “micro-rolagem” no topo/título). */}
+              {/* ✅ FIX: quando hideHeader=true, NÃO pode existir scroll aqui */}
               <div
                 className={[
                   'flex-1',

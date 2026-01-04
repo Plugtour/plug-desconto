@@ -1,3 +1,7 @@
+/* ============================
+   RightDrawerModal.tsx
+   ✅ respiro lateral +10px em cada lado
+============================ */
 'use client';
 
 import React from 'react';
@@ -25,16 +29,16 @@ export default function RightDrawerModal({
 
   const MODAL_TOP_OFFSET = 'calc(env(safe-area-inset-top) + 20px + 6px)';
   const GAP = 6;
-  const SIDE_GUTTER = 6;
+
+  // ✅ antes: 6  → agora: 12  ( +6px por lado )
+  const SIDE_GUTTER = 12;
+
   const DRAWER_W = 'min(448px, 100vw)';
 
   return (
     <ModalOverlay open={open} onClose={onClose}>
       {/* ÁREA CLICÁVEL FORA DO DRAWER (fecha) */}
-      <div
-        className="absolute inset-0 z-[1]"
-        onClick={onClose}
-      />
+      <div className="absolute inset-0 z-[1]" onClick={onClose} />
 
       {/* DRAWER */}
       <div
@@ -75,11 +79,7 @@ export default function RightDrawerModal({
             {!hideHeader && (
               <div className="px-4 pt-4 pb-3">
                 <div className="text-sm font-semibold text-zinc-900">{title}</div>
-                {subtitle && (
-                  <div className="text-[12px] font-medium text-emerald-700">
-                    {subtitle}
-                  </div>
-                )}
+                {subtitle && <div className="text-[12px] font-medium text-emerald-700">{subtitle}</div>}
               </div>
             )}
 
