@@ -125,34 +125,70 @@ export function CalendarBlock({
           { key: 'dom', label: 'dom' },
         ];
 
+  // ✅ dia vigente (enfeite) — OPÇÃO 1: pill no header do dia + verde clarinho nos 2 blocos abaixo
+  const todayKey = (() => {
+    const map = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'] as const;
+    return map[new Date().getDay()];
+  })();
+
+  const activePillBg = '#17BA60';
+  const softGreen = 'rgba(23, 186, 96, 0.18)'; // 👈 verde bem clarinho pros 2 blocos (Dia/Noite)
+
   return (
     <div className={noOuterBorder ? 'bg-transparent p-0' : 'rounded-[10px] border border-black/10 bg-zinc-100 p-2'}>
       <div className="grid grid-cols-8 gap-1 text-center text-[12px] font-semibold text-zinc-700">
         <div />
 
-        {days.map((d) => (
-          <div key={d.key} className="rounded bg-zinc-500/70 py-1 text-white">
-            {d.label}
-          </div>
-        ))}
+        {/* Labels (dias) */}
+        {days.map((d) => {
+          const isToday = d.key === todayKey;
+
+          return (
+            <div
+              key={d.key}
+              className={[
+                'py-1 text-white',
+                isToday ? 'rounded px-2' : 'rounded bg-zinc-500/70',
+              ].join(' ')}
+              style={isToday ? { backgroundColor: activePillBg } : undefined}
+              aria-current={isToday ? 'date' : undefined}
+              title={isToday ? 'Hoje' : undefined}
+            >
+              {d.label}
+            </div>
+          );
+        })}
 
         <div className="rounded bg-zinc-500/70 py-1 text-white">Dia</div>
-        {(cal.dayRow ?? []).slice(0, 7).map((ok, i) => (
-          <Cell key={`d-${i}`} ok={ok} />
-        ))}
+        {(cal.dayRow ?? []).slice(0, 7).map((ok, i) => {
+          const isTodayCol = days[i]?.key === todayKey;
+          return <Cell key={`d-${i}`} ok={ok} highlight={isTodayCol} highlightBg={softGreen} />;
+        })}
 
         <div className="rounded bg-zinc-500/70 py-1 text-white">Noite</div>
-        {(cal.nightRow ?? []).slice(0, 7).map((ok, i) => (
-          <Cell key={`n-${i}`} ok={ok} />
-        ))}
+        {(cal.nightRow ?? []).slice(0, 7).map((ok, i) => {
+          const isTodayCol = days[i]?.key === todayKey;
+          return <Cell key={`n-${i}`} ok={ok} highlight={isTodayCol} highlightBg={softGreen} />;
+        })}
       </div>
     </div>
   );
 }
 
-export function Cell({ ok }: { ok: boolean }) {
+export function Cell({
+  ok,
+  highlight = false,
+  highlightBg = 'rgba(23, 186, 96, 0.18)',
+}: {
+  ok: boolean;
+  highlight?: boolean;
+  highlightBg?: string;
+}) {
   return (
-    <div className="grid place-items-center rounded bg-zinc-200 py-1">
+    <div
+      className="grid place-items-center rounded py-1"
+      style={{ backgroundColor: highlight ? highlightBg : '#e4e4e7' }}
+    >
       <span className={ok ? 'text-emerald-600' : 'text-red-500'}>{ok ? '✓' : '✕'}</span>
     </div>
   );
@@ -184,14 +220,12 @@ export function TimeCard({
       <div className="text-[11px] font-semibold text-zinc-700">{time}</div>
       <div className="mt-0.5 text-[11px] font-extrabold text-red-500">{offLabel || '-'}</div>
 
-      {/* 🔽 ÚNICA ALTERAÇÃO: cor do botão interno */}
+      {/* botão interno */}
       <button
         type="button"
         className={[
           'mt-1 w-full rounded-[6px] py-1 text-[11px] font-semibold',
-          active
-            ? 'bg-[#17BA60] text-white'
-            : 'bg-zinc-200 text-zinc-800',
+          active ? 'bg-[#17BA60] text-white' : 'bg-zinc-200 text-zinc-800',
         ].join(' ')}
       >
         Utilizar
