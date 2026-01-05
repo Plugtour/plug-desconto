@@ -24,6 +24,9 @@ const ALERT_BUBBLE_ANIM_MS = 520;
 // ✅ delay inteligente (igual WhatsApp)
 const ALERT_BUBBLE_DELAY_MS = 10_000; // 10s (ajuste aqui)
 
+// ✅ anti-“briga” com o usuário: se ele mexeu no carrossel, não recentraliza
+const USER_SCROLL_GUARD_MS = 1200;
+
 function pad2(n: number) {
   return String(n).padStart(2, '0');
 }
@@ -120,8 +123,12 @@ export default function ProductTabDetalhes({
   // ✅ “tick” do horário atual (atualiza sozinho para trocar o vigente)
   const [nowTick, setNowTick] = useState(0);
 
-  // ✅ trava para não ficar recenterizando em loop
+  // ✅ trava para centralizar no carregamento
   const didCenterForIdRef = useRef<string | null>(null);
+
+  // ✅ guarda: usuário mexeu no carrossel recentemente?
+  const lastUserTouchTsRef = useRef<number>(0);
+  const userTouchTimerRef = useRef<number | null>(null);
 
   const media = data.media ?? [];
   const canSlide = media.length > 1;
@@ -150,8 +157,15 @@ export default function ProductTabDetalhes({
     // reseta refs dos horários
     timeItemRefs.current = [];
 
-    // permite centralizar de novo neste produto
+    // permite centralizar de novo neste produto (carregamento)
     didCenterForIdRef.current = null;
+
+    // reseta guarda do usuário
+    lastUserTouchTsRef.current = 0;
+    if (userTouchTimerRef.current) {
+      window.clearTimeout(userTouchTimerRef.current);
+      userTouchTimerRef.current = null;
+    }
   }, [data.id]);
 
   useEffect(() => {
@@ -361,7 +375,20 @@ export default function ProductTabDetalhes({
     return idx;
   }, [funcionamentoTimeCards, nowTick, data.id]);
 
-  // ✅ Centraliza NO CARREGAMENTO do modal/produto (já abre no meio, sem animação)
+  // ✅ helper: centraliza um índice no carrossel
+  function centerTimeIndex(index: number, behavior: ScrollBehavior) {
+    const scroller = timeScrollerRef.current;
+    const item = timeItemRefs.current[index];
+    if (!scroller || !item) return;
+
+    const target = item.offsetLeft + item.offsetWidth / 2 - scroller.clientWidth / 2;
+    const max = Math.max(0, scroller.scrollWidth - scroller.clientWidth);
+    const clamped = Math.max(0, Math.min(max, target));
+
+    scroller.scrollTo({ left: clamped, behavior });
+  }
+
+  // ✅ Centraliza NO CARREGAMENTO (já abre no meio, sem animação)
   useLayoutEffect(() => {
     if (activeTimeIndex < 0) return;
     if (didCenterForIdRef.current === data.id) return;
@@ -371,24 +398,64 @@ export default function ProductTabDetalhes({
     if (!scroller || !item) return;
 
     const centerNow = () => {
-      const target =
-        item.offsetLeft + item.offsetWidth / 2 - scroller.clientWidth / 2;
-
-      const max = Math.max(0, scroller.scrollWidth - scroller.clientWidth);
-      const clamped = Math.max(0, Math.min(max, target));
-
-      // ✅ já abre na posição certa
-      scroller.scrollLeft = clamped;
+      centerTimeIndex(activeTimeIndex, 'auto');
       didCenterForIdRef.current = data.id;
     };
 
-    // 2 frames + micro timeout: garante medidas prontas no primeiro paint
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         centerNow();
         window.setTimeout(centerNow, 0);
       });
     });
+  }, [activeTimeIndex, data.id]);
+
+  // ✅ Marca “usuário está mexendo” no carrossel (pra não recentralizar)
+  useEffect(() => {
+    const scroller = timeScrollerRef.current;
+    if (!scroller) return;
+
+    const markUserTouch = () => {
+      lastUserTouchTsRef.current = Date.now();
+      if (userTouchTimerRef.current) window.clearTimeout(userTouchTimerRef.current);
+      userTouchTimerRef.current = window.setTimeout(() => {
+        // só “libera” depois de um tempinho parado
+        lastUserTouchTsRef.current = lastUserTouchTsRef.current; // noop
+      }, USER_SCROLL_GUARD_MS);
+    };
+
+    scroller.addEventListener('pointerdown', markUserTouch, { passive: true });
+    scroller.addEventListener('touchstart', markUserTouch, { passive: true });
+    scroller.addEventListener('wheel', markUserTouch, { passive: true });
+    scroller.addEventListener('scroll', markUserTouch, { passive: true });
+
+    return () => {
+      scroller.removeEventListener('pointerdown', markUserTouch as any);
+      scroller.removeEventListener('touchstart', markUserTouch as any);
+      scroller.removeEventListener('wheel', markUserTouch as any);
+      scroller.removeEventListener('scroll', markUserTouch as any);
+      if (userTouchTimerRef.current) {
+        window.clearTimeout(userTouchTimerRef.current);
+        userTouchTimerRef.current = null;
+      }
+    };
+  }, [data.id]);
+
+  // ✅ Recentraliza quando o horário virar, mas sem atrapalhar se o usuário mexeu
+  useEffect(() => {
+    if (activeTimeIndex < 0) return;
+
+    // só faz isso depois do “center inicial”
+    if (didCenterForIdRef.current !== data.id) return;
+
+    const now = Date.now();
+    const last = lastUserTouchTsRef.current || 0;
+
+    // se o usuário mexeu recentemente, não mexe
+    if (now - last < USER_SCROLL_GUARD_MS) return;
+
+    // recenter suave (não é obrigatório, mas fica natural)
+    centerTimeIndex(activeTimeIndex, 'smooth');
   }, [activeTimeIndex, data.id]);
 
   // ✅ EXCETOS: se não vier do backend, usa placeholder
@@ -532,12 +599,7 @@ export default function ProductTabDetalhes({
               >
                 <SectionTitle>Horários:</SectionTitle>
 
-                <span
-                  className="text-[16px]"
-                  style={{
-                    transform: 'translate(0px, 0px)',
-                  }}
-                >
+                <span className="text-[16px]" style={{ transform: 'translate(0px, 0px)' }}>
                   ⚠️
                 </span>
               </button>
@@ -551,14 +613,7 @@ export default function ProductTabDetalhes({
                     onClick={closeAlertBubble}
                   />
 
-                  <div
-                    className="absolute z-[30]"
-                    style={{
-                      right: -128,
-                      bottom: '100%',
-                      marginBottom: -4,
-                    }}
-                  >
+                  <div className="absolute z-[30]" style={{ right: -128, bottom: '100%', marginBottom: -4 }}>
                     <div
                       className={[
                         'relative',
@@ -613,7 +668,7 @@ export default function ProductTabDetalhes({
             </div>
           </div>
 
-          {/* ✅ Carrossel: já abre centralizado no vigente */}
+          {/* ✅ Carrossel */}
           <div ref={timeScrollerRef} className="mt-2 flex gap-2 overflow-x-auto pb-2 px-1">
             {funcionamentoTimeCards.map((t, i) => {
               const isActiveTime = i === activeTimeIndex;
