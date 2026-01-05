@@ -112,7 +112,11 @@ export default function ProductDetailContent({
   return (
     <div className="relative">
       {/* BODY (tudo rola junto) */}
-      <div ref={bodyRef} className="relative max-h-[78vh] overflow-y-auto px-3 pb-[30px] pt-3">
+      <div
+        ref={bodyRef}
+        className="relative max-h-[78vh] overflow-y-auto px-3 pt-3 pb-[50px]"
+        style={{ scrollPaddingBottom: 50 }}
+        >
         {/* Título + estrelas/avaliações */}
         <div>
           <div className="text-[22px] font-bold tracking-[-.2px] leading-[22px] text-zinc-600">{data.title}</div>
