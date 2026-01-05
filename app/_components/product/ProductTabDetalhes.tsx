@@ -1,7 +1,7 @@
 // app/_components/product/ProductTabDetalhes.tsx
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useLayoutEffect } from 'react';
 import type { ProductModalData } from './ProductDetailContent';
 
 import { AccordionItem, CalendarBlock, ChevronYellow, SectionTitle, TimeCard } from './tabs/ProductDetailUI';
@@ -113,11 +113,15 @@ export default function ProductTabDetalhes({
   // ✅ root para achar o scroller do modal (e fechar ao scroll)
   const rootRef = useRef<HTMLDivElement | null>(null);
 
-  // ✅ refs do carrossel de horários (para rolar até o vigente)
+  // ✅ carrossel de horários (container + itens)
+  const timeScrollerRef = useRef<HTMLDivElement | null>(null);
   const timeItemRefs = useRef<Array<HTMLDivElement | null>>([]);
 
   // ✅ “tick” do horário atual (atualiza sozinho para trocar o vigente)
   const [nowTick, setNowTick] = useState(0);
+
+  // ✅ trava para não ficar recenterizando em loop
+  const didCenterForIdRef = useRef<string | null>(null);
 
   const media = data.media ?? [];
   const canSlide = media.length > 1;
@@ -145,10 +149,12 @@ export default function ProductTabDetalhes({
 
     // reseta refs dos horários
     timeItemRefs.current = [];
+
+    // permite centralizar de novo neste produto
+    didCenterForIdRef.current = null;
   }, [data.id]);
 
   useEffect(() => {
-    // atualiza “agora” com frequência suficiente pro “vigente” mudar sem recarregar
     const id = window.setInterval(() => setNowTick((n) => n + 1), 15_000);
     return () => window.clearInterval(id);
   }, []);
@@ -224,7 +230,6 @@ export default function ProductTabDetalhes({
   }
 
   function toggleAlertBubble() {
-    // ✅ marcou como interação do usuário (cancela auto-open)
     alertUserInteractedRef.current = true;
 
     if (alertTimerRef.current) {
@@ -238,22 +243,16 @@ export default function ProductTabDetalhes({
 
   // ✅ Auto-open com delay “igual WhatsApp”
   useEffect(() => {
-    // garante timer único
     if (alertTimerRef.current) {
       window.clearTimeout(alertTimerRef.current);
       alertTimerRef.current = null;
     }
 
-    // se usuário já interagiu, não faz auto-open
     if (alertUserInteractedRef.current) return;
-
-    // se já foi mostrado automaticamente para este produto, não repetir
     if (alertAutoShownForIdRef.current === data.id) return;
 
     alertTimerRef.current = window.setTimeout(() => {
-      // se o usuário interagiu antes do timer disparar, não abre
       if (alertUserInteractedRef.current) return;
-
       alertAutoShownForIdRef.current = data.id;
       openAlertBubble();
     }, ALERT_BUBBLE_DELAY_MS);
@@ -273,7 +272,6 @@ export default function ProductTabDetalhes({
     const root = rootRef.current;
     if (!root) return;
 
-    // acha o primeiro ancestral scrollável (o body do modal)
     const findScrollableParent = (el: HTMLElement | null) => {
       let cur: HTMLElement | null = el;
       while (cur) {
@@ -289,14 +287,10 @@ export default function ProductTabDetalhes({
     const scroller = findScrollableParent(root);
     if (!scroller) return;
 
-    const onScroll = () => {
-      // ✅ se rolar, fecha
-      closeAlertBubble();
-    };
+    const onScroll = () => closeAlertBubble();
 
     scroller.addEventListener('scroll', onScroll, { passive: true });
 
-    // extra: fecha também ao “wheel” e “touchmove” dentro do scroller
     const onWheel = () => closeAlertBubble();
     const onTouchMove = () => closeAlertBubble();
 
@@ -352,13 +346,11 @@ export default function ProductTabDetalhes({
 
     const mins = funcionamentoTimeCards.map((t) => toMinutes(t.time));
 
-    // último horário <= agora
     let idx = -1;
     for (let i = 0; i < mins.length; i++) {
       if (Number.isFinite(mins[i]) && mins[i] <= nowMin) idx = i;
     }
 
-    // antes do primeiro horário: pega o primeiro futuro
     if (idx === -1) {
       for (let i = 0; i < mins.length; i++) {
         if (Number.isFinite(mins[i]) && mins[i] > nowMin) return i;
@@ -369,17 +361,33 @@ export default function ProductTabDetalhes({
     return idx;
   }, [funcionamentoTimeCards, nowTick, data.id]);
 
-  // ✅ rola automaticamente para o card vigente ficar aparente (centralizado)
-  useEffect(() => {
+  // ✅ Centraliza NO CARREGAMENTO do modal/produto (já abre no meio, sem animação)
+  useLayoutEffect(() => {
     if (activeTimeIndex < 0) return;
+    if (didCenterForIdRef.current === data.id) return;
 
-    const el = timeItemRefs.current[activeTimeIndex];
-    if (!el) return;
+    const scroller = timeScrollerRef.current;
+    const item = timeItemRefs.current[activeTimeIndex];
+    if (!scroller || !item) return;
 
-    el.scrollIntoView({
-      behavior: 'smooth',
-      block: 'nearest',
-      inline: 'center',
+    const centerNow = () => {
+      const target =
+        item.offsetLeft + item.offsetWidth / 2 - scroller.clientWidth / 2;
+
+      const max = Math.max(0, scroller.scrollWidth - scroller.clientWidth);
+      const clamped = Math.max(0, Math.min(max, target));
+
+      // ✅ já abre na posição certa
+      scroller.scrollLeft = clamped;
+      didCenterForIdRef.current = data.id;
+    };
+
+    // 2 frames + micro timeout: garante medidas prontas no primeiro paint
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        centerNow();
+        window.setTimeout(centerNow, 0);
+      });
     });
   }, [activeTimeIndex, data.id]);
 
@@ -502,11 +510,9 @@ export default function ProductTabDetalhes({
             <CalendarBlock cal={funcionamentoCal} noOuterBorder />
           </div>
 
-          {/* Horários + alerta (área de toque maior e cobre “Horários” + ícone) */}
+          {/* Horários + alerta */}
           <div className="mt-[25px] flex items-center gap-2">
-            {/* ✅ wrapper relativo: o balão se ancora aqui */}
             <div className="relative">
-              {/* ✅ área clicável ampliada: pega “Horários” + ícone */}
               <button
                 type="button"
                 onClick={(e) => {
@@ -517,7 +523,6 @@ export default function ProductTabDetalhes({
                 aria-label="Alerta de horários"
                 className={[
                   'relative',
-                  // aumenta hit area e “estende” por cima do texto
                   '-mx-2 px-2 py-2',
                   'flex items-center gap-2',
                   'rounded-md',
@@ -527,21 +532,18 @@ export default function ProductTabDetalhes({
               >
                 <SectionTitle>Horários:</SectionTitle>
 
-                {/* ✅ ajuste fino do ícone: mexa aqui */}
                 <span
                   className="text-[16px]"
                   style={{
-                    transform: 'translate(0px, 0px)', // 👈 ajuste fino: X (direita+) / Y (baixo+)
+                    transform: 'translate(0px, 0px)',
                   }}
                 >
                   ⚠️
                 </span>
               </button>
 
-              {/* ✅ Balão do alerta (abre em cima do ícone) */}
               {alertOpen ? (
                 <>
-                  {/* OVERLAY INVISÍVEL — fecha ao clicar em qualquer lugar */}
                   <button
                     type="button"
                     aria-label="Fechar alerta"
@@ -549,7 +551,6 @@ export default function ProductTabDetalhes({
                     onClick={closeAlertBubble}
                   />
 
-                  {/* BALÃO (fica acima do overlay) */}
                   <div
                     className="absolute z-[30]"
                     style={{
@@ -567,7 +568,6 @@ export default function ProductTabDetalhes({
                         alertEntered ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-3 scale-[0.98]',
                       ].join(' ')}
                     >
-                      {/* BALÃO — clicar nele também fecha */}
                       <button
                         type="button"
                         onClick={closeAlertBubble}
@@ -584,7 +584,6 @@ export default function ProductTabDetalhes({
                         </div>
                       </button>
 
-                      {/* X externo */}
                       <button
                         type="button"
                         onClick={closeAlertBubble}
@@ -614,19 +613,23 @@ export default function ProductTabDetalhes({
             </div>
           </div>
 
-          {/* ✅ Carrossel de horários: destaque interno via TimeCard(active) */}
-          <div className="mt-2 flex gap-2 overflow-x-auto pb-2 scroll-px-3 px-1">
-            {funcionamentoTimeCards.map((t, i) => (
-              <div
-                key={`${t.time}-${i}`}
-                ref={(node) => {
-                  timeItemRefs.current[i] = node;
-                }}
-                className="shrink-0"
-              >
-                <TimeCard time={t.time} offLabel={t.offLabel} enabled={t.enabled} active={i === activeTimeIndex} />
-              </div>
-            ))}
+          {/* ✅ Carrossel: já abre centralizado no vigente */}
+          <div ref={timeScrollerRef} className="mt-2 flex gap-2 overflow-x-auto pb-2 px-1">
+            {funcionamentoTimeCards.map((t, i) => {
+              const isActiveTime = i === activeTimeIndex;
+
+              return (
+                <div
+                  key={`${t.time}-${i}`}
+                  ref={(node) => {
+                    timeItemRefs.current[i] = node;
+                  }}
+                  className="shrink-0"
+                >
+                  <TimeCard time={t.time} offLabel={t.offLabel} enabled={t.enabled} active={isActiveTime} />
+                </div>
+              );
+            })}
           </div>
 
           {hasExceptions ? (
@@ -693,7 +696,6 @@ export default function ProductTabDetalhes({
         </div>
       </div>
 
-      {/* (mantive economySlot disponível caso você queira recolocar aqui depois) */}
       {economySlot ? <div className="mt-3">{economySlot}</div> : null}
     </div>
   );
