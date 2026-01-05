@@ -59,7 +59,7 @@ const WHATSAPP_TMP_NUMBER = '9999999999';
 const WHATSAPP_TMP_LINK = `https://wa.me/${WHATSAPP_TMP_NUMBER}`;
 
 // ✅ posição do botão do WhatsApp (precisa bater com o bottom-[19px])
-const WA_BTN_BOTTOM_PX = 19;
+const WA_BTN_BOTTOM_PX = 60;
 const WA_BTN_SIZE_PX = 64;
 
 // ✅ agora o balão “volta” e fica até a metade do redondo verde
@@ -121,6 +121,8 @@ function buildHalfHourTimeCards(
   return out;
 }
 
+type AccordionKey = 'valores' | 'economia' | 'duvidas' | 'regras';
+
 export default function ProductDetailContent({
   data,
   tabDefault = 'detalhes',
@@ -148,6 +150,9 @@ export default function ProductDetailContent({
   // ✅ âncora: “Detalhes:” precisa ficar travado ao expandir/recolher
   const detailsAnchorRef = useRef<HTMLDivElement | null>(null);
 
+  // ✅ sanfona (uma por vez, igual print)
+  const [openAcc, setOpenAcc] = useState<AccordionKey | null>(null);
+
   const media = data.media ?? [];
   const canSlide = media.length > 1;
   const active = media[idx];
@@ -163,6 +168,9 @@ export default function ProductDetailContent({
 
     // reinicia “Ver mais”
     setDetailsExpanded(false);
+
+    // reinicia sanfona
+    setOpenAcc(null);
 
     const t = window.setTimeout(() => {
       setBubbleOpen(true);
@@ -228,7 +236,6 @@ export default function ProductDetailContent({
   function toggleDetailsAnchored() {
     const scroller = bodyRef.current;
     const anchor = detailsAnchorRef.current;
-
     const prevTop = anchor?.getBoundingClientRect().top ?? null;
 
     setDetailsExpanded((v) => !v);
@@ -239,7 +246,6 @@ export default function ProductDetailContent({
         if (!scroller || !anchor || prevTop == null) return;
         const nextTop = anchor.getBoundingClientRect().top;
         const delta = nextTop - prevTop;
-
         if (Math.abs(delta) > 0.5) {
           scroller.scrollBy({ top: delta, left: 0, behavior: 'auto' });
         }
@@ -268,16 +274,26 @@ export default function ProductDetailContent({
   // ✅ carrossel igual ao print (hora + % off + botão)
   const funcionamentoTimeCards = useMemo(() => buildHalfHourTimeCards(11, 0, 23, 0), []);
 
+  // ✅ EXCETOS: se não vier do backend, usa placeholder (Natal, Ano Novo, Páscoa)
+  const exceptionsClean = useMemo(() => {
+    const base = (data.exceptions ?? []).map((x) => (x ?? '').trim()).filter(Boolean);
+    if (base.length > 0) return base;
+
+    return ['Natal', 'Ano Novo', 'Páscoa', '24/12, 25/12, 31/12 e 01/01'];
+  }, [data.exceptions]);
+
+  const hasExceptions = exceptionsClean.length > 0;
+
   return (
     <div className="relative">
       {/* BODY (tudo rola junto) */}
-      <div ref={bodyRef} className="relative max-h-[78vh] overflow-y-auto px-3 pb-24 pt-3">
+      <div ref={bodyRef} className="relative max-h-[78vh] overflow-y-auto px-3 pb-[30px] pt-3">
         {/* Título + estrelas/avaliações */}
         <div>
           <div className="text-[22px] font-bold tracking-[-.2px] leading-[22px] text-zinc-600">{data.title}</div>
 
           <div className="mt-2">
-            <StarsRow rating={ratingNum} sizeClass="h-[17px] w-[17px]" />
+            <StarsRow rating={ratingNum} sizeClass="h-[19px] w-[19px]" />
             <div className="mt-0.5 text-[12px] text-zinc-500">
               <span className="font-semibold text-zinc-700">{ratingNum.toFixed(1)}</span> de{' '}
               <span className="font-semibold text-zinc-700">{reviewsNum}</span> avaliações
@@ -297,86 +313,90 @@ export default function ProductDetailContent({
           </div>
         </div>
 
-        {/* Banner alinhado */}
-        <div className="mt-3">
-          <div className="relative overflow-hidden rounded-none bg-zinc-200">
-            <div className="aspect-[16/9] w-full">
-              {active?.src ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={active.src} alt={active.alt ?? ''} className="h-full w-full object-cover" />
-              ) : (
-                <div className="h-full w-full" />
-              )}
+        {/* ✅ IMPORTANTE:
+            Banner + Subtítulo + Divisor só aparecem no tab "detalhes"
+        */}
+        {tab === 'detalhes' ? (
+          <>
+            {/* Banner alinhado */}
+            <div className="mt-3">
+              <div className="relative overflow-hidden rounded-none bg-zinc-200">
+                <div className="aspect-[16/9] w-full">
+                  {active?.src ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={active.src} alt={active.alt ?? ''} className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="h-full w-full" />
+                  )}
+                </div>
+
+                {canSlide ? (
+                  <div className="absolute left-0 right-0 top-0 h-[3px] bg-black/15">
+                    <div
+                      className="h-full bg-white/70"
+                      style={{ width: `${progressPct}%`, transition: `width ${SLIDE_STEP_MS}ms linear` }}
+                    />
+                  </div>
+                ) : null}
+
+                {canSlide ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={next}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 grid h-10 w-10 place-items-center"
+                      aria-label="Próximo"
+                    >
+                      <ChevronYellow dir="right" />
+                    </button>
+
+                    <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1.5">
+                      {media.map((_, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => {
+                            setTick(0);
+                            setIdx(i);
+                          }}
+                          className={['h-2 w-2 rounded-full', i === idx ? 'bg-white' : 'bg-white/55'].join(' ')}
+                          aria-label={`Imagem ${i + 1}`}
+                        />
+                      ))}
+                    </div>
+                  </>
+                ) : null}
+              </div>
             </div>
 
-            {canSlide ? (
-              <div className="absolute left-0 right-0 top-0 h-[3px] bg-black/15">
-                <div
-                  className="h-full bg-white/70"
-                  style={{ width: `${progressPct}%`, transition: `width ${SLIDE_STEP_MS}ms linear` }}
-                />
+            {/* subtítulo */}
+            <div className="mt-[15px]">
+              <div className="line-clamp-3 text-[16px] font-semibold leading-[18px] text-zinc-700">
+                Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et
+                dolore magna aliqua.
               </div>
-            ) : null}
+            </div>
 
-            {canSlide ? (
-              <>
-                <button
-                  type="button"
-                  onClick={next}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 grid h-10 w-10 place-items-center"
-                  aria-label="Próximo"
-                >
-                  <ChevronYellow dir="right" />
-                </button>
-
-                <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1.5">
-                  {media.map((_, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      onClick={() => {
-                        setTick(0);
-                        setIdx(i);
-                      }}
-                      className={['h-2 w-2 rounded-full', i === idx ? 'bg-white' : 'bg-white/55'].join(' ')}
-                      aria-label={`Imagem ${i + 1}`}
-                    />
-                  ))}
-                </div>
-              </>
-            ) : null}
-          </div>
-        </div>
-
-        {/* subtítulo */}
-        <div className="mt-[15px]">
-          <div className="line-clamp-3 text-[16px] font-semibold leading-[19px] text-zinc-600">
-            Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et
-            dolore magna aliqua.
-          </div>
-        </div>
-
-        <div className="my-[14px] border-b border-dotted border-black/25" />
+            <div className="my-[14px] border-b border-dotted border-black/25" />
+          </>
+        ) : null}
 
         {/* Conteúdo */}
         {tab === 'detalhes' ? (
           <>
-            {/* ✅ âncora travada */}
             <div ref={detailsAnchorRef}>
               <SectionTitle>Detalhes:</SectionTitle>
             </div>
 
             <div className="mt-2 text-[13px] leading-[16px] text-zinc-600">
-              {/* preview (máximo 4 linhas) */}
               <div className={detailsExpanded ? '' : 'line-clamp-4'}>{DETAILS_PREVIEW}</div>
 
-              {/* conteúdo extra (sempre abaixo do texto) */}
               <div
                 className={[
                   'overflow-hidden',
                   'transition-[max-height,opacity,transform] ease-out',
                   'duration-[520ms]',
-                  detailsExpanded ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-1',
+                  detailsExpanded ? 'opacity-100 translate-y-0 visible' : 'opacity-0 -translate-y-1 invisible',
                 ].join(' ')}
                 style={{ maxHeight: detailsExpanded ? detailsMoreH : 0 }}
                 aria-hidden={!detailsExpanded}
@@ -386,27 +406,23 @@ export default function ProductDetailContent({
                 </div>
               </div>
 
-              {/* ✅ AJUSTE: área clicável maior (sem aumentar fonte) */}
               <button
                 type="button"
-                onClick={toggleDetailsAnchored}
-                aria-label={detailsExpanded ? 'Ver menos detalhes' : 'Ver mais detalhes'}
                 className={[
                   'mt-1',
-                  'block w-full text-left',
-                  'text-[13px] font-medium text-emerald-700',
-                  // ⬇️ área de toque maior
-                  'py-3',
-                  '-my-2',
-                  'leading-none',
-                  'touch-manipulation select-none',
+                  '-mx-2 px-2 py-2',
+                  'block w-fit text-left',
+                  'text-[13px]',
+                  'font-normal',
+                  'text-emerald-700',
                   'active:opacity-80',
                 ].join(' ')}
+                onClick={toggleDetailsAnchored}
+                aria-label={detailsExpanded ? 'Ver menos detalhes' : 'Ver mais detalhes'}
               >
                 {detailsExpanded ? 'Ver menos' : 'Ver mais'}
               </button>
 
-              {/* ✅ Funcionamento e Horários sempre visíveis */}
               <div className="mt-4">
                 <SectionTitle>Funcionamento:</SectionTitle>
 
@@ -424,120 +440,202 @@ export default function ProductDetailContent({
                     <TimeCard key={t.time} time={t.time} offLabel={t.offLabel} enabled={t.enabled} />
                   ))}
                 </div>
+
+                {hasExceptions ? (
+                  <div className="mt-4">
+                    <SectionTitle>Excetos:</SectionTitle>
+                    <div className="mt-1 text-[13px] leading-[16px] text-zinc-500">
+                      {exceptionsClean.map((x, i) => (
+                        <div key={i}>{x}</div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className="mt-4 space-y-[5px]">
+                  <AccordionItem
+                    title="Valores:"
+                    open={openAcc === 'valores'}
+                    onToggle={() => setOpenAcc((v) => (v === 'valores' ? null : 'valores'))}
+                  >
+                    Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore
+                    et dolore magna aliqua.
+                  </AccordionItem>
+
+                  <AccordionItem
+                    title="Quanto posso economizar:"
+                    open={openAcc === 'economia'}
+                    onToggle={() => setOpenAcc((v) => (v === 'economia' ? null : 'economia'))}
+                  >
+                    Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore
+                    et dolore magna aliqua.
+                  </AccordionItem>
+
+                  <AccordionItem
+                    title="Dúvidas frequentes:"
+                    open={openAcc === 'duvidas'}
+                    onToggle={() => setOpenAcc((v) => (v === 'duvidas' ? null : 'duvidas'))}
+                  >
+                    Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore
+                    et dolore magna aliqua.
+                  </AccordionItem>
+
+                  <AccordionItem
+                    title="Regras:"
+                    open={openAcc === 'regras'}
+                    onToggle={() => setOpenAcc((v) => (v === 'regras' ? null : 'regras'))}
+                  >
+                    Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore
+                    et dolore magna aliqua.
+                  </AccordionItem>
+                </div>
+
+                {/* ✅ Obs (menos espaço embaixo) */}
+                <div className="mt-4 mb-2">
+                  <SectionTitle>Obs:</SectionTitle>
+
+                  <ul className="mt-1 list-disc pl-5 text-[13px] leading-[16px] text-zinc-500 space-y-1">
+                    <li>Lorem ipsum dolor sit amet, consectetur adipiscing.</li>
+                    <li>Sed do eiusmod tempor incididunt ut labore et dolore.</li>
+                    <li>Ut enim ad minim veniam, quis nostrud exercitation.</li>
+                    <li>Nisi ut aliquip ex ea commodo consequat.</li>
+                    <li>Duis aute irure dolor in reprehenderit in voluptate.</li>
+                  </ul>
+                </div>
               </div>
             </div>
           </>
         ) : null}
 
+        {/* ✅ Agora as outras abas NÃO apagam o Detalhes.
+            Apenas mostram "Em construção", e o banner não aparece (porque ficou acima no if do Detalhes).
+        */}
         {tab === 'avaliacoes' ? (
-          <div className="pt-2">
+          <div className="pt-4">
             <SectionTitle>Avaliações</SectionTitle>
-
-            <div className="mt-2">
-              <StarsRow rating={ratingNum} sizeClass="h-[17px] w-[17px]" />
-              <div className="-mt-0.5 text-[12px] text-zinc-500">
-                <span className="font-semibold text-zinc-700">{ratingNum.toFixed(1)}</span> de{' '}
-                <span className="font-semibold text-zinc-700">{reviewsNum}</span> avaliações
-              </div>
-            </div>
-
-            <div className="mt-3 rounded-[12px] border border-black/10 bg-white p-3 text-[13px] text-zinc-600">
-              Aqui entra a lista de avaliações (título, nome, texto curto).
+            <div className="mt-2 rounded-[12px] border border-black/10 bg-white p-3 text-[13px] text-zinc-600">
+              Em construção. Esta área será disponibilizada em breve.
             </div>
           </div>
         ) : null}
 
         {tab === 'endereco' ? (
-          <div className="pt-2">
+          <div className="pt-4">
             <SectionTitle>Endereço</SectionTitle>
-            <div className="mt-2 rounded-[12px] border border-black/10 bg-white p-3 text-[13px] text-zinc-700">
-              {data.addressText ?? '—'}
+            <div className="mt-2 rounded-[12px] border border-black/10 bg-white p-3 text-[13px] text-zinc-600">
+              Em construção. Esta área será disponibilizada em breve.
             </div>
           </div>
         ) : null}
-
-        {/* ✅ Balão WhatsApp + X (largura -30px) */}
-        {bubbleOpen ? (
-          <div
-            className="pointer-events-none fixed left-1/2 z-[65] w-[430px] max-w-full -translate-x-1/2 px-3"
-            style={{ bottom: BUBBLE_BOTTOM_PX }}
-          >
-            <div
-              className={[
-                'pointer-events-auto ml-auto relative',
-                'w-[142px]', // 172 - 30 = 142
-                'transition-[opacity,transform] ease-out',
-                `duration-[${BUBBLE_ANIM_MS}ms]`,
-                bubbleEntered ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-3 scale-[0.98]',
-              ].join(' ')}
-              style={{ marginRight: BUBBLE_SHIFT_LEFT_PX }}
-            >
-              <a
-                href={WHATSAPP_TMP_LINK}
-                target="_blank"
-                rel="noreferrer"
-                className="block w-full rounded-[10px] border border-black/10 bg-white p-2 text-[11px] text-zinc-700 shadow"
-                aria-label="Abrir WhatsApp"
-                onClick={() => {
-                  closeBubbleOnly();
-                }}
-              >
-                <div className="leading-tight">
-                  <div>Fale com o estabelecimento:</div>
-                  <div>
-                    <span className="font-semibold">{vendorName}</span>
-                  </div>
-                </div>
-              </a>
-
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  closeBubbleOnly();
-                }}
-                aria-label="Fechar balão"
-                className={[
-                  'absolute',
-                  '-top-[30px]',
-                  '-right-[8px]',
-                  'grid h-10 w-10 place-items-center',
-                  'text-red-600',
-                  'active:scale-95',
-                ].join(' ')}
-              >
-                <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-                  <path d="M6 6L18 18M18 6L6 18" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-                </svg>
-              </button>
-            </div>
-          </div>
-        ) : null}
-
-        {/* Botão WhatsApp */}
-        <a
-          href={whatsappHref || '#'}
-          className="fixed bottom-[19px] left-1/2 z-[70] w-[430px] max-w-full -translate-x-1/2 px-3"
-          aria-label="WhatsApp"
-          onClick={(e) => {
-            if (!whatsappHref || whatsappHref === '#') e.preventDefault();
-          }}
-        >
-          <div className="ml-auto relative grid h-[64px] w-[64px] place-items-center rounded-full bg-green-500 shadow-lg">
-            <WhatsAppIcon className="h-14 w-14 text-white" />
-
-            {bubbleOpen ? (
-              <span
-                className="absolute -top-2 -right-2 grid h-6 w-6 place-items-center rounded-full bg-red-600 text-[12px] font-extrabold text-white ring-2 ring-white"
-                aria-label="Nova mensagem"
-              >
-                1
-              </span>
-            ) : null}
-          </div>
-        </a>
       </div>
+
+      {/* ✅ CTA fixo: colado nas laterais e no fundo do modal, sem arredondamento */}
+      <div className="pointer-events-none fixed bottom-0 left-1/2 z-[60] w-[430px] max-w-full -translate-x-1/2">
+        <button
+          type="button"
+          className={[
+            'pointer-events-auto w-full',
+            'rounded-none', // 3) sem arredondamento
+            'bg-zinc-800',
+            'py-4',
+            'text-center',
+            'font-extrabold',
+            'text-yellow-400',
+            'shadow-lg',
+            'active:scale-[0.995]',
+          ].join(' ')}
+          onClick={() => {
+            // placeholder
+          }}
+          aria-label="Adquirir assinatura Plug Descontos"
+        >
+          {/* 4) texto “Adquira aqui a sua assinatura” em branco */}
+          <span className="block text-[18px] leading-[20px] text-white">Adquira aqui a sua assinatura</span>
+          <span className="mt-1 block text-[20px] leading-[22px] text-yellow-400">Plug Descontos</span>
+        </button>
+      </div>
+
+      {/* ✅ Balão WhatsApp + X (largura -30px) */}
+      {bubbleOpen ? (
+        <div
+          className="pointer-events-none fixed left-1/2 z-[65] w-[430px] max-w-full -translate-x-1/2 px-3"
+          style={{ bottom: BUBBLE_BOTTOM_PX }}
+        >
+          <div
+            className={[
+              'pointer-events-auto ml-auto relative',
+              'w-[142px]',
+              'transition-[opacity,transform] ease-out',
+              `duration-[${BUBBLE_ANIM_MS}ms]`,
+              bubbleEntered ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-3 scale-[0.98]',
+            ].join(' ')}
+            style={{ marginRight: BUBBLE_SHIFT_LEFT_PX }}
+          >
+            <a
+              href={WHATSAPP_TMP_LINK}
+              target="_blank"
+              rel="noreferrer"
+              className="block w-full rounded-[10px] border border-black/10 bg-white p-2 text-[11px] text-zinc-700 shadow"
+              aria-label="Abrir WhatsApp"
+              onClick={() => {
+                closeBubbleOnly();
+              }}
+            >
+              <div className="leading-tight">
+                <div>Fale com o estabelecimento:</div>
+                <div>
+                  <span className="font-semibold">{(data.vendorName ?? '').trim() || data.title}</span>
+                </div>
+              </div>
+            </a>
+
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                closeBubbleOnly();
+              }}
+              aria-label="Fechar balão"
+              className={[
+                'absolute',
+                '-top-[30px]',
+                '-right-[8px]',
+                'grid h-10 w-10 place-items-center',
+                'text-red-600',
+                'active:scale-95',
+              ].join(' ')}
+            >
+              <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+                <path d="M6 6L18 18M18 6L6 18" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Botão WhatsApp */}
+      <a
+        href={whatsappHref || '#'}
+        className="fixed bottom-[65px] left-1/2 z-[70] w-[430px] max-w-full -translate-x-1/2 px-3"
+        aria-label="WhatsApp"
+        onClick={(e) => {
+          if (!whatsappHref || whatsappHref === '#') e.preventDefault();
+        }}
+      >
+        <div className="ml-auto relative grid h-[64px] w-[64px] place-items-center rounded-full bg-green-500 shadow-lg">
+          <WhatsAppIcon className="h-14 w-14 text-white" />
+
+          {bubbleOpen ? (
+            <span
+              className="absolute -top-2 -right-2 grid h-6 w-6 place-items-center rounded-full bg-red-600 text-[12px] font-extrabold text-white ring-2 ring-white"
+              aria-label="Nova mensagem"
+            >
+              1
+            </span>
+          ) : null}
+        </div>
+      </a>
     </div>
   );
 }
@@ -611,7 +709,7 @@ function WhatsAppIcon({ className }: { className?: string }) {
   );
 }
 
-function StarsRow({ rating, sizeClass = 'h-[17px] w-[17px]' }: { rating: number; sizeClass?: string }) {
+function StarsRow({ rating, sizeClass = 'h-[19px] w-[19px]' }: { rating: number; sizeClass?: string }) {
   const r = Math.max(0, Math.min(5, Number.isFinite(rating) ? rating : 0));
   return (
     <div className="flex items-center">
@@ -632,7 +730,7 @@ function Star({ fillPct, className }: { fillPct: number; className?: string }) {
   const pct = Math.max(0, Math.min(100, fillPct));
 
   return (
-    <svg viewBox="0 0 24 24" className={className ?? 'h-[17px] w-[17px]'} aria-hidden="true">
+    <svg viewBox="0 0 24 24" className={className ?? 'h-[19px] w-[19px]'} aria-hidden="true">
       <path
         d="M12 3.6l2.5 5.3 5.8.5-4.4 3.8 1.4 5.7L12 16.1 6.7 18.9l1.4-5.7-4.4-3.8 5.8-.5L12 3.6z"
         className="fill-zinc-300"
@@ -704,7 +802,6 @@ function Cell({ ok }: { ok: boolean }) {
   );
 }
 
-/* ✅ card idêntico ao print (hora + % off + botão) */
 function TimeCard({ time, offLabel, enabled = true }: { time: string; offLabel: string; enabled?: boolean }) {
   return (
     <div
@@ -723,5 +820,89 @@ function TimeCard({ time, offLabel, enabled = true }: { time: string; offLabel: 
         Utilizar
       </button>
     </div>
+  );
+}
+
+function AccordionItem({
+  title,
+  open,
+  onToggle,
+  children,
+}: {
+  title: string;
+  open: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  const innerRef = useRef<HTMLDivElement | null>(null);
+  const [h, setH] = useState(0);
+
+  useEffect(() => {
+    const el = innerRef.current;
+    if (!el) return;
+
+    const measure = () => setH(el.scrollHeight || 0);
+    measure();
+
+    const ro = new ResizeObserver(() => measure());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={onToggle}
+        className={[
+          'w-full',
+          'rounded-[6px]',
+          'bg-zinc-600',
+          'px-3 py-2',
+          'text-left',
+          'text-[13px] font-extrabold text-white',
+          'flex items-center justify-between',
+          'active:scale-[0.99]',
+        ].join(' ')}
+        aria-expanded={open}
+      >
+        <span>{title}</span>
+        <span className="ml-3 grid h-6 w-6 place-items-center rounded bg-white/10">
+          {open ? <MinusIcon /> : <PlusIcon />}
+        </span>
+      </button>
+
+      <div
+        className={[
+          'overflow-hidden',
+          'transition-[max-height,opacity,transform] duration-[520ms] ease-out',
+          open ? 'opacity-100 translate-y-0 visible' : 'opacity-0 -translate-y-1 invisible',
+        ].join(' ')}
+        style={{ maxHeight: open ? h : 0 }}
+        aria-hidden={!open}
+      >
+        <div ref={innerRef} className="pt-2">
+          <div className="rounded-[6px] border border-black/10 bg-white p-3 text-[13px] leading-[16px] text-zinc-600">
+            {children}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PlusIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+      <path d="M12 5v14M5 12h14" stroke="white" strokeWidth="2.4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function MinusIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+      <path d="M5 12h14" stroke="white" strokeWidth="2.4" strokeLinecap="round" />
+    </svg>
   );
 }
