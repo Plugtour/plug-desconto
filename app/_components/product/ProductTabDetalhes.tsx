@@ -4,13 +4,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { ProductModalData } from './ProductDetailContent';
 
-import {
-  AccordionItem,
-  CalendarBlock,
-  ChevronYellow,
-  SectionTitle,
-  TimeCard,
-} from './tabs/ProductDetailUI';
+import { AccordionItem, CalendarBlock, ChevronYellow, SectionTitle, TimeCard } from './tabs/ProductDetailUI';
 
 // ✅ placeholder longo pra testar “Ver mais”
 const DETAILS_PREVIEW =
@@ -23,6 +17,12 @@ const DETAILS_MORE =
 
 const SLIDE_DURATION_MS = 6500;
 const SLIDE_STEP_MS = 50;
+
+// ✅ balão de alerta (mesmo “jeito” do WhatsApp)
+const ALERT_BUBBLE_ANIM_MS = 520;
+
+// ✅ delay inteligente (igual WhatsApp)
+const ALERT_BUBBLE_DELAY_MS = 10_000; // 10s (ajuste aqui)
 
 function pad2(n: number) {
   return String(n).padStart(2, '0');
@@ -92,6 +92,18 @@ export default function ProductTabDetalhes({
   // ✅ sanfona (uma por vez)
   const [openAcc, setOpenAcc] = useState<AccordionKey | null>(null);
 
+  // ✅ balão de alerta do “⚠️”
+  const [alertOpen, setAlertOpen] = useState(false);
+  const [alertEntered, setAlertEntered] = useState(false);
+
+  // ✅ refs para lógica “inteligente”
+  const alertTimerRef = useRef<number | null>(null);
+  const alertUserInteractedRef = useRef(false);
+  const alertAutoShownForIdRef = useRef<string | null>(null);
+
+  // ✅ root para achar o scroller do modal (e fechar ao scroll)
+  const rootRef = useRef<HTMLDivElement | null>(null);
+
   const media = data.media ?? [];
   const canSlide = media.length > 1;
   const active = media[idx];
@@ -101,6 +113,20 @@ export default function ProductTabDetalhes({
     setTick(0);
     setDetailsExpanded(false);
     setOpenAcc(null);
+
+    // reseta alerta
+    setAlertEntered(false);
+    setAlertOpen(false);
+
+    // reseta lógica do auto-open por produto
+    alertUserInteractedRef.current = false;
+    alertAutoShownForIdRef.current = null;
+
+    // limpa timer antigo
+    if (alertTimerRef.current) {
+      window.clearTimeout(alertTimerRef.current);
+      alertTimerRef.current = null;
+    }
   }, [data.id]);
 
   useEffect(() => {
@@ -163,6 +189,104 @@ export default function ProductTabDetalhes({
     });
   }
 
+  function openAlertBubble() {
+    setAlertOpen(true);
+    requestAnimationFrame(() => setAlertEntered(true));
+  }
+
+  function closeAlertBubble() {
+    setAlertEntered(false);
+    window.setTimeout(() => setAlertOpen(false), ALERT_BUBBLE_ANIM_MS);
+  }
+
+  function toggleAlertBubble() {
+    // ✅ marcou como interação do usuário (cancela auto-open)
+    alertUserInteractedRef.current = true;
+
+    if (alertTimerRef.current) {
+      window.clearTimeout(alertTimerRef.current);
+      alertTimerRef.current = null;
+    }
+
+    if (alertOpen) closeAlertBubble();
+    else openAlertBubble();
+  }
+
+  // ✅ Auto-open com delay “igual WhatsApp”
+  useEffect(() => {
+    // garante timer único
+    if (alertTimerRef.current) {
+      window.clearTimeout(alertTimerRef.current);
+      alertTimerRef.current = null;
+    }
+
+    // se usuário já interagiu, não faz auto-open
+    if (alertUserInteractedRef.current) return;
+
+    // se já foi mostrado automaticamente para este produto, não repetir
+    if (alertAutoShownForIdRef.current === data.id) return;
+
+    alertTimerRef.current = window.setTimeout(() => {
+      // se o usuário interagiu antes do timer disparar, não abre
+      if (alertUserInteractedRef.current) return;
+
+      alertAutoShownForIdRef.current = data.id;
+      openAlertBubble();
+    }, ALERT_BUBBLE_DELAY_MS);
+
+    return () => {
+      if (alertTimerRef.current) {
+        window.clearTimeout(alertTimerRef.current);
+        alertTimerRef.current = null;
+      }
+    };
+  }, [data.id]);
+
+  // ✅ Fechamento automático ao SCROLL do conteúdo do modal
+  useEffect(() => {
+    if (!alertOpen) return;
+
+    const root = rootRef.current;
+    if (!root) return;
+
+    // acha o primeiro ancestral scrollável (o body do modal)
+    const findScrollableParent = (el: HTMLElement | null) => {
+      let cur: HTMLElement | null = el;
+      while (cur) {
+        const cs = window.getComputedStyle(cur);
+        const oy = cs.overflowY;
+        const canScrollY = (oy === 'auto' || oy === 'scroll') && cur.scrollHeight > cur.clientHeight;
+        if (canScrollY) return cur;
+        cur = cur.parentElement;
+      }
+      return null;
+    };
+
+    const scroller = findScrollableParent(root);
+    if (!scroller) return;
+
+    const onScroll = () => {
+      // ✅ se rolar, fecha
+      closeAlertBubble();
+    };
+
+    scroller.addEventListener('scroll', onScroll, { passive: true });
+
+    // extra: fecha também ao “wheel” e “touchmove” dentro do scroller
+    const onWheel = () => closeAlertBubble();
+    const onTouchMove = () => closeAlertBubble();
+
+    scroller.addEventListener('wheel', onWheel, { passive: true });
+    scroller.addEventListener('touchmove', onTouchMove, { passive: true });
+
+    return () => {
+      scroller.removeEventListener('scroll', onScroll as any);
+      scroller.removeEventListener('wheel', onWheel as any);
+      scroller.removeEventListener('touchmove', onTouchMove as any);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [alertOpen]);
+
   // ✅ Funcionamento (fallback ilustrativo)
   const funcionamentoCal: NonNullable<ProductModalData['calendar']> = useMemo(() => {
     if (data.calendar) return data.calendar;
@@ -187,14 +311,13 @@ export default function ProductTabDetalhes({
   const exceptionsClean = useMemo(() => {
     const base = (data.exceptions ?? []).map((x) => (x ?? '').trim()).filter(Boolean);
     if (base.length > 0) return base;
-
     return ['Natal', 'Ano Novo', 'Páscoa', '24/12, 25/12, 31/12 e 01/01'];
   }, [data.exceptions]);
 
   const hasExceptions = exceptionsClean.length > 0;
 
   return (
-    <>
+    <div ref={rootRef}>
       {/* Banner alinhado */}
       <div className="mt-3">
         <div className="relative overflow-hidden rounded-none bg-zinc-200">
@@ -303,9 +426,118 @@ export default function ProductTabDetalhes({
             <CalendarBlock cal={funcionamentoCal} noOuterBorder />
           </div>
 
+          {/* Horários + alerta (área de toque maior e cobre “Horários” + ícone) */}
           <div className="mt-[25px] flex items-center gap-2">
-            <SectionTitle>Horários:</SectionTitle>
-            <span className="text-[16px]">⚠️</span>
+            {/* ✅ wrapper relativo: o balão se ancora aqui */}
+            <div className="relative">
+              {/* ✅ área clicável ampliada: pega “Horários” + ícone */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  toggleAlertBubble();
+                }}
+                aria-label="Alerta de horários"
+                className={[
+                  'relative',
+                  // aumenta hit area e “estende” por cima do texto
+                  '-mx-2 px-2 py-2',
+                  'flex items-center gap-2',
+                  'rounded-md',
+                  'touch-manipulation select-none',
+                  'active:opacity-80',
+                ].join(' ')}
+              >
+                <SectionTitle>Horários:</SectionTitle>
+
+                {/* ✅ ajuste fino do ícone: mexa aqui */}
+                <span
+                  className="text-[16px]"
+                  style={{
+                    transform: 'translate(0px, 0px)', // 👈 ajuste fino: X (direita+) / Y (baixo+)
+                  }}
+                >
+                  ⚠️
+                </span>
+              </button>
+
+              {/* ✅ Balão do alerta (abre em cima do ícone) */}
+            {alertOpen ? (
+                <>
+                    {/* OVERLAY INVISÍVEL — fecha ao clicar em qualquer lugar */}
+                    <button
+                    type="button"
+                    aria-label="Fechar alerta"
+                    className="fixed inset-0 z-[20] cursor-default"
+                    onClick={closeAlertBubble}
+                    />
+
+                    {/* BALÃO (fica acima do overlay) */}
+                    <div
+                    className="absolute z-[30]"
+                    style={{
+                        right: -128,
+                        bottom: '100%',
+                        marginBottom: -4,
+                    }}
+                    >
+                    <div
+                        className={[
+                        'relative',
+                        'w-[142px]',
+                        'transition-[opacity,transform] ease-out',
+                        `duration-[${ALERT_BUBBLE_ANIM_MS}ms]`,
+                        alertEntered
+                            ? 'opacity-100 translate-y-0 scale-100'
+                            : 'opacity-0 translate-y-3 scale-[0.98]',
+                        ].join(' ')}
+                    >
+                        {/* BALÃO — clicar nele também fecha */}
+                        <button
+                        type="button"
+                        onClick={closeAlertBubble}
+                        className="block w-full rounded-[10px] border border-black/10 bg-white p-2 text-left text-[11px] text-zinc-700 shadow"
+                        >
+                        <div className="leading-tight">
+                            <div className="font-semibold">Alerta:</div>
+                            <div className="mt-0.5">
+                            O desconto oferecido é de acordo com o horário de sua chegada ao estabelecimento.
+                            <br />
+                            <br />
+                            Para solicitar a conta, selecione nas abas abaixo o horário que você chegou no estabelecimento.
+                            </div>
+                        </div>
+                        </button>
+
+                        {/* X externo */}
+                        <button
+                        type="button"
+                        onClick={closeAlertBubble}
+                        aria-label="Fechar balão de alerta"
+                        className={[
+                            'absolute',
+                            '-top-[30px]',
+                            '-right-[8px]',
+                            'grid h-10 w-10 place-items-center',
+                            'text-red-600',
+                            'active:scale-95',
+                        ].join(' ')}
+                        >
+                        <svg viewBox="0 0 24 24" width="22" height="22">
+                            <path
+                            d="M6 6L18 18M18 6L6 18"
+                            stroke="currentColor"
+                            strokeWidth="3"
+                            strokeLinecap="round"
+                            />
+                        </svg>
+                        </button>
+                    </div>
+                    </div>
+                </>
+            ) : null}
+            </div>
           </div>
 
           <div className="mt-2 flex gap-2 overflow-x-auto pb-2">
@@ -363,7 +595,7 @@ export default function ProductTabDetalhes({
             </AccordionItem>
           </div>
 
-          {/* ✅ Obs (menos espaço embaixo) */}
+          {/* ✅ Obs */}
           <div className="mt-4 mb-2">
             <SectionTitle>Obs:</SectionTitle>
 
@@ -377,6 +609,9 @@ export default function ProductTabDetalhes({
           </div>
         </div>
       </div>
-    </>
+
+      {/* (mantive economySlot disponível caso você queira recolocar aqui depois) */}
+      {economySlot ? <div className="mt-3">{economySlot}</div> : null}
+    </div>
   );
 }
