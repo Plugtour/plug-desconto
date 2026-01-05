@@ -42,6 +42,7 @@ type Props = {
 type TabKey = 'detalhes' | 'avaliacoes' | 'endereco';
 
 export default function ProductDetailModal({ open, onClose, product }: Props) {
+  // ✅ trava SEMPRE a tela atrás enquanto open=true
   useLockBodyScroll(open);
 
   const [entered, setEntered] = useState(false);
@@ -83,7 +84,7 @@ export default function ProductDetailModal({ open, onClose, product }: Props) {
 
   return (
     <ModalOverlay open={open} onClose={onClose}>
-      {/* wrapper FIXO para impedir “rolagem do topo” */}
+      {/* wrapper FIXO */}
       <div
         className="fixed inset-x-0 bottom-0 z-[220]"
         style={{ top: TOP_OFFSET }}
@@ -106,13 +107,10 @@ export default function ProductDetailModal({ open, onClose, product }: Props) {
           aria-modal="true"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* HEADER (fixo) */}
+          {/* HEADER */}
           <div className="relative shrink-0 px-4 pt-4 pb-3">
-            <div className="pr-10 text-[22px] font-extrabold tracking-[-.2px] text-zinc-700">
-              {title}
-            </div>
+            <div className="pr-10 text-[22px] font-extrabold tracking-[-.2px] text-zinc-700">{title}</div>
 
-            {/* linha pontilhada como no mock */}
             <div className="mt-2 border-b border-dotted border-black/30" />
 
             <button
@@ -124,7 +122,6 @@ export default function ProductDetailModal({ open, onClose, product }: Props) {
               <span className="text-[30px] leading-none text-red-600">×</span>
             </button>
 
-            {/* ABAS (com mais respiro do título) */}
             <div className="mt-[14px] flex gap-2">
               <TabButton active={tab === 'detalhes'} onClick={() => setTab('detalhes')}>
                 Detalhes
@@ -138,87 +135,94 @@ export default function ProductDetailModal({ open, onClose, product }: Props) {
             </div>
           </div>
 
-          {/* BODY (único lugar que rola) */}
-          <div className="relative flex-1 overflow-y-auto px-4 pb-24 pt-3">
-            {/* SLIDER (banner colado nas laterais do modal / sem rounded) */}
-            <div className="relative -mx-4 overflow-hidden bg-zinc-200">
-              <div className="aspect-[16/9] w-full">
-                {active?.src ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={active.src} alt={active.alt ?? ''} className="h-full w-full object-cover" />
-                ) : (
-                  <div className="h-full w-full" />
-                )}
-              </div>
-
-              {media.length > 1 && (
-                <>
-                  <button
-                    type="button"
-                    onClick={prev}
-                    className="absolute left-2 top-1/2 -translate-y-1/2 grid h-10 w-10 place-items-center"
-                    aria-label="Anterior"
-                  >
-                    <ChevronYellow dir="left" />
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={next}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 grid h-10 w-10 place-items-center"
-                    aria-label="Próximo"
-                  >
-                    <ChevronYellow dir="right" />
-                  </button>
-
-                  <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1.5">
-                    {media.map((_, i) => (
-                      <button
-                        key={i}
-                        type="button"
-                        onClick={() => setIdx(i)}
-                        className={['h-2 w-2 rounded-full', i === idx ? 'bg-white' : 'bg-white/55'].join(' ')}
-                        aria-label={`Imagem ${i + 1}`}
-                      />
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-
-            {/* SUBTÍTULO (maior + peso maior + tom mais claro, máx 3 linhas) */}
-            <div className="mt-[14px]">
-              <div
-                className="text-[16px] font-extrabold leading-snug text-zinc-500"
-                style={{
-                  display: '-webkit-box',
-                  WebkitLineClamp: 3,
-                  WebkitBoxOrient: 'vertical' as any,
-                  overflow: 'hidden',
-                }}
-              >
-                Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor
-                incididunt ut labore et dolore magna aliqua.
-              </div>
-            </div>
-
-            {/* linha pontilhada visualmente no meio entre as frases */}
-            <div className="mt-3 mb-3 border-b border-dotted border-black/30" />
-
+          {/* ✅ BODY: único lugar que rola, e não “vaza” pro fundo */}
+          <div
+            className={[
+              'relative flex-1 overflow-y-auto px-4 pb-24 pt-3',
+              'overscroll-contain',
+              'touch-pan-y',
+            ].join(' ')}
+            style={{ WebkitOverflowScrolling: 'touch' as any }}
+          >
             {/* CONTEÚDO POR ABA */}
-            {tab === 'detalhes' && (
+            {tab !== 'detalhes' ? (
+              <div className="rounded-[12px] border border-black/10 bg-white p-3 text-[13px] text-zinc-600">
+                Em construção.
+              </div>
+            ) : (
               <>
+                {/* SLIDER */}
+                <div className="relative -mx-4 overflow-hidden bg-zinc-200">
+                  <div className="aspect-[16/9] w-full">
+                    {active?.src ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={active.src} alt={active.alt ?? ''} className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="h-full w-full" />
+                    )}
+                  </div>
+
+                  {media.length > 1 && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={prev}
+                        className="absolute left-2 top-1/2 -translate-y-1/2 grid h-10 w-10 place-items-center"
+                        aria-label="Anterior"
+                      >
+                        <ChevronYellow dir="left" />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={next}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 grid h-10 w-10 place-items-center"
+                        aria-label="Próximo"
+                      >
+                        <ChevronYellow dir="right" />
+                      </button>
+
+                      <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1.5">
+                        {media.map((_, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => setIdx(i)}
+                            className={['h-2 w-2 rounded-full', i === idx ? 'bg-white' : 'bg-white/55'].join(' ')}
+                            aria-label={`Imagem ${i + 1}`}
+                          />
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* SUBTÍTULO */}
+                <div className="mt-[14px]">
+                  <div
+                    className="text-[16px] font-extrabold leading-snug text-zinc-500"
+                    style={{
+                      display: '-webkit-box',
+                      WebkitLineClamp: 3,
+                      WebkitBoxOrient: 'vertical' as any,
+                      overflow: 'hidden',
+                    }}
+                  >
+                    Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore
+                    et dolore magna aliqua.
+                  </div>
+                </div>
+
+                <div className="mt-3 mb-3 border-b border-dotted border-black/30" />
+
                 <SectionTitle>Detalhes:</SectionTitle>
 
-                {/* texto extra solicitado logo após "Detalhes:" */}
                 <div className="mt-1 text-[13px] leading-relaxed text-zinc-600">
-                  Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor
-                  incididunt ut labore et dolore magna aliqua.
+                  Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore
+                  et dolore magna aliqua.
                 </div>
 
-                <div className="mt-2 text-[13px] leading-relaxed text-zinc-600">
-                  {product?.detailsHtml ?? '—'}
-                </div>
+                <div className="mt-2 text-[13px] leading-relaxed text-zinc-600">{product?.detailsHtml ?? '—'}</div>
 
                 {/* CALENDÁRIO */}
                 {product?.calendar ? (
@@ -255,62 +259,39 @@ export default function ProductDetailModal({ open, onClose, product }: Props) {
                   </>
                 ) : null}
 
-                {/* ACCORDIONS (barras cinza escuro) */}
+                {/* ACCORDIONS */}
                 <div className="mt-4 space-y-2 pb-2">
                   <AccordionBar title="Quanto posso economizar:" />
                   <AccordionBar title="Regras:" />
                 </div>
+
+                {/* balão */}
+                <div className="pointer-events-none fixed bottom-[122px] left-1/2 z-[60] w-[430px] max-w-full -translate-x-1/2 px-4">
+                  <div className="pointer-events-auto ml-auto w-[170px] rounded-[10px] border border-black/10 bg-white p-2 text-[11px] text-zinc-700 shadow">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="font-semibold leading-tight">Fale com</div>
+                        <div className="leading-tight">{title}</div>
+                      </div>
+                      <button className="text-zinc-400 hover:text-zinc-600" type="button" aria-label="Fechar">
+                        ×
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* botão WhatsApp (mock) */}
+                <a
+                  href="#"
+                  className="fixed bottom-[74px] left-1/2 z-[70] w-[430px] max-w-full -translate-x-1/2 px-4"
+                  aria-label="WhatsApp"
+                >
+                  <div className="ml-auto grid h-[64px] w-[64px] place-items-center rounded-full bg-green-500 shadow-lg">
+                    <span className="text-[28px] text-white">🟢</span>
+                  </div>
+                </a>
               </>
             )}
-
-            {tab === 'avaliacoes' && (
-              <div className="pt-2">
-                <SectionTitle>Avaliações</SectionTitle>
-                <div className="mt-1 text-[13px] text-zinc-600">
-                  {product?.rating
-                    ? `Nota ${product.rating.score.toFixed(1)} • ${product.rating.count} avaliações`
-                    : 'Sem avaliações ainda.'}
-                </div>
-                <div className="mt-3 rounded-[12px] border border-black/10 bg-white p-3 text-[13px] text-zinc-600">
-                  Aqui entra a lista de avaliações (título, nome, texto curto).
-                </div>
-              </div>
-            )}
-
-            {tab === 'endereco' && (
-              <div className="pt-2">
-                <SectionTitle>Endereço</SectionTitle>
-                <div className="mt-2 rounded-[12px] border border-black/10 bg-white p-3 text-[13px] text-zinc-700">
-                  {product?.address?.text ?? '—'}
-                </div>
-              </div>
-            )}
-
-            {/* balão “Fale com...” */}
-            <div className="pointer-events-none fixed bottom-[122px] left-1/2 z-[60] w-[430px] max-w-full -translate-x-1/2 px-4">
-              <div className="pointer-events-auto ml-auto w-[170px] rounded-[10px] border border-black/10 bg-white p-2 text-[11px] text-zinc-700 shadow">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <div className="font-semibold leading-tight">Fale com</div>
-                    <div className="leading-tight">{title}</div>
-                  </div>
-                  <button className="text-zinc-400 hover:text-zinc-600" type="button" aria-label="Fechar">
-                    ×
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* botão WhatsApp (mock) */}
-            <a
-              href="#"
-              className="fixed bottom-[74px] left-1/2 z-[70] w-[430px] max-w-full -translate-x-1/2 px-4"
-              aria-label="WhatsApp"
-            >
-              <div className="ml-auto grid h-[64px] w-[64px] place-items-center rounded-full bg-green-500 shadow-lg">
-                <span className="text-[28px] text-white">🟢</span>
-              </div>
-            </a>
           </div>
         </div>
       </div>
@@ -334,7 +315,7 @@ function TabButton({
       type="button"
       onClick={onClick}
       className={[
-        'relative h-10 flex-1 rounded-md text-[13px] font-semibold', // rounded-md
+        'relative h-10 flex-1 rounded-md text-[13px] font-semibold',
         'bg-zinc-600 text-white',
         'shadow-sm',
       ].join(' ')}
