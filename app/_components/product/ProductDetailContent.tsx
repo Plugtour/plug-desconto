@@ -69,6 +69,53 @@ const WA_BTN_SIZE_PX = 64;
 const BUBBLE_BOTTOM_PX = WA_BTN_BOTTOM_PX + Math.round(WA_BTN_SIZE_PX / 2) + 25; // metade do botão
 const BUBBLE_SHIFT_LEFT_PX = 23; // mantém o canto inferior direito “na seta”
 
+/* =========================
+   ICONS (Topo: Favorito / Share / PDF)
+========================= */
+function HeartIcon({ className, filled }: { className?: string; filled?: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill={filled ? 'currentColor' : 'none'}>
+      <path
+        d="M12 21s-7-4.6-9.4-9.1C.7 8.2 2.2 5.6 4.9 4.8c1.7-.5 3.6.1 5 1.6L12 8.5l2.1-2.1c1.4-1.5 3.3-2.1 5-1.6 2.7.8 4.2 3.4 2.3 7.1C19 16.4 12 21 12 21Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function PaperPlaneIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="none">
+      <path d="M21 3L10.2 13.8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path
+        d="M21 3l-6.7 19-3.2-7.1L4 11.7 21 3Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function PdfIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="none">
+      <path
+        d="M7 3h7l4 4v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+      <path d="M14 3v5h5" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="M8 16h8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M8 19h6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M8 13h8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export default function ProductDetailContent({
   data,
   tabDefault = 'detalhes',
@@ -109,6 +156,41 @@ export default function ProductDetailContent({
   const ratingNum = Number.isFinite(Number(data.rating ?? 0)) ? Number(data.rating ?? 0) : 0;
   const reviewsNum = Number(data.reviews ?? 0) || 0;
 
+  async function handleShare() {
+    try {
+      const url = typeof window !== 'undefined' ? window.location.href : '';
+      const title = (data.title ?? '').trim() || 'Oferta Plug Desconto';
+
+      // @ts-ignore
+      if (navigator?.share) {
+        // @ts-ignore
+        await navigator.share({ title, text: title, url });
+        return;
+      }
+
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = url;
+        ta.setAttribute('readonly', 'true');
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+    } catch {
+      // silencioso
+    }
+  }
+
+  function handlePdf() {
+    // placeholder simples (trocar depois por geração real)
+    if (typeof window !== 'undefined') window.print();
+  }
+
   return (
     <div className="relative">
       {/* BODY (tudo rola junto) */}
@@ -116,16 +198,68 @@ export default function ProductDetailContent({
         ref={bodyRef}
         className="relative max-h-[78vh] overflow-y-auto px-3 pt-3 pb-[50px]"
         style={{ scrollPaddingBottom: 50 }}
-        >
+      >
         {/* Título + estrelas/avaliações */}
-        <div>
+        <div className="relative">
           <div className="text-[22px] font-bold tracking-[-.2px] leading-[22px] text-zinc-600">{data.title}</div>
 
-          <div className="mt-2">
-            <StarsRow rating={ratingNum} sizeClass="h-[19px] w-[19px]" />
-            <div className="mt-0.5 text-[12px] text-zinc-500">
-              <span className="font-semibold text-zinc-700">{ratingNum.toFixed(1)}</span> de{' '}
-              <span className="font-semibold text-zinc-700">{reviewsNum}</span> avaliações
+          {/* ✅ Linha das estrelas + ações no canto direito (único lugar) */}
+          <div className="mt-2 flex items-start justify-between">
+            {/* Esquerda: estrelas + nota */}
+            <div>
+              <StarsRow rating={ratingNum} sizeClass="h-[19px] w-[19px]" />
+              <div className="mt-0.5 text-[12px] text-zinc-500">
+                <span className="font-semibold text-zinc-700">{ratingNum.toFixed(1)}</span> de{' '}
+                <span className="font-semibold text-zinc-700">{reviewsNum}</span> avaliações
+              </div>
+            </div>
+
+            {/* Direita: ações (coração - avião - pdf) */}
+            <div className="flex items-center gap-[2px]">
+              {/* Coração */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onToggleFavorite();
+                }}
+                aria-label={isFavorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+                className="grid h-9 w-9 place-items-center rounded-full text-zinc-500 hover:bg-black/5 active:scale-95"
+              >
+                <HeartIcon
+                  filled={isFavorite}
+                  className={['h-[26px] w-[26px]', isFavorite ? 'text-red-500' : 'text-zinc-500'].join(' ')}
+                />
+              </button>
+
+              {/* Avião */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  void handleShare();
+                }}
+                aria-label="Compartilhar"
+                className="grid h-9 w-9 place-items-center rounded-full text-zinc-500 hover:bg-black/5 active:scale-95"
+              >
+                <PaperPlaneIcon className="h-[26px] w-[26px]" />
+              </button>
+
+              {/* Arquivo / PDF */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handlePdf();
+                }}
+                aria-label="Baixar em PDF"
+                className="grid h-9 w-9 place-items-center rounded-full text-zinc-500 hover:bg-black/5 active:scale-95"
+              >
+                <PdfIcon className="h-[26px] w-[26px]" />
+              </button>
             </div>
           </div>
 
