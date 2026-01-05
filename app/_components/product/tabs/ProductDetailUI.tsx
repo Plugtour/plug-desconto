@@ -158,20 +158,41 @@ export function Cell({ ok }: { ok: boolean }) {
   );
 }
 
-export function TimeCard({ time, offLabel, enabled = true }: { time: string; offLabel: string; enabled?: boolean }) {
+/**
+ * TimeCard
+ */
+export function TimeCard({
+  time,
+  offLabel,
+  enabled = true,
+  active = false,
+}: {
+  time: string;
+  offLabel: string;
+  enabled?: boolean;
+  active?: boolean;
+}) {
   return (
     <div
       className={[
-        'min-w-[86px] rounded-[6px] border border-black/15 bg-zinc-100 p-2 text-center',
+        'min-w-[86px] rounded-[6px] border border-black/15 p-2 text-center',
+        active ? 'bg-[#007A55]/30' : 'bg-zinc-100',
         enabled ? '' : 'opacity-45',
       ].join(' ')}
+      aria-current={active ? 'true' : undefined}
     >
       <div className="text-[11px] font-semibold text-zinc-700">{time}</div>
       <div className="mt-0.5 text-[11px] font-extrabold text-red-500">{offLabel || '-'}</div>
 
+      {/* 🔽 ÚNICA ALTERAÇÃO: cor do botão interno */}
       <button
         type="button"
-        className="mt-1 w-full rounded-[6px] bg-zinc-200 py-1 text-[11px] font-semibold text-zinc-800"
+        className={[
+          'mt-1 w-full rounded-[6px] py-1 text-[11px] font-semibold',
+          active
+            ? 'bg-[#17BA60] text-white'
+            : 'bg-zinc-200 text-zinc-800',
+        ].join(' ')}
       >
         Utilizar
       </button>
@@ -223,7 +244,9 @@ export function AccordionItem({
         aria-expanded={open}
       >
         <span>{title}</span>
-        <span className="ml-3 grid h-6 w-6 place-items-center rounded bg-white/10">{open ? <MinusIcon /> : <PlusIcon />}</span>
+        <span className="ml-3 grid h-6 w-6 place-items-center rounded bg-white/10">
+          {open ? <MinusIcon /> : <PlusIcon />}
+        </span>
       </button>
 
       <div

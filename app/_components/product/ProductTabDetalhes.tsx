@@ -69,6 +69,15 @@ function buildHalfHourTimeCards(
   return out;
 }
 
+function toMinutes(hhmm: string) {
+  const m = String(hhmm || '').match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return NaN;
+  const h = Number(m[1]);
+  const mm = Number(m[2]);
+  if (!Number.isFinite(h) || !Number.isFinite(mm)) return NaN;
+  return h * 60 + mm;
+}
+
 type AccordionKey = 'valores' | 'economia' | 'duvidas' | 'regras';
 
 export default function ProductTabDetalhes({
@@ -104,6 +113,12 @@ export default function ProductTabDetalhes({
   // ✅ root para achar o scroller do modal (e fechar ao scroll)
   const rootRef = useRef<HTMLDivElement | null>(null);
 
+  // ✅ refs do carrossel de horários (para rolar até o vigente)
+  const timeItemRefs = useRef<Array<HTMLDivElement | null>>([]);
+
+  // ✅ “tick” do horário atual (atualiza sozinho para trocar o vigente)
+  const [nowTick, setNowTick] = useState(0);
+
   const media = data.media ?? [];
   const canSlide = media.length > 1;
   const active = media[idx];
@@ -127,7 +142,16 @@ export default function ProductTabDetalhes({
       window.clearTimeout(alertTimerRef.current);
       alertTimerRef.current = null;
     }
+
+    // reseta refs dos horários
+    timeItemRefs.current = [];
   }, [data.id]);
+
+  useEffect(() => {
+    // atualiza “agora” com frequência suficiente pro “vigente” mudar sem recarregar
+    const id = window.setInterval(() => setNowTick((n) => n + 1), 15_000);
+    return () => window.clearInterval(id);
+  }, []);
 
   useEffect(() => {
     if (!canSlide) return;
@@ -305,7 +329,59 @@ export default function ProductTabDetalhes({
     };
   }, [data.calendar]);
 
-  const funcionamentoTimeCards = useMemo(() => buildHalfHourTimeCards(11, 0, 23, 0), []);
+  // ✅ Lista de horários: usa data.times se vier do backend; senão usa placeholder
+  const funcionamentoTimeCards = useMemo(() => {
+    const fromData = (data.times ?? [])
+      .map((t) => ({
+        time: String(t.time ?? '').trim(),
+        offLabel: String(t.offLabel ?? '').trim() || '-',
+        enabled: t.enabled !== false,
+      }))
+      .filter((t) => /^\d{1,2}:\d{2}$/.test(t.time));
+
+    if (fromData.length > 0) return fromData;
+    return buildHalfHourTimeCards(11, 0, 23, 0);
+  }, [data.times]);
+
+  // ✅ índice do horário vigente (ex: 16:33 -> 16:30)
+  const activeTimeIndex = useMemo(() => {
+    if (!funcionamentoTimeCards.length) return -1;
+
+    const d = new Date();
+    const nowMin = d.getHours() * 60 + d.getMinutes();
+
+    const mins = funcionamentoTimeCards.map((t) => toMinutes(t.time));
+
+    // último horário <= agora
+    let idx = -1;
+    for (let i = 0; i < mins.length; i++) {
+      if (Number.isFinite(mins[i]) && mins[i] <= nowMin) idx = i;
+    }
+
+    // antes do primeiro horário: pega o primeiro futuro
+    if (idx === -1) {
+      for (let i = 0; i < mins.length; i++) {
+        if (Number.isFinite(mins[i]) && mins[i] > nowMin) return i;
+      }
+      return 0;
+    }
+
+    return idx;
+  }, [funcionamentoTimeCards, nowTick, data.id]);
+
+  // ✅ rola automaticamente para o card vigente ficar aparente (centralizado)
+  useEffect(() => {
+    if (activeTimeIndex < 0) return;
+
+    const el = timeItemRefs.current[activeTimeIndex];
+    if (!el) return;
+
+    el.scrollIntoView({
+      behavior: 'smooth',
+      block: 'nearest',
+      inline: 'center',
+    });
+  }, [activeTimeIndex, data.id]);
 
   // ✅ EXCETOS: se não vier do backend, usa placeholder
   const exceptionsClean = useMemo(() => {
@@ -463,86 +539,93 @@ export default function ProductTabDetalhes({
               </button>
 
               {/* ✅ Balão do alerta (abre em cima do ícone) */}
-            {alertOpen ? (
+              {alertOpen ? (
                 <>
-                    {/* OVERLAY INVISÍVEL — fecha ao clicar em qualquer lugar */}
-                    <button
+                  {/* OVERLAY INVISÍVEL — fecha ao clicar em qualquer lugar */}
+                  <button
                     type="button"
                     aria-label="Fechar alerta"
                     className="fixed inset-0 z-[20] cursor-default"
                     onClick={closeAlertBubble}
-                    />
+                  />
 
-                    {/* BALÃO (fica acima do overlay) */}
-                    <div
+                  {/* BALÃO (fica acima do overlay) */}
+                  <div
                     className="absolute z-[30]"
                     style={{
-                        right: -128,
-                        bottom: '100%',
-                        marginBottom: -4,
+                      right: -128,
+                      bottom: '100%',
+                      marginBottom: -4,
                     }}
-                    >
+                  >
                     <div
-                        className={[
+                      className={[
                         'relative',
                         'w-[142px]',
                         'transition-[opacity,transform] ease-out',
                         `duration-[${ALERT_BUBBLE_ANIM_MS}ms]`,
-                        alertEntered
-                            ? 'opacity-100 translate-y-0 scale-100'
-                            : 'opacity-0 translate-y-3 scale-[0.98]',
-                        ].join(' ')}
+                        alertEntered ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-3 scale-[0.98]',
+                      ].join(' ')}
                     >
-                        {/* BALÃO — clicar nele também fecha */}
-                        <button
+                      {/* BALÃO — clicar nele também fecha */}
+                      <button
                         type="button"
                         onClick={closeAlertBubble}
                         className="block w-full rounded-[10px] border border-black/10 bg-white p-2 text-left text-[11px] text-zinc-700 shadow"
-                        >
+                      >
                         <div className="leading-tight">
-                            <div className="font-semibold">Alerta:</div>
-                            <div className="mt-0.5">
+                          <div className="font-semibold">Alerta:</div>
+                          <div className="mt-0.5">
                             O desconto oferecido é de acordo com o horário de sua chegada ao estabelecimento.
                             <br />
                             <br />
                             Para solicitar a conta, selecione nas abas abaixo o horário que você chegou no estabelecimento.
-                            </div>
+                          </div>
                         </div>
-                        </button>
+                      </button>
 
-                        {/* X externo */}
-                        <button
+                      {/* X externo */}
+                      <button
                         type="button"
                         onClick={closeAlertBubble}
                         aria-label="Fechar balão de alerta"
                         className={[
-                            'absolute',
-                            '-top-[30px]',
-                            '-right-[8px]',
-                            'grid h-10 w-10 place-items-center',
-                            'text-red-600',
-                            'active:scale-95',
+                          'absolute',
+                          '-top-[30px]',
+                          '-right-[8px]',
+                          'grid h-10 w-10 place-items-center',
+                          'text-red-600',
+                          'active:scale-95',
                         ].join(' ')}
-                        >
+                      >
                         <svg viewBox="0 0 24 24" width="22" height="22">
-                            <path
+                          <path
                             d="M6 6L18 18M18 6L6 18"
                             stroke="currentColor"
                             strokeWidth="3"
                             strokeLinecap="round"
-                            />
+                          />
                         </svg>
-                        </button>
+                      </button>
                     </div>
-                    </div>
+                  </div>
                 </>
-            ) : null}
+              ) : null}
             </div>
           </div>
 
-          <div className="mt-2 flex gap-2 overflow-x-auto pb-2">
-            {funcionamentoTimeCards.map((t) => (
-              <TimeCard key={t.time} time={t.time} offLabel={t.offLabel} enabled={t.enabled} />
+          {/* ✅ Carrossel de horários: destaque interno via TimeCard(active) */}
+          <div className="mt-2 flex gap-2 overflow-x-auto pb-2 scroll-px-3 px-1">
+            {funcionamentoTimeCards.map((t, i) => (
+              <div
+                key={`${t.time}-${i}`}
+                ref={(node) => {
+                  timeItemRefs.current[i] = node;
+                }}
+                className="shrink-0"
+              >
+                <TimeCard time={t.time} offLabel={t.offLabel} enabled={t.enabled} active={i === activeTimeIndex} />
+              </div>
             ))}
           </div>
 

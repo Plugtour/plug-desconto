@@ -76,7 +76,7 @@ function HeartIcon({ className, filled }: { className?: string; filled?: boolean
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill={filled ? 'currentColor' : 'none'}>
       <path
-        d="M12 21s-7-4.6-9.4-9.1C.7 8.2 2.2 5.6 4.9 4.8c1.7-.5 3.6.1 5 1.6L12 8.5l2.1-2.1c1.4-1.5 3.3-2.1 5-1.6 2.7.8 4.2 3.4 2.3 7.1C19 16.4 12 21 12 21Z"
+        d="M12 21C12 21 4 15.36 4 9.5C4 7.02 6.02 5 8.5 5C10.04 5 11.4 5.81 12 7C12.6 5.81 13.96 5 15.5 5C17.98 5 20 7.02 20 9.5C20 15.36 12 21 12 21Z"
         stroke="currentColor"
         strokeWidth="1.8"
         strokeLinejoin="round"
