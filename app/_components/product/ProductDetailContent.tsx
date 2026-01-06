@@ -49,6 +49,9 @@ type Props = {
   onClose: () => void;
 
   whatsappHref?: string | null;
+
+  // ✅ ADICIONADO: permite injetar o bloco de economia (ex: OfferEconomyLine)
+  economySlot?: React.ReactNode;
 };
 
 // balão: delay + animação suave
@@ -121,6 +124,9 @@ export default function ProductDetailContent({
   onToggleFavorite,
   onClose,
   whatsappHref = '#',
+
+  // ✅ ADICIONADO
+  economySlot,
 }: Props) {
   const [tab, setTab] = useState<'detalhes' | 'avaliacoes' | 'endereco'>(tabDefault);
   const bodyRef = useRef<HTMLDivElement | null>(null);
@@ -259,6 +265,9 @@ export default function ProductDetailContent({
               </button>
             </div>
           </div>
+
+          {/* ✅ Slot de economia (aparece logo abaixo do topo, sem mexer no resto) */}
+          {economySlot ? <div className="mt-2">{economySlot}</div> : null}
 
           <div className="mt-[10px] flex gap-2">
             <TabButton active={tab === 'detalhes'} onClick={() => setTab('detalhes')}>
