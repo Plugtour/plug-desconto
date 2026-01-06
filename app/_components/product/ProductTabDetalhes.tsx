@@ -4,7 +4,8 @@
 import React, { useEffect, useMemo, useRef, useState, useLayoutEffect } from 'react';
 import type { ProductModalData } from './ProductDetailContent';
 
-import { AccordionItem, CalendarBlock, ChevronYellow, SectionTitle, TimeCard } from './tabs/ProductDetailUI';
+import { AccordionItem, CalendarBlock, SectionTitle, TimeCard } from './tabs/ProductDetailUI';
+import TimedMediaCarousel from '@/app/_components/media/TimedMediaCarousel';
 
 // ✅ placeholder longo pra testar “Ver mais”
 const DETAILS_PREVIEW =
@@ -16,7 +17,6 @@ const DETAILS_MORE =
   'Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.';
 
 const SLIDE_DURATION_MS = 6500;
-const SLIDE_STEP_MS = 50;
 
 // ✅ balão de alerta (mesmo “jeito” do WhatsApp)
 const ALERT_BUBBLE_ANIM_MS = 520;
@@ -90,9 +90,6 @@ export default function ProductTabDetalhes({
   data: ProductModalData;
   economySlot?: React.ReactNode;
 }) {
-  const [idx, setIdx] = useState(0);
-  const [tick, setTick] = useState(0);
-
   // ✅ “Ver mais” do Detalhes (abre/fecha deslizando)
   const [detailsExpanded, setDetailsExpanded] = useState(false);
   const detailsMoreInnerRef = useRef<HTMLDivElement | null>(null);
@@ -130,13 +127,34 @@ export default function ProductTabDetalhes({
   const lastUserTouchTsRef = useRef<number>(0);
   const userTouchTimerRef = useRef<number | null>(null);
 
-  const media = data.media ?? [];
-  const canSlide = media.length > 1;
-  const active = media[idx];
+  // ✅ banner do produto (mesmo modelo da home: só imagens)
+const bannerMedia = useMemo(() => {
+  const normalized = (data.media ?? [])
+    .map((m: any) => ({
+      src: String(
+        m?.src ??
+        m?.url ??
+        m?.imageUrl ??
+        m?.image ??
+        ''
+      ).trim(),
+      alt: String(m?.alt ?? ''),
+    }))
+    .filter((m) => m.src.startsWith('/'));
+
+  // ✅ fallback AUTOMÁTICO usando seus banners locais
+  if (normalized.length === 0) {
+    return [
+      { src: '/banners/banner-1.webp', alt: 'Banner 1' },
+      { src: '/banners/banner-2.webp', alt: 'Banner 2' },
+      { src: '/banners/banner-3.webp', alt: 'Banner 3' },
+    ];
+  }
+
+  return normalized;
+}, [data.media]);
 
   useEffect(() => {
-    setIdx(0);
-    setTick(0);
     setDetailsExpanded(false);
     setOpenAcc(null);
 
@@ -172,35 +190,6 @@ export default function ProductTabDetalhes({
     const id = window.setInterval(() => setNowTick((n) => n + 1), 15_000);
     return () => window.clearInterval(id);
   }, []);
-
-  useEffect(() => {
-    if (!canSlide) return;
-
-    const id = window.setInterval(() => {
-      setTick((t) => {
-        const nextT = t + SLIDE_STEP_MS;
-        if (nextT >= SLIDE_DURATION_MS) {
-          setIdx((i) => (i + 1) % media.length);
-          return 0;
-        }
-        return nextT;
-      });
-    }, SLIDE_STEP_MS);
-
-    return () => window.clearInterval(id);
-  }, [canSlide, media.length]);
-
-  const progressPct = useMemo(() => {
-    if (!canSlide) return 100;
-    const pct = (tick / SLIDE_DURATION_MS) * 100;
-    return Math.max(0, Math.min(100, pct));
-  }, [tick, canSlide]);
-
-  function next() {
-    if (!media.length) return;
-    setTick(0);
-    setIdx((i) => (i + 1) % media.length);
-  }
 
   // mede altura do bloco “mais”
   useEffect(() => {
@@ -419,7 +408,6 @@ export default function ProductTabDetalhes({
       lastUserTouchTsRef.current = Date.now();
       if (userTouchTimerRef.current) window.clearTimeout(userTouchTimerRef.current);
       userTouchTimerRef.current = window.setTimeout(() => {
-        // só “libera” depois de um tempinho parado
         lastUserTouchTsRef.current = lastUserTouchTsRef.current; // noop
       }, USER_SCROLL_GUARD_MS);
     };
@@ -444,17 +432,13 @@ export default function ProductTabDetalhes({
   // ✅ Recentraliza quando o horário virar, mas sem atrapalhar se o usuário mexeu
   useEffect(() => {
     if (activeTimeIndex < 0) return;
-
-    // só faz isso depois do “center inicial”
     if (didCenterForIdRef.current !== data.id) return;
 
     const now = Date.now();
     const last = lastUserTouchTsRef.current || 0;
 
-    // se o usuário mexeu recentemente, não mexe
     if (now - last < USER_SCROLL_GUARD_MS) return;
 
-    // recenter suave (não é obrigatório, mas fica natural)
     centerTimeIndex(activeTimeIndex, 'smooth');
   }, [activeTimeIndex, data.id]);
 
@@ -469,54 +453,22 @@ export default function ProductTabDetalhes({
 
   return (
     <div ref={rootRef}>
-      {/* Banner alinhado */}
+      {/* Banner do produto (igual Home: rotação + swipe + progress + setas; sem coração/avião) */}
       <div className="mt-3">
         <div className="relative overflow-hidden rounded-none bg-zinc-200">
-          <div className="aspect-[16/9] w-full">
-            {active?.src ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={active.src} alt={active.alt ?? ''} className="h-full w-full object-cover" />
-            ) : (
-              <div className="h-full w-full" />
-            )}
-          </div>
-
-          {canSlide ? (
-            <div className="absolute left-0 right-0 top-0 h-[3px] bg-black/15">
-              <div
-                className="h-full bg-white/70"
-                style={{ width: `${progressPct}%`, transition: `width ${SLIDE_STEP_MS}ms linear` }}
-              />
-            </div>
-          ) : null}
-
-          {canSlide ? (
-            <>
-              <button
-                type="button"
-                onClick={next}
-                className="absolute right-2 top-1/2 -translate-y-1/2 grid h-10 w-10 place-items-center"
-                aria-label="Próximo"
-              >
-                <ChevronYellow dir="right" />
-              </button>
-
-              <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1.5">
-                {media.map((_, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => {
-                      setTick(0);
-                      setIdx(i);
-                    }}
-                    className={['h-2 w-2 rounded-full', i === idx ? 'bg-white' : 'bg-white/55'].join(' ')}
-                    aria-label={`Imagem ${i + 1}`}
-                  />
-                ))}
-              </div>
-            </>
-          ) : null}
+          <TimedMediaCarousel
+            media={bannerMedia}
+            className="w-full"
+            durationMs={SLIDE_DURATION_MS}
+            showProgress
+            showDots
+            showArrows
+            showNextButton={false}
+            showPauseButton={false}
+            homeOverlay
+            aspectClassName="aspect-[16/9]"
+            imageClassName="object-cover"
+          />
         </div>
       </div>
 
