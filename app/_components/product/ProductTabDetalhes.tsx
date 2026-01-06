@@ -85,10 +85,8 @@ type AccordionKey = 'valores' | 'economia' | 'duvidas' | 'regras';
 
 export default function ProductTabDetalhes({
   data,
-  economySlot,
 }: {
   data: ProductModalData;
-  economySlot?: React.ReactNode;
 }) {
   // ✅ “Ver mais” do Detalhes (abre/fecha deslizando)
   const [detailsExpanded, setDetailsExpanded] = useState(false);
@@ -128,31 +126,31 @@ export default function ProductTabDetalhes({
   const userTouchTimerRef = useRef<number | null>(null);
 
   // ✅ banner do produto (mesmo modelo da home: só imagens)
-const bannerMedia = useMemo(() => {
-  const normalized = (data.media ?? [])
-    .map((m: any) => ({
-      src: String(
-        m?.src ??
-        m?.url ??
-        m?.imageUrl ??
-        m?.image ??
-        ''
-      ).trim(),
-      alt: String(m?.alt ?? ''),
-    }))
-    .filter((m) => m.src.startsWith('/'));
+  const bannerMedia = useMemo(() => {
+    const normalized = (data.media ?? [])
+      .map((m: any) => ({
+        src: String(m?.src ?? m?.url ?? m?.imageUrl ?? m?.image ?? '').trim(),
+        alt: String(m?.alt ?? ''),
+      }))
+      // ✅ aceita imagens locais E externas (http/https)
+      .filter(
+        (m) =>
+          m.src.startsWith('/') ||
+          m.src.startsWith('http://') ||
+          m.src.startsWith('https://')
+      );
 
-  // ✅ fallback AUTOMÁTICO usando seus banners locais
-  if (normalized.length === 0) {
-    return [
-      { src: '/banners/banner-1.webp', alt: 'Banner 1' },
-      { src: '/banners/banner-2.webp', alt: 'Banner 2' },
-      { src: '/banners/banner-3.webp', alt: 'Banner 3' },
-    ];
-  }
+    // ✅ fallback AUTOMÁTICO usando seus banners locais
+    if (normalized.length === 0) {
+      return [
+        { src: '/banners/banner-1.webp', alt: 'Banner 1' },
+        { src: '/banners/banner-2.webp', alt: 'Banner 2' },
+        { src: '/banners/banner-3.webp', alt: 'Banner 3' },
+      ];
+    }
 
-  return normalized;
-}, [data.media]);
+    return normalized;
+  }, [data.media]);
 
   useEffect(() => {
     setDetailsExpanded(false);
@@ -280,7 +278,8 @@ const bannerMedia = useMemo(() => {
       while (cur) {
         const cs = window.getComputedStyle(cur);
         const oy = cs.overflowY;
-        const canScrollY = (oy === 'auto' || oy === 'scroll') && cur.scrollHeight > cur.clientHeight;
+        const canScrollY =
+          (oy === 'auto' || oy === 'scroll') && cur.scrollHeight > cur.clientHeight;
         if (canScrollY) return cur;
         cur = cur.parentElement;
       }

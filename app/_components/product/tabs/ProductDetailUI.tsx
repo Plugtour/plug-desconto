@@ -1,7 +1,7 @@
 // app/_components/product/tabs/ProductDetailUI.tsx
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ProductModalData } from '../ProductDetailContent';
 
 export function TabButton({
@@ -125,51 +125,161 @@ export function CalendarBlock({
           { key: 'dom', label: 'dom' },
         ];
 
-  // ✅ dia vigente (enfeite) — OPÇÃO 1: pill no header do dia + verde clarinho nos 2 blocos abaixo
   const todayKey = (() => {
     const map = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'] as const;
     return map[new Date().getDay()];
   })();
 
-  const activePillBg = '#17BA60';
-  const softGreen = 'rgba(23, 186, 96, 0.18)'; // 👈 verde bem clarinho pros 2 blocos (Dia/Noite)
+  const activeBg = '#17BA60';
+  const softGreen = 'rgba(23, 186, 96, 0.18)';
+
+  // refs para posicionar a seta entre "Noite" (coluna do dia) e "Hoje" (card final)
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const todayNightCellRef = useRef<HTMLDivElement | null>(null);
+  const todayHojeCellRef = useRef<HTMLDivElement | null>(null);
+
+  const [arrowPos, setArrowPos] = useState<{ left: number; top: number } | null>(null);
+
+  const computeArrow = () => {
+    const wrap = wrapRef.current;
+    const night = todayNightCellRef.current;
+    const hoje = todayHojeCellRef.current;
+    if (!wrap || !night || !hoje) return;
+
+    const wr = wrap.getBoundingClientRect();
+    const nr = night.getBoundingClientRect();
+    const hr = hoje.getBoundingClientRect();
+
+    // centro da coluna (X)
+    const centerX = nr.left + nr.width / 2;
+
+    // meio do “vão” entre Noite (embaixo) e Hoje (em cima)
+    const gapMidY = (nr.bottom + hr.top) / 2;
+
+    setArrowPos({
+      left: centerX - wr.left,
+      top: gapMidY - wr.top,
+    });
+  };
+
+  useLayoutEffect(() => {
+    computeArrow();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [todayKey, cal.nightRow]);
+
+  useEffect(() => {
+    const onResize = () => computeArrow();
+    window.addEventListener('resize', onResize);
+
+    const ro = new ResizeObserver(() => computeArrow());
+    if (wrapRef.current) ro.observe(wrapRef.current);
+
+    return () => {
+      window.removeEventListener('resize', onResize);
+      ro.disconnect();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className={noOuterBorder ? 'bg-transparent p-0' : 'rounded-[10px] border border-black/10 bg-zinc-100 p-2'}>
-      <div className="grid grid-cols-8 gap-1 text-center text-[12px] font-semibold text-zinc-700">
-        <div />
-
-        {/* Labels (dias) */}
-        {days.map((d) => {
-          const isToday = d.key === todayKey;
-
-          return (
+      <div ref={wrapRef} className="relative">
+        {/* ✅ seta apontando pra CIMA, entre Noite e Hoje (mesma cor do card "Hoje") */}
+        {arrowPos ? (
+          <div
+            className="pointer-events-none absolute z-[20]"
+            style={{
+              left: arrowPos.left,
+              top: arrowPos.top,
+              transform: 'translate(-50%,-50%)',
+            }}
+            aria-hidden="true"
+          >
             <div
-              key={d.key}
-              className={[
-                'py-1 text-white',
-                isToday ? 'rounded px-2' : 'rounded bg-zinc-500/70',
-              ].join(' ')}
-              style={isToday ? { backgroundColor: activePillBg } : undefined}
-              aria-current={isToday ? 'date' : undefined}
-              title={isToday ? 'Hoje' : undefined}
-            >
-              {d.label}
-            </div>
-          );
-        })}
+              className="h-0 w-0"
+              style={{
+                borderLeft: '7px solid transparent',
+                borderRight: '7px solid transparent',
+                borderBottom: `11px solid ${activeBg}`,
+                filter: 'drop-shadow(0 0px 0 rgba(0,0,0,0.12))',
+              }}
+            />
+          </div>
+        ) : null}
 
-        <div className="rounded bg-zinc-500/70 py-1 text-white">Dia</div>
-        {(cal.dayRow ?? []).slice(0, 7).map((ok, i) => {
-          const isTodayCol = days[i]?.key === todayKey;
-          return <Cell key={`d-${i}`} ok={ok} highlight={isTodayCol} highlightBg={softGreen} />;
-        })}
+        <div className="grid grid-cols-8 gap-1 text-center text-[12px] font-semibold text-zinc-700">
+          <div />
 
-        <div className="rounded bg-zinc-500/70 py-1 text-white">Noite</div>
-        {(cal.nightRow ?? []).slice(0, 7).map((ok, i) => {
-          const isTodayCol = days[i]?.key === todayKey;
-          return <Cell key={`n-${i}`} ok={ok} highlight={isTodayCol} highlightBg={softGreen} />;
-        })}
+          {/* Header (dias) */}
+          {days.map((d) => {
+            const isToday = d.key === todayKey;
+            return (
+              <div
+                key={d.key}
+                className={['rounded py-1 text-white', isToday ? '' : 'bg-zinc-500/70'].join(' ')}
+                style={isToday ? { backgroundColor: activeBg } : undefined}
+                aria-current={isToday ? 'date' : undefined}
+              >
+                {d.label}
+              </div>
+            );
+          })}
+
+          <div className="rounded bg-zinc-500/70 py-1 text-white">Dia</div>
+          {(cal.dayRow ?? []).slice(0, 7).map((ok, i) => {
+            const isTodayCol = days[i]?.key === todayKey;
+            return <Cell key={`d-${i}`} ok={ok} highlight={isTodayCol} highlightBg={softGreen} />;
+          })}
+
+          <div className="rounded bg-zinc-500/70 py-1 text-white">Noite</div>
+          {(cal.nightRow ?? []).slice(0, 7).map((ok, i) => {
+            const isTodayCol = days[i]?.key === todayKey;
+            return (
+              <Cell
+                key={`n-${i}`}
+                ok={ok}
+                highlight={isTodayCol}
+                highlightBg={softGreen}
+                elRef={
+                  isTodayCol
+                    ? (n) => {
+                        todayNightCellRef.current = n;
+                      }
+                    : null
+                }
+              />
+            );
+          })}
+
+          {/* "Hoje" no fim da coluna */}
+          <div />
+          {days.map((d) => {
+            const isToday = d.key === todayKey;
+            return (
+              <div
+                key={`h-${d.key}`}
+                ref={
+                  isToday
+                    ? (n) => {
+                        todayHojeCellRef.current = n;
+                      }
+                    : null
+                }
+                className={['rounded py-1', isToday ? 'text-white' : 'bg-transparent'].join(' ')}
+                style={isToday ? { backgroundColor: activeBg } : undefined}
+              >
+                <span
+                  className={[
+                    'block text-[11px] font-extrabold leading-none',
+                    isToday ? 'opacity-100' : 'opacity-0',
+                  ].join(' ')}
+                >
+                  Hoje
+                </span>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -179,13 +289,16 @@ export function Cell({
   ok,
   highlight = false,
   highlightBg = 'rgba(23, 186, 96, 0.18)',
+  elRef,
 }: {
   ok: boolean;
   highlight?: boolean;
   highlightBg?: string;
+  elRef?: React.Ref<HTMLDivElement>;
 }) {
   return (
     <div
+      ref={elRef}
       className="grid place-items-center rounded py-1"
       style={{ backgroundColor: highlight ? highlightBg : '#e4e4e7' }}
     >
@@ -220,7 +333,6 @@ export function TimeCard({
       <div className="text-[11px] font-semibold text-zinc-700">{time}</div>
       <div className="mt-0.5 text-[11px] font-extrabold text-red-500">{offLabel || '-'}</div>
 
-      {/* botão interno */}
       <button
         type="button"
         className={[

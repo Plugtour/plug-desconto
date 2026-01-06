@@ -130,6 +130,13 @@ export default function TimedMediaCarousel({
 
   const [active, setActive] = useState(0);
 
+  // ✅ se a lista mudar e o active ficar fora do range, corrige sem quebrar autoplay
+  useEffect(() => {
+    if (count <= 0) return;
+    if (active > count - 1) setActive(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [count]);
+
   // swipe/slide
   const [isDragging, setIsDragging] = useState(false);
   const [dragX, setDragX] = useState(0);
@@ -298,6 +305,7 @@ export default function TimedMediaCarousel({
   function startFadeTo(targetIndex: number) {
     if (isFading || isSlideAnimating) return;
     if (fadeTimerRef.current) window.clearTimeout(fadeTimerRef.current);
+    if (count <= 0) return;
 
     const safe = ((targetIndex % count) + count) % count;
     if (safe === active) return;

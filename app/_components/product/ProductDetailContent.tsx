@@ -1,7 +1,7 @@
 // app/_components/product/ProductDetailContent.tsx
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 import ProductTabDetalhes from './ProductTabDetalhes';
 import ProductTabAvaliacoes from './ProductTabAvaliacoes';
@@ -49,8 +49,6 @@ type Props = {
   onClose: () => void;
 
   whatsappHref?: string | null;
-
-  economySlot?: React.ReactNode;
 };
 
 // balão: delay + animação suave
@@ -123,7 +121,6 @@ export default function ProductDetailContent({
   onToggleFavorite,
   onClose,
   whatsappHref = '#',
-  economySlot,
 }: Props) {
   const [tab, setTab] = useState<'detalhes' | 'avaliacoes' | 'endereco'>(tabDefault);
   const bodyRef = useRef<HTMLDivElement | null>(null);
@@ -278,7 +275,7 @@ export default function ProductDetailContent({
 
         {/* Conteúdo (separado em arquivos) */}
         {tab === 'detalhes' ? (
-          <ProductTabDetalhes data={data} economySlot={economySlot} />
+          <ProductTabDetalhes data={data} />
         ) : tab === 'avaliacoes' ? (
           <ProductTabAvaliacoes />
         ) : (
