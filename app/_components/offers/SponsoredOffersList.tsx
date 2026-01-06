@@ -2,17 +2,18 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState, useLayoutEffect } from 'react';
-import Link from 'next/link';
 import type { SponsoredOffer } from '../../../_data/sponsoredOffers';
 import OfferEconomyLine from './OfferEconomyLine';
 
-// ✅ Modal 2 (cópia idêntica do Modal 1 — por enquanto)
+// ✅ Modal (sheet)
 import MenuCarouselModalRight from '@/app/_components/modals/MenuCarouselModalRight';
+
+// ✅ Modal padrão “modelo”
+import ProductDetailContent, { type ProductModalData } from '@/app/_components/product/ProductDetailContent';
 
 import {
   getFavorites,
   onFavoritesChange,
-  isFavorite,
   toggleFavorite,
   type FavoriteItem,
 } from '@/app/_components/favorites/favoritesStore';
@@ -112,8 +113,7 @@ function HeartIcon({ filled, className }: { filled: boolean; className?: string 
 }
 
 /* =========================
-   ✅ FAVORITOS: map (igual ao arquivo que funciona)
-   - Isso força a hidratação do store via getFavorites()
+   ✅ FAVORITOS: map (hidrata via getFavorites)
 ========================= */
 function buildFavMapFromStore(): Record<string, boolean> {
   const list = getFavorites?.() ?? [];
@@ -143,12 +143,7 @@ function TempImagePlaceholder() {
           strokeWidth="2"
           strokeLinejoin="round"
         />
-        <path
-          d="M8 11.5l2.2 2.2L14.2 9.7 20 15.5"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinejoin="round"
-        />
+        <path d="M8 11.5l2.2 2.2L14.2 9.7 20 15.5" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
         <path d="M9 9.2a.9.9 0 1 0 0-1.8.9.9 0 0 0 0 1.8Z" stroke="currentColor" strokeWidth="2" />
       </svg>
     </div>
@@ -325,20 +320,15 @@ export default function SponsoredOffersList({
   /* =========================
      ✅ FAVORITOS (store real)
   ========================= */
-  const [favoritesVersion, setFavoritesVersion] = useState(0);
-
-  // ✅ NOVO: mapa de ids para renderizar o coração SEM depender do isFavorite “cru”
   const [favIds, setFavIds] = useState<Record<string, boolean>>({});
 
   useLayoutEffect(() => {
     const sync = () => {
-      // ✅ importante: força a hidratação do store (localStorage -> memória)
       try {
         setFavIds(buildFavMapFromStore());
       } catch {
         setFavIds({});
       }
-      setFavoritesVersion((v) => v + 1);
     };
 
     sync();
@@ -349,7 +339,6 @@ export default function SponsoredOffersList({
     };
   }, []);
 
-  // Mantive sua função, mas agora a UI lê do favIds (mais confiável pós-F5)
   const isFavId = (id: any) => !!favIds[String(id ?? '').trim()];
 
   const toggleFavFromOffer = (offer: SponsoredOffer) => {
@@ -375,15 +364,16 @@ export default function SponsoredOffersList({
     };
 
     toggleFavorite(fav);
-    // store emite mudança; o effect acima recalcula favIds e re-renderiza
   };
 
   function openModal(item?: SponsoredOffer) {
     if (item) setSelected(item);
     setModalOpen(true);
   }
+
   function closeModal() {
     setModalOpen(false);
+    setSelected(null);
   }
 
   useMemo(() => {
@@ -486,9 +476,6 @@ export default function SponsoredOffersList({
 
   const showTitle = !!title && title.trim().length > 0;
 
-  const needsStickySpacer = total <= 6;
-  const spacerHeight = `90vh`;
-
   const listTopRef = useRef<HTMLDivElement | null>(null);
   const [filterIsStuck, setFilterIsStuck] = useState(false);
 
@@ -567,114 +554,55 @@ export default function SponsoredOffersList({
   }, [active, total]);
 
   /* =========================
-     MODAL CONTENT
+     ✅ MODAL CONTENT PADRÃO (igual patrocinado)
   ========================= */
   const modalContent = useMemo(() => {
-    // força recalcular quando favoritos mudarem
-    void favoritesVersion;
+    if (!selected) return <div className="p-2" />;
 
-    const item = selected;
-    if (!item) return <div className="px-4 pb-6" />;
+    const o: any = selected as any;
+    const id = String(o.id ?? '');
+    const isFav = isFavId(id);
 
-    const o: any = item as any;
-
-    const tagsLine = buildTags(item);
-    const rating = o.rating ?? 4.8;
-    const reviews = o.reviews ?? 0;
+    const tagsLine = buildTags(selected);
+    const rating = Number(o.rating ?? 4.8);
+    const reviews = Number(o.reviews ?? 0);
     const imageUrl = o.imageUrl ?? null;
-    const isFav = isFavId(o.id);
     const hrefSafe = safeHref(o.href);
 
+    const data: ProductModalData = {
+      id,
+      title: String(o.title ?? ''),
+      headline: String(o.headline ?? tagsLine ?? ''),
+      vendorName: String(o.vendorName ?? o.title ?? ''),
+      vendorAbout: String(o.vendorAbout ?? o.detailsHtml ?? o.subtitle ?? ''),
+
+      media: imageUrl ? [{ src: imageUrl, alt: String(o.title ?? '') }] : [],
+      addressText: String(o.address?.text ?? o.addressText ?? ''),
+
+      rating,
+      reviews,
+
+      savingsText: o.savingsText ?? null,
+      priceText: o.priceText ?? null,
+
+      calendar: o.calendar ?? null,
+      times: o.times ?? null,
+      exceptions: o.exceptions ?? null,
+    };
+
     return (
-      <div className="h-full flex flex-col">
-        <div className="px-4 pt-3 pb-4">
-          <div className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-black/15" />
-          <div className="text-[14px] font-semibold text-black">Detalhes</div>
-          <div className="mt-1 text-[13px] text-black/60">Veja mais informações deste item.</div>
-        </div>
-
-        <div className="px-4 pb-5 flex-1 overflow-hidden">
-          <div className="h-full overflow-auto">
-            <div className="relative rounded-xl bg-white/90 ring-1 ring-black/10 overflow-hidden">
-              <div className="relative">
-                <div className="p-3">
-                  <div className="flex gap-3">
-                    <div className="h-[106px] w-[106px] flex-none overflow-hidden rounded-md bg-zinc-200">
-                      {imageUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={imageUrl} alt={o.title} className="h-full w-full object-cover" loading="lazy" />
-                      ) : (
-                        <TempImagePlaceholder />
-                      )}
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                      <div className="pr-[41px] text-[12px] font-extrabold leading-snug text-zinc-900 line-clamp-2">{o.title}</div>
-
-                      <div className="mt-[4px]">
-                        <div className="text-[12px] text-zinc-500 line-clamp-1">{tagsLine}</div>
-                        <OfferEconomyLine savingsText={o.savingsText ?? null} priceText={o.priceText ?? null} />
-                      </div>
-
-                      <div className="mt-1.5 flex items-end justify-between">
-                        <div>
-                          <StarsRow rating={Number(rating)} />
-                          <div className="-mt-0.5 text-[12px] text-zinc-500">
-                            <span className="font-semibold text-zinc-700">{Number(rating).toFixed(1)}</span> de{' '}
-                            <span className="font-semibold text-zinc-700">{reviews}</span> avaliações
-                          </div>
-                        </div>
-
-                        <span className="text-[14px] font-semibold text-green-600">Ver mais</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    aria-label={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      toggleFavFromOffer(item);
-                    }}
-                    className="absolute -right-[4px] top-1 inline-flex h-10 w-10 items-center justify-center"
-                  >
-                    <HeartIcon
-                      filled={isFav}
-                      className={['h-9 w-9 transition', isFav ? 'text-red-500' : 'text-zinc-300 hover:text-zinc-400'].join(' ')}
-                    />
-                  </button>
-                </div>
-
-                <div className="mx-2 border-b border-dotted border-zinc-300" />
-              </div>
-
-              <div className="p-3 grid grid-cols-2 gap-2">
-                <Link
-                  href={hrefSafe}
-                  onClick={() => setModalOpen(false)}
-                  className="rounded-md bg-emerald-600 px-3 py-2 text-center text-[13px] font-semibold text-white shadow-sm hover:bg-emerald-700"
-                >
-                  Ir para oferta
-                </Link>
-
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  className="rounded-md bg-white px-3 py-2 text-center text-[13px] font-semibold text-black ring-1 ring-black/10 hover:bg-black/5"
-                >
-                  Fechar
-                </button>
-              </div>
-            </div>
-
-            <div className="h-4" />
-          </div>
-        </div>
-      </div>
+      <ProductDetailContent
+        data={data}
+        isFavorite={isFav}
+        onToggleFavorite={() => {
+          toggleFavFromOffer(selected);
+        }}
+        onClose={closeModal}
+        economySlot={<OfferEconomyLine savingsText={o.savingsText ?? null} priceText={o.priceText ?? null} />}
+        whatsappHref={o.whatsappHref ?? '#'}
+      />
     );
-  }, [selected, favoritesVersion, favIds]);
+  }, [selected, favIds]);
 
   return (
     <section className={['w-full', className || ''].join(' ')}>
@@ -698,11 +626,19 @@ export default function SponsoredOffersList({
               Todos
             </FilterChip>
 
-            <FilterChip iconKind="melhores" isActive={active === 'melhores'} onClick={() => setActivePreserveScroll('melhores')}>
+            <FilterChip
+              iconKind="melhores"
+              isActive={active === 'melhores'}
+              onClick={() => setActivePreserveScroll('melhores')}
+            >
               Melhores avaliados
             </FilterChip>
 
-            <FilterChip iconKind="descontos" isActive={active === 'descontos'} onClick={() => setActivePreserveScroll('descontos')}>
+            <FilterChip
+              iconKind="descontos"
+              isActive={active === 'descontos'}
+              onClick={() => setActivePreserveScroll('descontos')}
+            >
               Maiores descontos
             </FilterChip>
 
@@ -710,7 +646,11 @@ export default function SponsoredOffersList({
               Novo
             </FilterChip>
 
-            <FilterChip iconKind="aberto" isActive={active === 'aberto'} onClick={() => setActivePreserveScroll('aberto')}>
+            <FilterChip
+              iconKind="aberto"
+              isActive={active === 'aberto'}
+              onClick={() => setActivePreserveScroll('aberto')}
+            >
               Aberto agora
             </FilterChip>
 
@@ -718,7 +658,11 @@ export default function SponsoredOffersList({
               Perto de mim
             </FilterChip>
 
-            <FilterChip iconKind="delivery" isActive={active === 'delivery'} onClick={() => setActivePreserveScroll('delivery')}>
+            <FilterChip
+              iconKind="delivery"
+              isActive={active === 'delivery'}
+              onClick={() => setActivePreserveScroll('delivery')}
+            >
               Delivery
             </FilterChip>
           </div>
@@ -751,8 +695,6 @@ export default function SponsoredOffersList({
         ) : (
           <>
             {visibleItems.map((item, idx) => {
-              void favoritesVersion;
-
               const o: any = item as any;
 
               const isFav = isFavId(o.id);
@@ -785,7 +727,9 @@ export default function SponsoredOffersList({
                       </div>
 
                       <div className="min-w-0 flex-1">
-                        <div className="pr-[41px] text-[12px] font-extrabold leading-snug text-zinc-900 line-clamp-2">{o.title}</div>
+                        <div className="pr-[41px] text-[12px] font-extrabold leading-snug text-zinc-900 line-clamp-2">
+                          {o.title}
+                        </div>
 
                         <div className="mt-[4px]">
                           <div className="text-[12px] text-zinc-500 line-clamp-1">{tagsLine}</div>
@@ -834,7 +778,10 @@ export default function SponsoredOffersList({
                     >
                       <HeartIcon
                         filled={isFav}
-                        className={['h-9 w-9 transition', isFav ? 'text-red-500' : 'text-zinc-300 hover:text-zinc-400'].join(' ')}
+                        className={[
+                          'h-9 w-9 transition',
+                          isFav ? 'text-red-500' : 'text-zinc-300 hover:text-zinc-400',
+                        ].join(' ')}
                       />
                     </button>
                   </div>

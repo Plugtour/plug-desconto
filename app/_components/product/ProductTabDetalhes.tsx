@@ -446,7 +446,7 @@ const bannerMedia = useMemo(() => {
   const exceptionsClean = useMemo(() => {
     const base = (data.exceptions ?? []).map((x) => (x ?? '').trim()).filter(Boolean);
     if (base.length > 0) return base;
-    return ['Natal', 'Ano Novo', 'Páscoa', '24/12, 25/12, 31/12 e 01/01'];
+    return ['24/12, 25/12, 31/12 e 01/01'];
   }, [data.exceptions]);
 
   const hasExceptions = exceptionsClean.length > 0;
@@ -702,8 +702,6 @@ const bannerMedia = useMemo(() => {
           </div>
         </div>
       </div>
-
-      {economySlot ? <div className="mt-3">{economySlot}</div> : null}
     </div>
   );
 }

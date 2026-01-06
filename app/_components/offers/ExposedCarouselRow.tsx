@@ -4,11 +4,15 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 
-// ✅ Modal 2 (por enquanto idêntico ao Modal 1)
+// ✅ Modal 2 (bottom sheet)
 import MenuCarouselModalRight from '../modals/MenuCarouselModalRight';
 
 // ✅ store global de favoritos
 import { getFavorites, onFavoritesChange, toggleFavorite } from '../favorites/favoritesStore';
+
+// ✅ mesmo conteúdo de modal dos patrocinados
+import ProductDetailContent, { type ProductModalData } from '@/app/_components/product/ProductDetailContent';
+import OfferEconomyLine from '@/app/_components/offers/OfferEconomyLine';
 
 export type ExposedCarouselItem = {
   id: string;
@@ -18,6 +22,17 @@ export type ExposedCarouselItem = {
   savingsText?: string | null;
   rating?: number | null;
   reviews?: number | null;
+
+  // opcionais (se já existir no seu data depois)
+  priceText?: string | null;
+  vendorName?: string | null;
+  vendorAbout?: string | null;
+  addressText?: string | null;
+  whatsappHref?: string | null;
+
+  calendar?: ProductModalData['calendar'] | null;
+  times?: ProductModalData['times'] | null;
+  exceptions?: ProductModalData['exceptions'] | null;
 };
 
 type Props = {
@@ -35,6 +50,13 @@ type Props = {
 function safeHref(v: any) {
   const s = typeof v === 'string' ? v.trim() : '';
   return s.length ? s : '/';
+}
+
+function isAllowedMediaSrc(src: string) {
+  const s = String(src || '').trim();
+  // ✅ garante que o banner funcione mesmo com seu filtro atual no ProductTabDetalhes (que aceita apenas "/")
+  // Se você já corrigiu o filtro lá pra aceitar https/http, isso também continua funcionando.
+  return s.startsWith('/') || s.startsWith('http://') || s.startsWith('https://');
 }
 
 /* =========================
@@ -126,7 +148,6 @@ export default function ExposedCarouselRow({
   void categoryCount;
 
   const [favIds, setFavIds] = useState<Record<string, boolean>>({});
-
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [hideViewRank, setHideViewRank] = useState(false);
 
@@ -174,108 +195,77 @@ export default function ExposedCarouselRow({
     setSelectedItem(null);
   };
 
+  // ✅ Modal com o MESMO conteúdo/padrão do patrocinado (ProductDetailContent)
   const modalContent = useMemo(() => {
-    if (!selectedItem) return <div className="px-4 pb-6" />;
+    if (!selectedItem) return <div className="p-2" />;
 
-    const id = String(selectedItem.id ?? '');
+    const o: any = selectedItem as any;
+    const id = String(o.id ?? '');
     const isFav = !!favIds[id];
 
-    const rating = Number(selectedItem.rating ?? 4.8);
-    const reviews = Number(selectedItem.reviews ?? 0);
-    const savings = selectedItem.savingsText ?? null;
-    const imageUrl = selectedItem.imageUrl ?? null;
-    const hrefSafe = safeHref(selectedItem.href);
+    const rating = Number(o.rating ?? 4.8);
+    const reviews = Number(o.reviews ?? 0);
+    const hrefSafe = safeHref(o.href);
+    const imageUrl = o.imageUrl ?? null;
+
+    // ✅ garante banner rotativo (>= 3 slides)
+    // - se a imagem do item for válida, entra também
+    // - sempre inclui banners locais
+    const mediaList = [
+      ...(imageUrl && isAllowedMediaSrc(String(imageUrl)) ? [{ src: String(imageUrl), alt: String(o.title ?? '') }] : []),
+      { src: '/banners/banner-1.webp', alt: 'Banner 1' },
+      { src: '/banners/banner-2.webp', alt: 'Banner 2' },
+      { src: '/banners/banner-3.webp', alt: 'Banner 3' },
+    ];
+
+    const data: ProductModalData = {
+      id,
+      title: String(o.title ?? ''),
+      headline: String(categoryLabel ?? ''),
+      vendorName: String((o.vendorName ?? '').trim() || o.title || ''),
+      vendorAbout: String((o.vendorAbout ?? '').trim() || ''),
+      media: mediaList,
+      addressText: String((o.addressText ?? '').trim() || ''),
+      rating,
+      reviews,
+      savingsText: o.savingsText ?? null,
+      priceText: o.priceText ?? null,
+      calendar: o.calendar ?? null,
+      times: o.times ?? null,
+      exceptions: o.exceptions ?? null,
+    };
 
     return (
-      <div className="px-4 pb-6">
-        {/* Imagem */}
-        <div className="overflow-hidden rounded-md bg-zinc-200">
-          <div className="aspect-[16/10] w-full">
-            {imageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={imageUrl} alt={selectedItem.title} className="h-full w-full object-cover" loading="lazy" />
-            ) : (
-              <div className="h-full w-full bg-zinc-300" />
-            )}
-          </div>
-        </div>
-
-        {/* Título + Favoritar */}
-        <div className="mt-3 flex items-start gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="text-[14px] font-extrabold leading-snug text-zinc-900">{selectedItem.title}</div>
-            <div className="mt-1 text-[12px] text-zinc-500">{categoryLabel}</div>
-          </div>
-
-          <button
-            type="button"
-            aria-label={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
-            onClick={() => {
-              toggleFavorite?.({
-                id,
-                title: selectedItem.title ?? '',
-                imageUrl: imageUrl ?? null,
-                href: hrefSafe,
-                savingsText: selectedItem.savingsText ?? null,
-                rating: selectedItem.rating ?? null,
-                reviews: selectedItem.reviews ?? null,
-                categoryLabel,
-              } as any);
-            }}
-            className="shrink-0 inline-flex h-10 w-10 items-center justify-center rounded-md bg-white/80 ring-1 ring-black/10 active:scale-[0.99]"
-          >
-            <HeartIcon
-              filled={isFav}
-              className={['h-7 w-7', isFav ? 'text-red-500' : 'text-zinc-300 hover:text-zinc-400'].join(' ')}
-            />
-          </button>
-        </div>
-
-        {/* Economia */}
-        {savings ? <div className="mt-2 text-[12px] font-medium text-zinc-900 leading-[1.2]">{savings}</div> : null}
-
-        {/* Avaliações */}
-        <div className="mt-2">
-          <StarsRow rating={rating} />
-          <div className="-mt-0.5 text-[12px] text-zinc-500">
-            <span className="font-semibold text-zinc-700">{Number(rating).toFixed(1)}</span> de{' '}
-            <span className="font-semibold text-zinc-700">{reviews}</span>
-          </div>
-        </div>
-
-        {/* Ações */}
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <Link
-            href={hrefSafe}
-            onClick={() => setDrawerOpen(false)}
-            className="rounded-md bg-emerald-600 px-3 py-2 text-center text-[13px] font-semibold text-white shadow-sm hover:bg-emerald-700"
-          >
-            Ir para oferta
-          </Link>
-
-          <button
-            type="button"
-            onClick={closeModal}
-            className="rounded-md bg-white px-3 py-2 text-[13px] font-semibold text-black ring-1 ring-black/10 hover:bg-black/5"
-          >
-            Fechar
-          </button>
-        </div>
-      </div>
+      <ProductDetailContent
+        data={data}
+        isFavorite={isFav}
+        onToggleFavorite={() => {
+          toggleFavorite?.({
+            id,
+            title: o.title ?? '',
+            href: hrefSafe,
+            imageUrl: imageUrl ?? null,
+            subtitle: categoryLabel ?? null,
+            city: null,
+            priceText: o.priceText ?? null,
+            savingsText: o.savingsText ?? null,
+            rating: o.rating ?? null,
+            reviews: o.reviews ?? null,
+            tags: null,
+            categoryLabel: categoryLabel ?? null,
+          } as any);
+        }}
+        onClose={closeModal}
+        economySlot={<OfferEconomyLine savingsText={o.savingsText ?? null} priceText={o.priceText ?? null} />}
+        whatsappHref={o.whatsappHref ?? '#'}
+      />
     );
   }, [selectedItem, favIds, categoryLabel]);
 
   return (
     <section className={className}>
-      {/* ✅ Modal 2 (substitui RightDrawerModal) */}
+      {/* ✅ Modal 2 */}
       <MenuCarouselModalRight open={drawerOpen} onClose={closeModal} hideHeader>
-        {/* Cabeçalho equivalente ao title/subtitle do RightDrawerModal */}
-        <div className="px-4 pt-3 pb-2">
-          <div className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-black/15" />
-          <div className="text-[14px] font-semibold text-black">Detalhes</div>
-          <div className="mt-1 text-[13px] text-black/60">{categoryLabel}</div>
-        </div>
-
         {modalContent}
       </MenuCarouselModalRight>
 
@@ -301,7 +291,6 @@ export default function ExposedCarouselRow({
           const rating = item.rating ?? 4.8;
           const reviews = item.reviews ?? 812;
           const savings = item.savingsText ?? 'Economia de R$30 a R$90';
-
           const isFav = !!favIds[item.id];
 
           return (
@@ -347,14 +336,19 @@ export default function ExposedCarouselRow({
                 >
                   <HeartIcon
                     filled={isFav}
-                    className={['h-9 w-9 transition', isFav ? 'text-red-500' : 'text-zinc-300 hover:text-zinc-400'].join(' ')}
+                    className={[
+                      'h-9 w-9 transition',
+                      isFav ? 'text-red-500' : 'text-zinc-300 hover:text-zinc-400',
+                    ].join(' ')}
                   />
                 </button>
               </div>
 
               {/* TEXTO */}
               <div className="bg-zinc-200 px-4 py-3">
-                <div className="min-h-[36px] text-[13px] font-extrabold leading-[1.25] text-zinc-900 line-clamp-2">{item.title}</div>
+                <div className="min-h-[36px] text-[13px] font-extrabold leading-[1.25] text-zinc-900 line-clamp-2">
+                  {item.title}
+                </div>
 
                 <div className="mt-3">
                   <div className="text-[12px] font-normal text-zinc-600 leading-[1.2]">{categoryLabel}</div>
