@@ -1,3 +1,4 @@
+// app/_components/menu/MenuCarouselModal.tsx
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -12,10 +13,8 @@ type Props = {
   categoryCount?: number | null;
   title?: string;
 
-  // permite reutilizar o modal em outros contextos (ex: busca / destinos)
   children?: React.ReactNode;
 
-  // para casos como Busca/Destinos, onde não queremos cabeçalho de categoria
   hideHeader?: boolean;
 };
 
@@ -30,24 +29,20 @@ export default function MenuCarouselModal({
 }: Props) {
   useLockBodyScroll(open);
 
-  // ✅ (AJUSTE) controla a animação de entrada
   const [entered, setEntered] = useState(false);
 
   useEffect(() => {
     if (!open) {
-      // quando fechar: volta pro estado "fora" pra animar saída
       setEntered(false);
       return;
     }
 
-    // quando abrir: começa "fora" e no próximo frame vai para "dentro"
     setEntered(false);
 
     const r1 = requestAnimationFrame(() => {
       const r2 = requestAnimationFrame(() => {
         setEntered(true);
       });
-      // cleanup do r2
       return () => cancelAnimationFrame(r2);
     });
 
@@ -66,8 +61,7 @@ export default function MenuCarouselModal({
   const MODAL_TOP_OFFSET = 'calc(env(safe-area-inset-top) + 20px + 6px)';
   const GAP_BETWEEN_BUTTON_AND_MODAL = 6;
 
-  // respiro lateral
-  const SIDE_GUTTER_PX = 6;
+  const SIDE_GUTTER_PX = 10;
 
   const countText = typeof categoryCount === 'number' ? `${categoryCount} produtos` : '';
 
@@ -87,20 +81,14 @@ export default function MenuCarouselModal({
           ].join(' ')}
         />
 
-        {/* ✅ (AJUSTE) transform usa "entered" para animar a abertura */}
         <div
           className="fixed left-0 right-0 bottom-0 z-[230]"
           style={{
             top: MODAL_TOP_OFFSET,
-
-            // 🔥 AQUI é a linha principal ajustada:
             transform: entered ? 'translateY(0%)' : 'translateY(110%)',
-
             transitionProperty: 'transform',
             transitionDuration: entered ? '560ms' : '520ms',
-            transitionTimingFunction: entered
-              ? 'cubic-bezier(0.16, 1, 0.3, 1)' // entrada bem suave
-              : 'cubic-bezier(0.4, 0, 0.2, 1)', // saída natural
+            transitionTimingFunction: entered ? 'cubic-bezier(0.16, 1, 0.3, 1)' : 'cubic-bezier(0.4, 0, 0.2, 1)',
           }}
           role="dialog"
           aria-modal="true"
@@ -112,7 +100,7 @@ export default function MenuCarouselModal({
               paddingRight: SIDE_GUTTER_PX,
             }}
           >
-            {/* BOTÃO FECHAR — alinhado à esquerda */}
+            {/* BOTÃO FECHAR */}
             <div className="relative pt-1 flex justify-start">
               <div className="w-full flex justify-start pl-0">
                 <button
@@ -156,14 +144,13 @@ export default function MenuCarouselModal({
                 </div>
               )}
 
-              {/* ✅ Conteúdo reutilizável + rolagem segura */}
+              {/* ✅ AQUI: zera as vars do topo só dentro do modal (isso sobe o filtro sticky) */}
               <div
-                className={[
-                  'h-full',
-                  'flex flex-col',
-                  // ✅ ÚNICO AJUSTE: remove padding automático quando hideHeader=true
-                  hideHeader ? 'overflow-auto' : 'overflow-auto',
-                ].join(' ')}
+                className={['h-full', 'flex flex-col', 'overflow-auto'].join(' ')}
+                style={{
+                  ['--app-header-h' as any]: '0px',
+                  ['--sticky-stack-h' as any]: '0px',
+                }}
               >
                 {children ?? <div className="px-4 pb-6" />}
               </div>

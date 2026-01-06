@@ -20,6 +20,8 @@ import { EXPOSED_GASTRONOMY } from '../../_data/exposedOffers';
 import BottomNav from './bottom-nav/BottomNav';
 import { BOTTOM_NAV_ITEMS } from './bottom-nav/items';
 
+import type { SponsoredOffer } from '../../_data/sponsoredOffers';
+
 type OfferLike = any;
 
 type IconKey =
@@ -38,6 +40,74 @@ type CategoryItem = {
   count: number;
   iconKey: IconKey;
 };
+
+function norm(v: any) {
+  return typeof v === 'string' ? v.trim() : '';
+}
+
+function safeNumber(v: any, fallback = 0) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function safeHref(v: any) {
+  const s = norm(v);
+  return s.length ? s : '/';
+}
+
+/** Mapeia "offers" genérico -> SponsoredOffer (o formato que o SponsoredOffersList usa) */
+function mapToSponsoredOffer(o: any, fallbackCategoryTitle: string): SponsoredOffer {
+  const id = norm(o?.id ?? o?._id) || `tmp-${Math.random().toString(16).slice(2)}`;
+  const title = norm(o?.title ?? o?.name ?? o?.nome ?? o?.titulo) || 'Benefício';
+
+  const slug = norm(o?.slug ?? o?.seoSlug ?? o?.slugId);
+  const href = safeHref(o?.href ?? (slug ? `/beneficio/${encodeURIComponent(slug)}` : o?.link ?? '/'));
+
+  const imageUrl = norm(o?.imageUrl ?? o?.image ?? o?.cover ?? o?.coverImage ?? o?.banner) || null;
+
+  const rating = safeNumber(o?.rating ?? o?.nota ?? o?.stars, 4.7);
+  const reviews = safeNumber(o?.reviews ?? o?.reviewsCount ?? o?.avaliacoes, 320);
+
+  const savingsText = o?.savingsText ?? o?.economyText ?? o?.economizeText ?? null;
+  const priceText = o?.priceText ?? o?.precoTexto ?? o?.discountText ?? o?.desconto ?? '20%';
+
+  const city = norm(o?.city ?? o?.cidade) || null;
+
+  const tags =
+    Array.isArray(o?.tags) && o.tags.length
+      ? o.tags
+      : [city || 'Serra Gaúcha', fallbackCategoryTitle, 'Top'];
+
+  // campos extras opcionais que seu ProductDetailContent tenta ler
+  const vendorName = o?.vendorName ?? o?.parceiro ?? o?.partnerName ?? null;
+  const vendorAbout = o?.vendorAbout ?? o?.description ?? o?.descricao ?? o?.shortDescription ?? null;
+
+  return {
+    id,
+    title,
+    href,
+    imageUrl,
+    rating,
+    reviews,
+    savingsText,
+    priceText,
+
+    // opcional/extra
+    tags,
+    city,
+    vendorName,
+    vendorAbout,
+    subtitle: o?.subtitle ?? o?.subTitle ?? null,
+
+    // se tiver no backend, já passa:
+    whatsappHref: o?.whatsappHref ?? null,
+    address: o?.address ?? null,
+    addressText: o?.addressText ?? null,
+    calendar: o?.calendar ?? null,
+    times: o?.times ?? null,
+    exceptions: o?.exceptions ?? null,
+  } as any;
+}
 
 export default function HomeScreenClient({
   regionLabel = 'Serra Gaúcha',
@@ -73,20 +143,21 @@ export default function HomeScreenClient({
      MODAL (Categorias)
   ========================= */
   const [menuModalOpen, setMenuModalOpen] = useState(false);
+  const [menuModalCategoryId, setMenuModalCategoryId] = useState<string>('');
   const [menuModalCategoryName, setMenuModalCategoryName] = useState<string>('');
   const [menuModalCategoryCount, setMenuModalCategoryCount] = useState<number>(0);
 
-  const openMenuModal = () => setMenuModalOpen(true);
   const closeMenuModal = () => setMenuModalOpen(false);
 
   const handleCategoryClick = (cat: CategoryItem) => {
+    setMenuModalCategoryId(cat?.id ?? '');
     setMenuModalCategoryName(cat?.title ?? '');
     setMenuModalCategoryCount(Number(cat?.count ?? 0));
-    openMenuModal();
+    setMenuModalOpen(true);
   };
 
   /* =========================
-     ✅ NOVO: MODAL (Busca rápida)
+     MODAL (Busca rápida)
   ========================= */
   const [searchModalOpen, setSearchModalOpen] = useState(false);
   const openSearchModal = () => setSearchModalOpen(true);
@@ -167,9 +238,7 @@ export default function HomeScreenClient({
         if (!id || !title) return null;
 
         const subtitle =
-          (o?.subtitle ?? o?.subTitle ?? o?.descricaoCurta ?? o?.shortDescription ?? null) as
-            | string
-            | null;
+          (o?.subtitle ?? o?.subTitle ?? o?.descricaoCurta ?? o?.shortDescription ?? null) as string | null;
 
         const categoryId =
           (o?.categoryId ?? o?.category ?? o?.categoriaId ?? null) as string | null;
@@ -177,14 +246,10 @@ export default function HomeScreenClient({
         const city = (o?.city ?? o?.cidade ?? o?.locationCity ?? null) as string | null;
 
         const priceText =
-          (o?.priceText ?? o?.precoTexto ?? o?.price_label ?? o?.priceLabel ?? null) as
-            | string
-            | null;
+          (o?.priceText ?? o?.precoTexto ?? o?.price_label ?? o?.priceLabel ?? null) as string | null;
 
         const imageUrl =
-          (o?.imageUrl ?? o?.image ?? o?.cover ?? o?.coverImage ?? o?.banner ?? null) as
-            | string
-            | null;
+          (o?.imageUrl ?? o?.image ?? o?.cover ?? o?.coverImage ?? o?.banner ?? null) as string | null;
 
         return { id, slug, title, subtitle, categoryId, city, priceText, imageUrl };
       })
@@ -192,12 +257,47 @@ export default function HomeScreenClient({
   }, [offers]);
 
   /* =========================
+     LISTA DO MODAL POR CATEGORIA
+  ========================= */
+  const modalItems: SponsoredOffer[] = useMemo(() => {
+    const selectedId = norm(menuModalCategoryId);
+    const catTitle = categories.find((c) => c.id === selectedId)?.title || menuModalCategoryName || 'Categoria';
+
+    const raw = Array.isArray(offers) ? offers : [];
+    const filtered = selectedId
+      ? raw.filter((o: any) => norm(o?.categoryId ?? o?.category ?? o?.categoriaId) === selectedId)
+      : raw;
+
+    const mapped = filtered.map((o: any) => mapToSponsoredOffer(o, catTitle));
+
+    if (mapped.length) return mapped;
+
+    // fallback (não fica vazio)
+    return Array.from({ length: 12 }).map((_, i) =>
+      mapToSponsoredOffer(
+        {
+          id: `mock-${selectedId || 'cat'}-${i + 1}`,
+          title: `${catTitle} em destaque ${i + 1}`,
+          imageUrl: null,
+          href: '/beneficio/mock',
+          rating: i % 3 === 0 ? 4.9 : 4.7,
+          reviews: 200 + i * 37,
+          priceText: i % 2 === 0 ? '25%' : '20%',
+          savingsText: 'Economize agora',
+          tags: [regionLabel, catTitle, 'Destaque'],
+        },
+        catTitle
+      )
+    );
+  }, [offers, menuModalCategoryId, menuModalCategoryName, categories, regionLabel]);
+
+  /* =========================
      MENU FLUTUANTE (trigger)
   ========================= */
   const gridMenuRef = useRef<HTMLDivElement | null>(null);
   const [showFloatingMenu, setShowFloatingMenu] = useState(false);
 
-  const FLOATING_MENU_H = 75; // px
+  const FLOATING_MENU_H = 75;
   const rafRef = useRef<number | null>(null);
   const HYSTERESIS_PX = 18;
   const MIN_SCROLL_TO_ENABLE = 8;
@@ -209,7 +309,6 @@ export default function HomeScreenClient({
 
       const rect = el.getBoundingClientRect();
       const topDoc = window.scrollY + rect.top;
-
       const rowH = rect.height / 2;
       return topDoc + rowH * 1.5;
     };
@@ -265,61 +364,49 @@ export default function HomeScreenClient({
         ['--sticky-stack-h' as any]: `${stickyStackPx}px`,
       }}
     >
-      <div
-        id="top-fixed-stack"
-        className="pointer-events-none absolute inset-x-0 top-0"
-        aria-hidden="true"
-      >
+      <div id="top-fixed-stack" className="pointer-events-none absolute inset-x-0 top-0" aria-hidden="true">
         <div style={{ height: showFloatingMenu ? FLOATING_MENU_H : 0 }} />
       </div>
 
-      {/* ✅ MODAL (Categorias) */}
+      {/* ✅ MODAL (Categorias) — AGORA COM LISTA */}
       <MenuCarouselModal
         open={menuModalOpen}
         onClose={closeMenuModal}
         title="Categoria"
         categoryName={menuModalCategoryName}
         categoryCount={menuModalCategoryCount}
-      />
-
-      {/* ✅ MODAL (Busca rápida) — mesmo componente, conteúdo do QuickSearchPanel */}
-      <MenuCarouselModal
-        open={searchModalOpen}
-        onClose={closeSearchModal}
-        hideHeader
       >
-        <div className="rounded-t-md bg-zinc-100/92 shadow-2xl ring-1 ring-black/10 overflow-hidden">
-          <QuickSearchPanel
-            offers={searchData}
-            categories={searchCategories}
-            onRequestClose={closeSearchModal}
+        <div className="px-0 pb-2">
+          <SponsoredOffersList
+            className="mt-0"
+            title=""
+            items={modalItems}
+            initialCount={10}
+            step={10}
+            categories={categories.map((c) => ({ id: c.id, title: c.title }))}
           />
+        </div>
+      </MenuCarouselModal>
+
+      {/* ✅ MODAL (Busca rápida) */}
+      <MenuCarouselModal open={searchModalOpen} onClose={closeSearchModal} hideHeader>
+        <div className="rounded-t-md bg-zinc-100/92 shadow-2xl ring-1 ring-black/10 overflow-hidden">
+          <QuickSearchPanel offers={searchData} categories={searchCategories} onRequestClose={closeSearchModal} />
         </div>
       </MenuCarouselModal>
 
       {/* MENU CARROSSEL */}
       <div ref={gridMenuRef}>
-        <MenuCarousel
-          categories={categories}
-          className="pt-0"
-          onOpenModal={() => openMenuModal()}
-          onCategoryClick={handleCategoryClick}
-        />
+        <MenuCarousel categories={categories} className="pt-0" onCategoryClick={handleCategoryClick} />
       </div>
 
       <HomeBanner className="mt-4" />
 
       {/* MENU FLUTUANTE */}
-      <FloatingTopMenu
-        categories={categories}
-        visible={showFloatingMenu}
-        onOpenModal={() => openMenuModal()}
-        onCategoryClick={handleCategoryClick}
-      />
+      <FloatingTopMenu categories={categories} visible={showFloatingMenu} onCategoryClick={handleCategoryClick} />
 
       <div className="pt-1">
         <div className="px-4 mt-1 pb-2">
-          {/* ✅ AQUI: clique na busca abre o MenuCarouselModal (com conteúdo da 2ª imagem) */}
           <QuickSearch
             offers={searchData}
             categories={searchCategories}
@@ -343,7 +430,7 @@ export default function HomeScreenClient({
       <SponsoredOffersList
         className="mt-7"
         title=""
-        items={top10ListItems}
+        items={top10ListItems as any}
         initialCount={5}
         step={5}
         categories={categories.map((c) => ({ id: c.id, title: c.title }))}
