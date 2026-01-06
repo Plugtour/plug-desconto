@@ -206,6 +206,9 @@ export default function ProductDetailContent({
         <div className="relative">
           <div className="text-[22px] font-bold tracking-[-.2px] leading-[22px] text-zinc-600">{data.title}</div>
 
+          {/* ✅ LINHA DE ECONOMIA REMOVIDA (ÚNICA ALTERAÇÃO) */}
+          {/* {economySlot ? <div className="mt-2 text-[16px] font-black text-zinc-800">{economySlot}</div> : null} */}
+
           {/* ✅ Linha das estrelas + ações no canto direito (único lugar) */}
           <div className="mt-2 flex items-start justify-between">
             {/* Esquerda: estrelas + nota */}
@@ -265,9 +268,6 @@ export default function ProductDetailContent({
               </button>
             </div>
           </div>
-
-          {/* ✅ Slot de economia (aparece logo abaixo do topo, sem mexer no resto) */}
-          {economySlot ? <div className="mt-2">{economySlot}</div> : null}
 
           <div className="mt-[10px] flex gap-2">
             <TabButton active={tab === 'detalhes'} onClick={() => setTab('detalhes')}>
