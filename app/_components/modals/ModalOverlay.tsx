@@ -1,7 +1,4 @@
-/* ============================
-   ModalOverlay.tsx
-   (sem mudanças — respiro é nos modais)
-============================ */
+// app/_components/modals/ModalOverlay.tsx
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
@@ -12,13 +9,12 @@ type Props = {
   children?: React.ReactNode;
 };
 
-const EXIT_MS = 320; // precisa cobrir o duration-300 do modal
+const EXIT_MS = 320;
 
 export default function ModalOverlay({ open, onClose, children }: Props) {
   const [mounted, setMounted] = useState(open);
   const tRef = useRef<number | null>(null);
 
-  // Mantém montado durante o fechamento para o slide completar
   useEffect(() => {
     if (open) {
       if (tRef.current) window.clearTimeout(tRef.current);
@@ -40,7 +36,6 @@ export default function ModalOverlay({ open, onClose, children }: Props) {
     };
   }, [open, mounted]);
 
-  // ESC para fechar (enquanto estiver montado)
   useEffect(() => {
     if (!mounted) return;
 
@@ -56,7 +51,6 @@ export default function ModalOverlay({ open, onClose, children }: Props) {
 
   return (
     <div className="fixed inset-0 z-[9999]">
-      {/* BACKDROP REAL (captura clique) */}
       <div
         className={[
           'absolute inset-0',
@@ -67,7 +61,6 @@ export default function ModalOverlay({ open, onClose, children }: Props) {
         onClick={onClose}
       />
 
-      {/* CONTEÚDO (acima do backdrop) */}
       <div
         className="absolute inset-0 z-[1]"
         onClick={(e) => e.stopPropagation()}

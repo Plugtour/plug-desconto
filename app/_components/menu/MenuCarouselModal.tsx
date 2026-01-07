@@ -60,7 +60,6 @@ export default function MenuCarouselModal({
 
   const MODAL_TOP_OFFSET = 'calc(env(safe-area-inset-top) + 20px + 6px)';
   const GAP_BETWEEN_BUTTON_AND_MODAL = 6;
-
   const SIDE_GUTTER_PX = 10;
 
   const countText = typeof categoryCount === 'number' ? `${categoryCount} produtos` : '';
@@ -100,7 +99,6 @@ export default function MenuCarouselModal({
               paddingRight: SIDE_GUTTER_PX,
             }}
           >
-            {/* BOTÃO FECHAR */}
             <div className="relative pt-1 flex justify-start">
               <div className="w-full flex justify-start pl-0">
                 <button
@@ -132,10 +130,10 @@ export default function MenuCarouselModal({
 
             <div aria-hidden="true" style={{ height: GAP_BETWEEN_BUTTON_AND_MODAL }} />
 
-            {/* SHEET */}
             <div
               className={['bg-zinc-100', 'flex-1', 'rounded-t-md', 'overflow-hidden'].join(' ')}
               onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
             >
               {!hideHeader && (
                 <div className="px-4 pt-4 pb-3">
@@ -144,7 +142,7 @@ export default function MenuCarouselModal({
                 </div>
               )}
 
-              {/* ✅ AQUI: zera as vars do topo só dentro do modal (isso sobe o filtro sticky) */}
+              {/* mantém o comportamento que você já aprovou (filtro sticky sobe só dentro do modal) */}
               <div
                 className={['h-full', 'flex flex-col', 'overflow-auto'].join(' ')}
                 style={{

@@ -1,3 +1,4 @@
+// app/_components/modals/useLockBodyScroll.ts
 'use client';
 
 import { useEffect, useRef } from 'react';
@@ -16,7 +17,6 @@ type SavedStyles = {
 };
 
 function getScrollbarWidth() {
-  // largura da barra (pra não dar “pulo” no layout)
   return Math.max(0, window.innerWidth - document.documentElement.clientWidth);
 }
 
@@ -30,7 +30,6 @@ export default function useLockBodyScroll(locked: boolean) {
     const html = document.documentElement;
     const body = document.body;
 
-    // salva estado atual 1x
     if (!saved.current) {
       saved.current = {
         htmlOverflow: html.style.overflow,
@@ -46,14 +45,11 @@ export default function useLockBodyScroll(locked: boolean) {
       };
     }
 
-    // captura scroll atual
     scrollYRef.current = window.scrollY || window.pageYOffset || 0;
 
-    // evita “pulo” ao sumir barra
     const sbw = getScrollbarWidth();
     const currentPr = parseFloat(window.getComputedStyle(body).paddingRight || '0') || 0;
 
-    // trava fundo (robusto em iOS também)
     html.style.overflow = 'hidden';
     (html.style as any).overscrollBehavior = 'none';
 
@@ -66,7 +62,6 @@ export default function useLockBodyScroll(locked: boolean) {
     body.style.paddingRight = `${currentPr + sbw}px`;
 
     return () => {
-      // restaura tudo
       const s = saved.current;
       if (!s) return;
 
@@ -81,7 +76,6 @@ export default function useLockBodyScroll(locked: boolean) {
       body.style.width = s.bodyWidth ?? '';
       body.style.paddingRight = s.bodyPaddingRight ?? '';
 
-      // volta pro scroll anterior
       const y = scrollYRef.current || 0;
       window.scrollTo(0, y);
 

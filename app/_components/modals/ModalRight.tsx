@@ -1,3 +1,4 @@
+// app/_components/modals/ModalRight.tsx
 'use client';
 
 import React, { useEffect, useId, useRef } from 'react';
@@ -8,11 +9,8 @@ type Props = {
   children: React.ReactNode;
   className?: string;
 
-  /** largura do drawer (igual ao padrão do seu modal atual) */
-  widthClassName?: string; // ex: 'w-[92vw] max-w-[420px]'
-
-  /** se quiser manter o mesmo “top/bottom padding” do modal base */
-  panelClassName?: string; // classes extras no painel
+  widthClassName?: string;
+  panelClassName?: string;
 };
 
 export default function ModalRight({
@@ -26,7 +24,6 @@ export default function ModalRight({
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement | null>(null);
 
-  // ESC para fechar
   useEffect(() => {
     if (!open) return;
 
@@ -38,7 +35,6 @@ export default function ModalRight({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [open, onClose]);
 
-  // Lock do scroll do body
   useEffect(() => {
     if (!open) return;
 
@@ -50,24 +46,17 @@ export default function ModalRight({
     };
   }, [open]);
 
-  // Foco inicial no painel
   useEffect(() => {
     if (!open) return;
     const t = window.setTimeout(() => panelRef.current?.focus(), 0);
     return () => window.clearTimeout(t);
   }, [open]);
 
-  // Mantém no DOM para animar (usando pointer-events + opacity)
   return (
     <div
-      className={[
-        'fixed inset-0 z-[160]',
-        open ? 'pointer-events-auto' : 'pointer-events-none',
-        className ?? '',
-      ].join(' ')}
+      className={['fixed inset-0 z-[160]', open ? 'pointer-events-auto' : 'pointer-events-none', className ?? ''].join(' ')}
       aria-hidden={!open}
     >
-      {/* Overlay */}
       <button
         type="button"
         aria-label="Fechar"
@@ -80,7 +69,6 @@ export default function ModalRight({
         ].join(' ')}
       />
 
-      {/* Painel (direita -> esquerda) */}
       <div
         ref={panelRef}
         role="dialog"
@@ -95,7 +83,6 @@ export default function ModalRight({
           open ? 'translate-x-0' : 'translate-x-full',
         ].join(' ')}
       >
-        {/* Conteúdo do painel (estilo do seu modal base: glass / card) */}
         <div
           className={[
             'h-full',
@@ -106,7 +93,6 @@ export default function ModalRight({
             panelClassName ?? '',
           ].join(' ')}
         >
-          {/* “Título invisível” p/ acessibilidade (se quiser, pode substituir por header real dentro do children) */}
           <h2 id={titleId} className="sr-only">
             Painel lateral
           </h2>

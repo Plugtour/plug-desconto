@@ -1,7 +1,3 @@
-/* ============================
-   MenuCarouselModalRight.tsx
-   ✅ respiro lateral +10px em cada lado
-============================ */
 // app/_components/modals/MenuCarouselModalRight.tsx
 'use client';
 
@@ -21,6 +17,10 @@ type Props = {
   hideHeader?: boolean;
 };
 
+/**
+ * ✅ Modal 2 (o seu atual) — NÃO mexe.
+ * Continua funcionando igual, sem empilhamento especial.
+ */
 export default function MenuCarouselModalRight({
   open,
   onClose,
@@ -52,17 +52,17 @@ export default function MenuCarouselModalRight({
 
   useEffect(() => {
     if (!open) return;
+
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
+
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose]);
 
   const MODAL_TOP_OFFSET = 'calc(env(safe-area-inset-top) + 20px + 6px)';
   const GAP_BETWEEN_BUTTON_AND_MODAL = 6;
-
-  // ✅ antes: 4 → agora: 10  ( +6px por lado )
   const SIDE_GUTTER_PX = 10;
 
   const countText = typeof categoryCount === 'number' ? `${categoryCount} produtos` : '';
@@ -99,7 +99,6 @@ export default function MenuCarouselModalRight({
             className="mx-auto w-full max-w-md h-full flex flex-col min-h-0"
             style={{ paddingLeft: SIDE_GUTTER_PX, paddingRight: SIDE_GUTTER_PX }}
           >
-            {/* BOTÃO FECHAR */}
             <div className="relative pt-1 flex justify-start">
               <div className="w-full flex justify-start pl-0">
                 <button
@@ -131,7 +130,6 @@ export default function MenuCarouselModalRight({
 
             <div aria-hidden="true" style={{ height: GAP_BETWEEN_BUTTON_AND_MODAL }} />
 
-            {/* SHEET */}
             <div
               className={['bg-zinc-100', 'flex-1', 'rounded-t-md', 'overflow-hidden', 'min-h-0'].join(' ')}
               onClick={(e) => e.stopPropagation()}
@@ -143,7 +141,6 @@ export default function MenuCarouselModalRight({
                 </div>
               )}
 
-              {/* ✅ FIX: quando hideHeader=true, NÃO pode existir scroll aqui */}
               <div
                 className={[
                   'flex-1',
