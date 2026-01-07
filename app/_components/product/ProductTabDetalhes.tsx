@@ -7,6 +7,9 @@ import type { ProductModalData } from './ProductDetailContent';
 import { AccordionItem, CalendarBlock, SectionTitle, TimeCard } from './tabs/ProductDetailUI';
 import TimedMediaCarousel from '@/app/_components/media/TimedMediaCarousel';
 
+// ✅ Voucher Flow
+import VoucherFlowController from '@/app/_components/voucher-flow/VoucherFlowController';
+
 // ✅ placeholder longo pra testar “Ver mais”
 const DETAILS_PREVIEW =
   'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. ' +
@@ -88,6 +91,9 @@ export default function ProductTabDetalhes({
 }: {
   data: ProductModalData;
 }) {
+  // ✅ NOVO: controle do fluxo de voucher
+  const [voucherOpen, setVoucherOpen] = useState(false);
+
   // ✅ “Ver mais” do Detalhes (abre/fecha deslizando)
   const [detailsExpanded, setDetailsExpanded] = useState(false);
   const detailsMoreInnerRef = useRef<HTMLDivElement | null>(null);
@@ -632,7 +638,13 @@ export default function ProductTabDetalhes({
                   }}
                   className="shrink-0"
                 >
-                  <TimeCard time={t.time} offLabel={t.offLabel} enabled={t.enabled} active={isActiveTime} />
+                  <TimeCard
+                    time={t.time}
+                    offLabel={t.offLabel}
+                    enabled={t.enabled}
+                    active={isActiveTime}
+                    onUse={() => setVoucherOpen(true)}
+                  />
                 </div>
               );
             })}
@@ -701,6 +713,13 @@ export default function ProductTabDetalhes({
           </div>
         </div>
       </div>
+
+      {/* ✅ Flow do voucher: montado 1x */}
+      <VoucherFlowController
+        open={voucherOpen}
+        onClose={() => setVoucherOpen(false)}
+        restaurantName={data.title}
+      />
     </div>
   );
 }

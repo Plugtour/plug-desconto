@@ -315,18 +315,22 @@ export function TimeCard({
   offLabel,
   enabled = true,
   active = false,
+  onUse,
 }: {
   time: string;
   offLabel: string;
   enabled?: boolean;
   active?: boolean;
+  onUse?: () => void;
 }) {
+  const canUse = !!enabled;
+
   return (
     <div
       className={[
         'min-w-[86px] rounded-[6px] border border-black/15 p-2 text-center',
         active ? 'bg-[#007A55]/30' : 'bg-zinc-100',
-        enabled ? '' : 'opacity-45',
+        canUse ? 'cursor-pointer' : 'opacity-45 cursor-default',
       ].join(' ')}
       aria-current={active ? 'true' : undefined}
     >
@@ -335,9 +339,18 @@ export function TimeCard({
 
       <button
         type="button"
+        disabled={!canUse}
+        aria-disabled={!canUse}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (!canUse) return;
+          onUse?.();
+        }}
         className={[
           'mt-1 w-full rounded-[6px] py-1 text-[11px] font-semibold',
           active ? 'bg-[#17BA60] text-white' : 'bg-zinc-200 text-zinc-800',
+          canUse ? 'active:opacity-90' : 'opacity-60',
         ].join(' ')}
       >
         Utilizar
