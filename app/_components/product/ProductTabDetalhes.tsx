@@ -34,18 +34,30 @@ function pad2(n: number) {
   return String(n).padStart(2, '0');
 }
 
-function buildHalfHourTimeCards(
-  startHH = 11,
-  startMM = 0,
-  endHH = 23,
-  endMM = 0
-): Array<{ time: string; offLabel: string; enabled: boolean }> {
+function toMinutes(hhmm: string) {
+  const m = String(hhmm || '').match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return NaN;
+  const h = Number(m[1]);
+  const mm = Number(m[2]);
+  if (!Number.isFinite(h) || !Number.isFinite(mm)) return NaN;
+  return h * 60 + mm;
+}
+
+// ✅ regra de funcionamento: 11:30 até 23:00 (inclusive). 23:30+ fechado. Reabre 11:30.
+function isOpenByBusinessHours(timeHHMM: string) {
+  const min = toMinutes(timeHHMM);
+  if (!Number.isFinite(min)) return false;
+
+  const OPEN_FROM = 11 * 60 + 30; // 11:30
+  const OPEN_UNTIL = 23 * 60 + 0; // 23:00
+
+  return min >= OPEN_FROM && min <= OPEN_UNTIL;
+}
+
+function buildHalfHourTimeCards24h(): Array<{ time: string; offLabel: string; enabled: boolean }> {
   const out: Array<{ time: string; offLabel: string; enabled: boolean }> = [];
-  let h = startHH;
-  let m = startMM;
 
-  const endTotal = endHH * 60 + endMM;
-
+  // ✅ padrão reaproveitado só pros horários abertos
   const pattern = [
     { offLabel: '50% off', enabled: true },
     { offLabel: '-', enabled: true },
@@ -55,33 +67,33 @@ function buildHalfHourTimeCards(
     { offLabel: '-', enabled: true },
   ];
 
-  let i = 0;
-  while (h * 60 + m <= endTotal) {
-    const p = pattern[i % pattern.length];
-    out.push({
-      time: `${pad2(h)}:${pad2(m)}`,
-      offLabel: p.offLabel,
-      enabled: p.enabled,
-    });
+  let openIdx = 0;
 
-    m += 30;
-    if (m >= 60) {
-      m = 0;
-      h += 1;
+  for (let total = 0; total <= 23 * 60 + 30; total += 30) {
+    const h = Math.floor(total / 60);
+    const m = total % 60;
+    const time = `${pad2(h)}:${pad2(m)}`;
+
+    const open = isOpenByBusinessHours(time);
+
+    if (open) {
+      const p = pattern[openIdx % pattern.length];
+      out.push({
+        time,
+        offLabel: p.offLabel,
+        enabled: true,
+      });
+      openIdx += 1;
+    } else {
+      out.push({
+        time,
+        offLabel: '-',
+        enabled: false,
+      });
     }
-    i += 1;
   }
 
   return out;
-}
-
-function toMinutes(hhmm: string) {
-  const m = String(hhmm || '').match(/^(\d{1,2}):(\d{2})$/);
-  if (!m) return NaN;
-  const h = Number(m[1]);
-  const mm = Number(m[2]);
-  if (!Number.isFinite(h) || !Number.isFinite(mm)) return NaN;
-  return h * 60 + mm;
 }
 
 type AccordionKey = 'valores' | 'economia' | 'duvidas' | 'regras';
@@ -331,9 +343,10 @@ export default function ProductTabDetalhes({
     };
   }, [data.calendar]);
 
-  // ✅ Lista de horários: usa data.times se vier do backend; senão usa placeholder
+  // ✅ Lista de horários: usa data.times se vier do backend; senão usa fallback 24h
+  // ✅ SEMPRE aplica regra de funcionamento (11:30–23:00)
   const funcionamentoTimeCards = useMemo(() => {
-    const fromData = (data.times ?? [])
+    const fromDataRaw = (data.times ?? [])
       .map((t) => ({
         time: String(t.time ?? '').trim(),
         offLabel: String(t.offLabel ?? '').trim() || '-',
@@ -341,8 +354,18 @@ export default function ProductTabDetalhes({
       }))
       .filter((t) => /^\d{1,2}:\d{2}$/.test(t.time));
 
-    if (fromData.length > 0) return fromData;
-    return buildHalfHourTimeCards(11, 0, 23, 0);
+    const base = fromDataRaw.length > 0 ? fromDataRaw : buildHalfHourTimeCards24h();
+
+    // aplica funcionamento
+    const normalized = base.map((t) => {
+      const open = isOpenByBusinessHours(t.time);
+      if (!open) {
+        return { ...t, enabled: false, offLabel: '-' };
+      }
+      return { ...t, enabled: true };
+    });
+
+    return normalized;
   }, [data.times]);
 
   // ✅ índice do horário vigente (ex: 16:33 -> 16:30)

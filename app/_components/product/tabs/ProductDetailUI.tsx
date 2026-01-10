@@ -133,7 +133,6 @@ export function CalendarBlock({
   const activeBg = '#17BA60';
   const softGreen = 'rgba(23, 186, 96, 0.18)';
 
-  // refs para posicionar a seta entre "Noite" (coluna do dia) e "Hoje" (card final)
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const todayNightCellRef = useRef<HTMLDivElement | null>(null);
   const todayHojeCellRef = useRef<HTMLDivElement | null>(null);
@@ -150,10 +149,7 @@ export function CalendarBlock({
     const nr = night.getBoundingClientRect();
     const hr = hoje.getBoundingClientRect();
 
-    // centro da coluna (X)
     const centerX = nr.left + nr.width / 2;
-
-    // meio do “vão” entre Noite (embaixo) e Hoje (em cima)
     const gapMidY = (nr.bottom + hr.top) / 2;
 
     setArrowPos({
@@ -184,7 +180,6 @@ export function CalendarBlock({
   return (
     <div className={noOuterBorder ? 'bg-transparent p-0' : 'rounded-[10px] border border-black/10 bg-zinc-100 p-2'}>
       <div ref={wrapRef} className="relative">
-        {/* ✅ seta apontando pra CIMA, entre Noite e Hoje (mesma cor do card "Hoje") */}
         {arrowPos ? (
           <div
             className="pointer-events-none absolute z-[20]"
@@ -210,7 +205,6 @@ export function CalendarBlock({
         <div className="grid grid-cols-8 gap-1 text-center text-[12px] font-semibold text-zinc-700">
           <div />
 
-          {/* Header (dias) */}
           {days.map((d) => {
             const isToday = d.key === todayKey;
             return (
@@ -251,7 +245,6 @@ export function CalendarBlock({
             );
           })}
 
-          {/* "Hoje" no fim da coluna */}
           <div />
           {days.map((d) => {
             const isToday = d.key === todayKey;
@@ -324,12 +317,15 @@ export function TimeCard({
   onUse?: () => void;
 }) {
   const canUse = !!enabled;
+  const buttonText = canUse ? 'Utilizar' : 'Fechado';
 
   return (
     <div
       className={[
         'min-w-[86px] rounded-[6px] border border-black/15 p-2 text-center',
-        active ? 'bg-[#007A55]/30' : 'bg-zinc-100',
+        // ✅ aberto mantém exatamente como está
+        // ✅ fechado selecionado: mais esbranquiçado (ajuste pendente)
+        active ? (canUse ? 'bg-[#007A55]/30' : 'bg-red-500/12') : 'bg-zinc-100',
         canUse ? 'cursor-pointer' : 'opacity-45 cursor-default',
       ].join(' ')}
       aria-current={active ? 'true' : undefined}
@@ -349,11 +345,17 @@ export function TimeCard({
         }}
         className={[
           'mt-1 w-full rounded-[6px] py-1 text-[11px] font-semibold',
-          active ? 'bg-[#17BA60] text-white' : 'bg-zinc-200 text-zinc-800',
-          canUse ? 'active:opacity-90' : 'opacity-60',
+          // ✅ aberto: mantém exatamente como está
+          canUse
+            ? active
+              ? 'bg-[#17BA60] text-white'
+              : 'bg-zinc-200 text-zinc-800'
+            : // ✅ fechado: vermelho vivo, sem escurecer quando selecionado
+              'bg-red-600 text-white',
+          canUse ? 'active:opacity-100' : 'opacity-100',
         ].join(' ')}
       >
-        Utilizar
+        {buttonText}
       </button>
     </div>
   );
