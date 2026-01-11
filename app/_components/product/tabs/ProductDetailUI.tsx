@@ -290,11 +290,7 @@ export function Cell({
   elRef?: React.Ref<HTMLDivElement>;
 }) {
   return (
-    <div
-      ref={elRef}
-      className="grid place-items-center rounded py-1"
-      style={{ backgroundColor: highlight ? highlightBg : '#e4e4e7' }}
-    >
+    <div ref={elRef} className="grid place-items-center rounded py-1" style={{ backgroundColor: highlight ? highlightBg : '#e4e4e7' }}>
       <span className={ok ? 'text-emerald-600' : 'text-red-500'}>{ok ? '✓' : '✕'}</span>
     </div>
   );
@@ -308,51 +304,72 @@ export function TimeCard({
   offLabel,
   enabled = true,
   active = false,
+  clickable = false,
   onUse,
 }: {
   time: string;
   offLabel: string;
   enabled?: boolean;
   active?: boolean;
+  clickable?: boolean; // ✅ controla se está liberado pelo horário vigente
   onUse?: () => void;
 }) {
-  const canUse = !!enabled;
-  const buttonText = canUse ? 'Utilizar' : 'Fechado';
+  // ✅ fechado nunca pode clicar
+  const canClick = !!enabled && !!clickable;
+
+  const buttonText = !enabled ? 'Fechado' : canClick ? 'Utilizar' : 'Utilizar';
+
+  const handleUse = (e?: React.SyntheticEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (!canClick) return;
+    onUse?.();
+  };
 
   return (
     <div
+      role={canClick ? 'button' : undefined}
+      tabIndex={canClick ? 0 : -1}
+      onClick={canClick ? handleUse : undefined}
+      onKeyDown={
+        canClick
+          ? (e) => {
+              if (e.key === 'Enter' || e.key === ' ') handleUse(e);
+            }
+          : undefined
+      }
       className={[
         'min-w-[86px] rounded-[6px] border border-black/15 p-2 text-center',
-        // ✅ aberto mantém exatamente como está
-        // ✅ fechado selecionado: mais esbranquiçado (ajuste pendente)
-        active ? (canUse ? 'bg-[#007A55]/30' : 'bg-red-500/12') : 'bg-zinc-100',
-        canUse ? 'cursor-pointer' : 'opacity-45 cursor-default',
+        active ? (enabled ? 'bg-[#007A55]/30' : 'bg-red-500/12') : 'bg-zinc-100',
+
+        // ✅ card 100% clicável somente quando liberado
+        canClick ? 'cursor-pointer' : 'cursor-default',
+        canClick ? 'select-none touch-manipulation' : '',
+
+        // ✅ fechado mais apagado
+        !enabled ? 'opacity-45' : canClick ? 'opacity-100' : 'opacity-60',
       ].join(' ')}
       aria-current={active ? 'true' : undefined}
+      aria-disabled={!canClick}
     >
       <div className="text-[11px] font-semibold text-zinc-700">{time}</div>
       <div className="mt-0.5 text-[11px] font-extrabold text-red-500">{offLabel || '-'}</div>
 
       <button
         type="button"
-        disabled={!canUse}
-        aria-disabled={!canUse}
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          if (!canUse) return;
-          onUse?.();
-        }}
+        disabled={!canClick}
+        aria-disabled={!canClick}
+        onClick={handleUse}
         className={[
-          'mt-1 w-full rounded-[6px] py-1 text-[11px] font-semibold',
-          // ✅ aberto: mantém exatamente como está
-          canUse
-            ? active
-              ? 'bg-[#17BA60] text-white'
-              : 'bg-zinc-200 text-zinc-800'
-            : // ✅ fechado: vermelho vivo, sem escurecer quando selecionado
-              'bg-red-600 text-white',
-          canUse ? 'active:opacity-100' : 'opacity-100',
+          'mt-1 w-full rounded-[4px] px-1 py-1 text-[11px] font-semibold',
+          // ✅ exatamente como você pediu:
+          // - liberado: verde + branco
+          // - fechado: vermelho
+          // - futuro (aberto porém bloqueado): cinza
+          !enabled ? 'bg-red-600 text-white' : canClick ? 'bg-[#17BA60] text-white' : 'bg-zinc-300 text-zinc-700',
+          'opacity-100',
         ].join(' ')}
       >
         {buttonText}

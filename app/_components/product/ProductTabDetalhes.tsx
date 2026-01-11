@@ -21,11 +21,11 @@ const DETAILS_MORE =
 
 const SLIDE_DURATION_MS = 6500;
 
-// ✅ balão de alerta (mesmo “jeito” do WhatsApp)
+// ✅ balão de alerta
 const ALERT_BUBBLE_ANIM_MS = 520;
 
-// ✅ delay inteligente (igual WhatsApp)
-const ALERT_BUBBLE_DELAY_MS = 10_000; // 10s (ajuste aqui)
+// ✅ delay inteligente
+const ALERT_BUBBLE_DELAY_MS = 10_000;
 
 // ✅ anti-“briga” com o usuário: se ele mexeu no carrossel, não recentraliza
 const USER_SCROLL_GUARD_MS = 1200;
@@ -57,7 +57,6 @@ function isOpenByBusinessHours(timeHHMM: string) {
 function buildHalfHourTimeCards24h(): Array<{ time: string; offLabel: string; enabled: boolean }> {
   const out: Array<{ time: string; offLabel: string; enabled: boolean }> = [];
 
-  // ✅ padrão reaproveitado só pros horários abertos
   const pattern = [
     { offLabel: '50% off', enabled: true },
     { offLabel: '-', enabled: true },
@@ -98,67 +97,44 @@ function buildHalfHourTimeCards24h(): Array<{ time: string; offLabel: string; en
 
 type AccordionKey = 'valores' | 'economia' | 'duvidas' | 'regras';
 
-export default function ProductTabDetalhes({
-  data,
-}: {
-  data: ProductModalData;
-}) {
-  // ✅ NOVO: controle do fluxo de voucher
+export default function ProductTabDetalhes({ data }: { data: ProductModalData }) {
   const [voucherOpen, setVoucherOpen] = useState(false);
 
-  // ✅ “Ver mais” do Detalhes (abre/fecha deslizando)
   const [detailsExpanded, setDetailsExpanded] = useState(false);
   const detailsMoreInnerRef = useRef<HTMLDivElement | null>(null);
   const [detailsMoreH, setDetailsMoreH] = useState(0);
 
-  // ✅ âncora: “Detalhes:” precisa ficar travado ao expandir/recolher
   const detailsAnchorRef = useRef<HTMLDivElement | null>(null);
 
-  // ✅ sanfona (uma por vez)
   const [openAcc, setOpenAcc] = useState<AccordionKey | null>(null);
 
-  // ✅ balão de alerta do “⚠️”
   const [alertOpen, setAlertOpen] = useState(false);
   const [alertEntered, setAlertEntered] = useState(false);
 
-  // ✅ refs para lógica “inteligente”
   const alertTimerRef = useRef<number | null>(null);
   const alertUserInteractedRef = useRef(false);
   const alertAutoShownForIdRef = useRef<string | null>(null);
 
-  // ✅ root para achar o scroller do modal (e fechar ao scroll)
   const rootRef = useRef<HTMLDivElement | null>(null);
 
-  // ✅ carrossel de horários (container + itens)
   const timeScrollerRef = useRef<HTMLDivElement | null>(null);
   const timeItemRefs = useRef<Array<HTMLDivElement | null>>([]);
 
-  // ✅ “tick” do horário atual (atualiza sozinho para trocar o vigente)
   const [nowTick, setNowTick] = useState(0);
 
-  // ✅ trava para centralizar no carregamento
   const didCenterForIdRef = useRef<string | null>(null);
 
-  // ✅ guarda: usuário mexeu no carrossel recentemente?
   const lastUserTouchTsRef = useRef<number>(0);
   const userTouchTimerRef = useRef<number | null>(null);
 
-  // ✅ banner do produto (mesmo modelo da home: só imagens)
   const bannerMedia = useMemo(() => {
     const normalized = (data.media ?? [])
       .map((m: any) => ({
         src: String(m?.src ?? m?.url ?? m?.imageUrl ?? m?.image ?? '').trim(),
         alt: String(m?.alt ?? ''),
       }))
-      // ✅ aceita imagens locais E externas (http/https)
-      .filter(
-        (m) =>
-          m.src.startsWith('/') ||
-          m.src.startsWith('http://') ||
-          m.src.startsWith('https://')
-      );
+      .filter((m) => m.src.startsWith('/') || m.src.startsWith('http://') || m.src.startsWith('https://'));
 
-    // ✅ fallback AUTOMÁTICO usando seus banners locais
     if (normalized.length === 0) {
       return [
         { src: '/banners/banner-1.webp', alt: 'Banner 1' },
@@ -174,27 +150,20 @@ export default function ProductTabDetalhes({
     setDetailsExpanded(false);
     setOpenAcc(null);
 
-    // reseta alerta
     setAlertEntered(false);
     setAlertOpen(false);
 
-    // reseta lógica do auto-open por produto
     alertUserInteractedRef.current = false;
     alertAutoShownForIdRef.current = null;
 
-    // limpa timer antigo
     if (alertTimerRef.current) {
       window.clearTimeout(alertTimerRef.current);
       alertTimerRef.current = null;
     }
 
-    // reseta refs dos horários
     timeItemRefs.current = [];
-
-    // permite centralizar de novo neste produto (carregamento)
     didCenterForIdRef.current = null;
 
-    // reseta guarda do usuário
     lastUserTouchTsRef.current = 0;
     if (userTouchTimerRef.current) {
       window.clearTimeout(userTouchTimerRef.current);
@@ -207,7 +176,6 @@ export default function ProductTabDetalhes({
     return () => window.clearInterval(id);
   }, []);
 
-  // mede altura do bloco “mais”
   useEffect(() => {
     const inner = detailsMoreInnerRef.current;
     if (!inner) return;
@@ -260,7 +228,6 @@ export default function ProductTabDetalhes({
     else openAlertBubble();
   }
 
-  // ✅ Auto-open com delay “igual WhatsApp”
   useEffect(() => {
     if (alertTimerRef.current) {
       window.clearTimeout(alertTimerRef.current);
@@ -284,7 +251,6 @@ export default function ProductTabDetalhes({
     };
   }, [data.id]);
 
-  // ✅ Fechamento automático ao SCROLL do conteúdo do modal
   useEffect(() => {
     if (!alertOpen) return;
 
@@ -296,8 +262,7 @@ export default function ProductTabDetalhes({
       while (cur) {
         const cs = window.getComputedStyle(cur);
         const oy = cs.overflowY;
-        const canScrollY =
-          (oy === 'auto' || oy === 'scroll') && cur.scrollHeight > cur.clientHeight;
+        const canScrollY = (oy === 'auto' || oy === 'scroll') && cur.scrollHeight > cur.clientHeight;
         if (canScrollY) return cur;
         cur = cur.parentElement;
       }
@@ -325,7 +290,6 @@ export default function ProductTabDetalhes({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [alertOpen]);
 
-  // ✅ Funcionamento (fallback ilustrativo)
   const funcionamentoCal: NonNullable<ProductModalData['calendar']> = useMemo(() => {
     if (data.calendar) return data.calendar;
     return {
@@ -343,8 +307,6 @@ export default function ProductTabDetalhes({
     };
   }, [data.calendar]);
 
-  // ✅ Lista de horários: usa data.times se vier do backend; senão usa fallback 24h
-  // ✅ SEMPRE aplica regra de funcionamento (11:30–23:00)
   const funcionamentoTimeCards = useMemo(() => {
     const fromDataRaw = (data.times ?? [])
       .map((t) => ({
@@ -356,19 +318,16 @@ export default function ProductTabDetalhes({
 
     const base = fromDataRaw.length > 0 ? fromDataRaw : buildHalfHourTimeCards24h();
 
-    // aplica funcionamento
     const normalized = base.map((t) => {
       const open = isOpenByBusinessHours(t.time);
-      if (!open) {
-        return { ...t, enabled: false, offLabel: '-' };
-      }
+      if (!open) return { ...t, enabled: false, offLabel: '-' };
       return { ...t, enabled: true };
     });
 
     return normalized;
   }, [data.times]);
 
-  // ✅ índice do horário vigente (ex: 16:33 -> 16:30)
+  // ✅ vigente = último horário <= agora (ex: 14:20 -> 14:00; ex: 14:33 -> 14:30)
   const activeTimeIndex = useMemo(() => {
     if (!funcionamentoTimeCards.length) return -1;
 
@@ -382,17 +341,9 @@ export default function ProductTabDetalhes({
       if (Number.isFinite(mins[i]) && mins[i] <= nowMin) idx = i;
     }
 
-    if (idx === -1) {
-      for (let i = 0; i < mins.length; i++) {
-        if (Number.isFinite(mins[i]) && mins[i] > nowMin) return i;
-      }
-      return 0;
-    }
-
-    return idx;
+    return idx; // -1 se ainda não chegou no primeiro horário do dia
   }, [funcionamentoTimeCards, nowTick, data.id]);
 
-  // ✅ helper: centraliza um índice no carrossel
   function centerTimeIndex(index: number, behavior: ScrollBehavior) {
     const scroller = timeScrollerRef.current;
     const item = timeItemRefs.current[index];
@@ -405,7 +356,6 @@ export default function ProductTabDetalhes({
     scroller.scrollTo({ left: clamped, behavior });
   }
 
-  // ✅ Centraliza NO CARREGAMENTO (já abre no meio, sem animação)
   useLayoutEffect(() => {
     if (activeTimeIndex < 0) return;
     if (didCenterForIdRef.current === data.id) return;
@@ -427,7 +377,6 @@ export default function ProductTabDetalhes({
     });
   }, [activeTimeIndex, data.id]);
 
-  // ✅ Marca “usuário está mexendo” no carrossel (pra não recentralizar)
   useEffect(() => {
     const scroller = timeScrollerRef.current;
     if (!scroller) return;
@@ -457,20 +406,17 @@ export default function ProductTabDetalhes({
     };
   }, [data.id]);
 
-  // ✅ Recentraliza quando o horário virar, mas sem atrapalhar se o usuário mexeu
   useEffect(() => {
     if (activeTimeIndex < 0) return;
     if (didCenterForIdRef.current !== data.id) return;
 
     const now = Date.now();
     const last = lastUserTouchTsRef.current || 0;
-
     if (now - last < USER_SCROLL_GUARD_MS) return;
 
     centerTimeIndex(activeTimeIndex, 'smooth');
   }, [activeTimeIndex, data.id]);
 
-  // ✅ EXCETOS: se não vier do backend, usa placeholder
   const exceptionsClean = useMemo(() => {
     const base = (data.exceptions ?? []).map((x) => (x ?? '').trim()).filter(Boolean);
     if (base.length > 0) return base;
@@ -481,7 +427,7 @@ export default function ProductTabDetalhes({
 
   return (
     <div ref={rootRef}>
-      {/* Banner do produto (igual Home: rotação + swipe + progress + setas; sem coração/avião) */}
+      {/* Banner */}
       <div className="mt-3">
         <div className="relative overflow-hidden rounded-none bg-zinc-200">
           <TimedMediaCarousel
@@ -510,7 +456,6 @@ export default function ProductTabDetalhes({
 
       <div className="my-[14px] border-b border-dotted border-black/25" />
 
-      {/* Conteúdo */}
       <div ref={detailsAnchorRef}>
         <SectionTitle>Detalhes:</SectionTitle>
       </div>
@@ -651,7 +596,14 @@ export default function ProductTabDetalhes({
           {/* ✅ Carrossel */}
           <div ref={timeScrollerRef} className="mt-2 flex gap-2 overflow-x-auto pb-2 px-1">
             {funcionamentoTimeCards.map((t, i) => {
-              const isActiveTime = i === activeTimeIndex;
+              const isActive = i === activeTimeIndex;
+
+              // ✅ regra que você pediu:
+              // - atrás do vigente (<= activeTimeIndex): clicável
+              // - à frente (> activeTimeIndex): não clicável
+              // - fechado (enabled=false): nunca clicável
+              // - se activeTimeIndex=-1 (antes de começar o dia): nada clicável
+              const clickable = !!t.enabled && activeTimeIndex >= 0 && i <= activeTimeIndex;
 
               return (
                 <div
@@ -665,8 +617,12 @@ export default function ProductTabDetalhes({
                     time={t.time}
                     offLabel={t.offLabel}
                     enabled={t.enabled}
-                    active={isActiveTime}
-                    onUse={() => setVoucherOpen(true)}
+                    active={isActive}
+                    clickable={clickable}
+                    onUse={() => {
+                      if (!clickable) return;
+                      setVoucherOpen(true);
+                    }}
                   />
                 </div>
               );
@@ -722,7 +678,6 @@ export default function ProductTabDetalhes({
             </AccordionItem>
           </div>
 
-          {/* ✅ Obs */}
           <div className="mt-4 mb-2">
             <SectionTitle>Obs:</SectionTitle>
 
@@ -737,12 +692,7 @@ export default function ProductTabDetalhes({
         </div>
       </div>
 
-      {/* ✅ Flow do voucher: montado 1x */}
-      <VoucherFlowController
-        open={voucherOpen}
-        onClose={() => setVoucherOpen(false)}
-        restaurantName={data.title}
-      />
+      <VoucherFlowController open={voucherOpen} onClose={() => setVoucherOpen(false)} restaurantName={data.title} />
     </div>
   );
 }
