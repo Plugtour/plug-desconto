@@ -117,6 +117,21 @@ function PdfIcon({ className }: { className?: string }) {
   );
 }
 
+function normalizeWhatsAppHref(input?: string | null) {
+  const raw = String(input ?? '').trim();
+  if (!raw || raw === '#') return WHATSAPP_TMP_LINK;
+
+  // já é link http(s)
+  if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+
+  // número puro (ou com +)
+  const digits = raw.replace(/[^\d]/g, '');
+  if (digits.length >= 8) return `https://wa.me/${digits}`;
+
+  // fallback seguro
+  return WHATSAPP_TMP_LINK;
+}
+
 export default function ProductDetailContent({
   data,
   tabDefault = 'detalhes',
@@ -134,6 +149,9 @@ export default function ProductDetailContent({
   // balão
   const [bubbleOpen, setBubbleOpen] = useState(false);
   const [bubbleEntered, setBubbleEntered] = useState(false);
+
+  // ✅ link final do WhatsApp (sempre válido)
+  const waHref = normalizeWhatsAppHref(whatsappHref);
 
   useEffect(() => {
     setTab(tabDefault);
@@ -334,7 +352,7 @@ export default function ProductDetailContent({
             style={{ marginRight: BUBBLE_SHIFT_LEFT_PX }}
           >
             <a
-              href={WHATSAPP_TMP_LINK}
+              href={waHref}
               target="_blank"
               rel="noreferrer"
               className="block w-full rounded-[10px] border border-black/10 bg-white p-2 text-[11px] text-zinc-700 shadow"
@@ -376,16 +394,15 @@ export default function ProductDetailContent({
         </div>
       ) : null}
 
-      {/* Botão WhatsApp */}
+      {/* ✅ Botão WhatsApp (flutuante) */}
       <a
-        href={whatsappHref || '#'}
-        className="fixed bottom-[65px] left-1/2 z-[70] w-[430px] max-w-full -translate-x-1/2 px-3"
+        href={waHref}
+        target="_blank"
+        rel="noreferrer"
+        className="fixed bottom-[65px] left-1/2 z-[70] w-[430px] max-w-full -translate-x-1/2 px-3 pointer-events-auto"
         aria-label="WhatsApp"
-        onClick={(e) => {
-          if (!whatsappHref || whatsappHref === '#') e.preventDefault();
-        }}
       >
-        <div className="ml-auto relative grid h-[64px] w-[64px] place-items-center rounded-full bg-green-500 shadow-lg">
+        <div className="ml-auto relative grid h-[64px] w-[64px] place-items-center rounded-full bg-green-500 shadow-lg cursor-pointer active:scale-[0.98]">
           <WhatsAppIcon className="h-14 w-14 text-white" />
 
           {bubbleOpen ? (

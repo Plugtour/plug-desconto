@@ -3,8 +3,10 @@
 
 import React, { useEffect, useState } from 'react';
 
-// Base
-import VoucherModalShell from './base/VoucherModalShell';
+// ✅ Modal padrão do projeto
+import MenuCarouselModalRightStacked from '@/app/_components/modals/MenuCarouselModalRightStacked';
+
+// UI
 import VoucherProgressDots from './base/VoucherProgressDots';
 
 // Steps
@@ -22,7 +24,6 @@ type Props = {
 
   restaurantName: string;
   userName?: string | null;
-
   discountPct?: number;
 };
 
@@ -39,14 +40,11 @@ export default function VoucherFlowController({
   userName = null,
   discountPct = 20,
 }: Props) {
-  const [step, setStep] = useState<number>(1);
+  const [step, setStep] = useState(1);
+  const [voucherCode, setVoucherCode] = useState(generateVoucherCode());
+  const [discountValue, setDiscountValue] = useState(0);
+  const [paidValue, setPaidValue] = useState(0);
 
-  // dados coletados ao longo do fluxo
-  const [voucherCode, setVoucherCode] = useState<string>(generateVoucherCode());
-  const [discountValue, setDiscountValue] = useState<number>(0);
-  const [paidValue, setPaidValue] = useState<number>(0);
-
-  // ✅ reset completo sempre que o modal abrir
   useEffect(() => {
     if (!open) return;
 
@@ -61,12 +59,10 @@ export default function VoucherFlowController({
   }
 
   function resetAndClose() {
-    // ✅ reset total (pra sempre reabrir limpo)
     setStep(1);
     setDiscountValue(0);
     setPaidValue(0);
     setVoucherCode(generateVoucherCode());
-
     onClose();
   }
 
@@ -76,22 +72,10 @@ export default function VoucherFlowController({
         return <Step01AskBill userName={userName} onYes={next} onNo={resetAndClose} />;
 
       case 2:
-        return (
-          <Step02Terms
-            discountPct={discountPct}
-            onAgree={next}
-            onClose={resetAndClose}
-          />
-        );
+        return <Step02Terms discountPct={discountPct} onAgree={next} onClose={resetAndClose} />;
 
       case 3:
-        return (
-          <Step03Voucher
-            voucherCode={voucherCode}
-            discountPct={discountPct}
-            onNext={next}
-          />
-        );
+        return <Step03Voucher voucherCode={voucherCode} discountPct={discountPct} onNext={next} />;
 
       case 4:
         return (
@@ -118,12 +102,7 @@ export default function VoucherFlowController({
       case 6:
         return (
           <Step06Rating
-            onSubmit={(data) => {
-              // ✅ pronto pro backend (quando você ligar API):
-              // data.rating, data.highlights, data.comment
-              // discountValue, paidValue, voucherCode, restaurantName, discountPct
-
-              void data;
+            onSubmit={() => {
               next();
             }}
           />
@@ -138,17 +117,16 @@ export default function VoucherFlowController({
   }
 
   return (
-    <VoucherModalShell
+    <MenuCarouselModalRightStacked
       open={open}
       onClose={resetAndClose}
       title={restaurantName}
-      showClose
-      lockOverlay
-      maxWidthClass="max-w-[420px]"
+      hideHeader
+      liftPx={30} // ✅ sobe 30px como você pediu
     >
       <VoucherProgressDots current={step} total={TOTAL_STEPS} />
 
       {renderStep()}
-    </VoucherModalShell>
+    </MenuCarouselModalRightStacked>
   );
 }

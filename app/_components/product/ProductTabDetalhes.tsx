@@ -127,6 +127,15 @@ export default function ProductTabDetalhes({ data }: { data: ProductModalData })
   const lastUserTouchTsRef = useRef<number>(0);
   const userTouchTimerRef = useRef<number | null>(null);
 
+  // ✅ alvo (Horários + ⚠️) para saber se está visível
+  const horariosTriggerRef = useRef<HTMLDivElement | null>(null);
+
+  // ✅ visível + modal parado
+  const [horariosInView, setHorariosInView] = useState(false);
+  const [modalIdle, setModalIdle] = useState(true);
+
+  const idleTimerRef = useRef<number | null>(null);
+
   const bannerMedia = useMemo(() => {
     const normalized = (data.media ?? [])
       .map((m: any) => ({
@@ -168,6 +177,14 @@ export default function ProductTabDetalhes({ data }: { data: ProductModalData })
     if (userTouchTimerRef.current) {
       window.clearTimeout(userTouchTimerRef.current);
       userTouchTimerRef.current = null;
+    }
+
+    setHorariosInView(false);
+    setModalIdle(true);
+
+    if (idleTimerRef.current) {
+      window.clearTimeout(idleTimerRef.current);
+      idleTimerRef.current = null;
     }
   }, [data.id]);
 
@@ -228,6 +245,78 @@ export default function ProductTabDetalhes({ data }: { data: ProductModalData })
     else openAlertBubble();
   }
 
+  // ✅ helper: acha o scroller do modal
+  function findScrollableParent(el: HTMLElement | null) {
+    let cur: HTMLElement | null = el;
+    while (cur) {
+      const cs = window.getComputedStyle(cur);
+      const oy = cs.overflowY;
+      const canScrollY = (oy === 'auto' || oy === 'scroll') && cur.scrollHeight > cur.clientHeight;
+      if (canScrollY) return cur;
+      cur = cur.parentElement;
+    }
+    return null;
+  }
+
+  // ✅ (1) Horários precisa estar visível no campo de visão
+  useEffect(() => {
+    const el = horariosTriggerRef.current;
+    if (!el) return;
+
+    const io = new IntersectionObserver(
+      (entries) => {
+        const e = entries[0];
+        // threshold alto: garante que “Horários + ⚠️” esteja bem visível (perto do meio)
+        setHorariosInView(!!e?.isIntersecting && (e.intersectionRatio ?? 0) >= 0.6);
+      },
+      { threshold: [0, 0.25, 0.6, 0.85, 1] }
+    );
+
+    io.observe(el);
+    return () => io.disconnect();
+  }, [data.id]);
+
+  // ✅ (2) Modal precisa estar parado (sem scroll por um tempinho)
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+
+    const scroller = findScrollableParent(root);
+    if (!scroller) return;
+
+    const markScrolling = () => {
+      setModalIdle(false);
+
+      if (idleTimerRef.current) window.clearTimeout(idleTimerRef.current);
+      idleTimerRef.current = window.setTimeout(() => {
+        setModalIdle(true);
+      }, 220); // ajuste fino se quiser
+    };
+
+    // começa como parado
+    setModalIdle(true);
+
+    scroller.addEventListener('scroll', markScrolling, { passive: true });
+    scroller.addEventListener('wheel', markScrolling, { passive: true });
+    scroller.addEventListener('touchmove', markScrolling, { passive: true });
+
+    return () => {
+      scroller.removeEventListener('scroll', markScrolling as any);
+      scroller.removeEventListener('wheel', markScrolling as any);
+      scroller.removeEventListener('touchmove', markScrolling as any);
+
+      if (idleTimerRef.current) {
+        window.clearTimeout(idleTimerRef.current);
+        idleTimerRef.current = null;
+      }
+    };
+  }, [data.id]);
+
+  // ✅ (3) Auto-open do alerta:
+  // - só arma quando Horários estiver visível
+  // - só arma quando modal estiver parado
+  // - não abre se o usuário já interagiu
+  // - abre só 1x por produto
   useEffect(() => {
     if (alertTimerRef.current) {
       window.clearTimeout(alertTimerRef.current);
@@ -237,8 +326,15 @@ export default function ProductTabDetalhes({ data }: { data: ProductModalData })
     if (alertUserInteractedRef.current) return;
     if (alertAutoShownForIdRef.current === data.id) return;
 
+    if (!horariosInView) return;
+    if (!modalIdle) return;
+
     alertTimerRef.current = window.setTimeout(() => {
       if (alertUserInteractedRef.current) return;
+      if (alertAutoShownForIdRef.current === data.id) return;
+      if (!horariosInView) return;
+      if (!modalIdle) return;
+
       alertAutoShownForIdRef.current = data.id;
       openAlertBubble();
     }, ALERT_BUBBLE_DELAY_MS);
@@ -249,25 +345,14 @@ export default function ProductTabDetalhes({ data }: { data: ProductModalData })
         alertTimerRef.current = null;
       }
     };
-  }, [data.id]);
+  }, [data.id, horariosInView, modalIdle]);
 
+  // ✅ Fechamento automático ao SCROLL do conteúdo do modal (mantém)
   useEffect(() => {
     if (!alertOpen) return;
 
     const root = rootRef.current;
     if (!root) return;
-
-    const findScrollableParent = (el: HTMLElement | null) => {
-      let cur: HTMLElement | null = el;
-      while (cur) {
-        const cs = window.getComputedStyle(cur);
-        const oy = cs.overflowY;
-        const canScrollY = (oy === 'auto' || oy === 'scroll') && cur.scrollHeight > cur.clientHeight;
-        if (canScrollY) return cur;
-        cur = cur.parentElement;
-      }
-      return null;
-    };
 
     const scroller = findScrollableParent(root);
     if (!scroller) return;
@@ -504,7 +589,8 @@ export default function ProductTabDetalhes({ data }: { data: ProductModalData })
 
           {/* Horários + alerta */}
           <div className="mt-[25px] flex items-center gap-2">
-            <div className="relative">
+            {/* ✅ ref aqui: serve de alvo para saber se está visível */}
+            <div ref={horariosTriggerRef} className="relative">
               <button
                 type="button"
                 onClick={(e) => {
@@ -598,7 +684,7 @@ export default function ProductTabDetalhes({ data }: { data: ProductModalData })
             {funcionamentoTimeCards.map((t, i) => {
               const isActive = i === activeTimeIndex;
 
-              // ✅ regra que você pediu:
+              // ✅ regra:
               // - atrás do vigente (<= activeTimeIndex): clicável
               // - à frente (> activeTimeIndex): não clicável
               // - fechado (enabled=false): nunca clicável

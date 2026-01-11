@@ -20,10 +20,13 @@ type Props = {
   showClose?: boolean;
 
   /** largura máxima do modal */
-  maxWidthClass?: string; // ex: 'max-w-[420px]'
+  maxWidthClass?: string; // ex: 'max-w-[380px]'
 
   /** bloqueia fechamento ao clicar fora */
   lockOverlay?: boolean;
+
+  /** sobe o modal (px). Ex: 30 = sobe 30px */
+  liftPx?: number;
 };
 
 export default function VoucherModalShell({
@@ -34,6 +37,7 @@ export default function VoucherModalShell({
   showClose = true,
   maxWidthClass = 'max-w-[420px]',
   lockOverlay = true,
+  liftPx = 30,
 }: Props) {
   const titleId = useId();
 
@@ -65,6 +69,9 @@ export default function VoucherModalShell({
     onClose();
   }
 
+  const liftClass =
+    liftPx && liftPx > 0 ? `-translate-y-[${liftPx}px]` : '';
+
   return (
     <div
       className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40"
@@ -74,7 +81,7 @@ export default function VoucherModalShell({
       aria-labelledby={title ? titleId : undefined}
     >
       <div
-        className={`relative w-full ${maxWidthClass} mx-3`}
+        className={`relative w-full ${maxWidthClass} mx-3 ${liftClass}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="relative overflow-hidden rounded-3xl bg-white shadow-xl">
