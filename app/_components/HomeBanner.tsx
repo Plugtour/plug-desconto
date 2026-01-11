@@ -120,8 +120,8 @@ export default function HomeBanner({ className }: Props) {
   const slideTimerRef = useRef<number | null>(null);
 
   // fade
-  const [fadeTo, setFadeTo] = useState<number | null>(null);
   const [isFading, setIsFading] = useState(false);
+  const [fadeTo, setFadeTo] = useState<number | null>(null);
   const fadeTimerRef = useRef<number | null>(null);
 
   // pausa
@@ -132,7 +132,6 @@ export default function HomeBanner({ className }: Props) {
   const startYRef = useRef<number | null>(null);
   const draggingRef = useRef(false);
   const hasMovedRef = useRef(false);
-  const lockHorizontalRef = useRef(false);
 
   // container width
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -163,6 +162,7 @@ export default function HomeBanner({ className }: Props) {
   useEffect(() => {
     const sync = () => setFavIds(buildFavMapFromStore());
     sync();
+
     const off = onFavoritesChange?.(sync);
     return () => {
       if (typeof off === 'function') off();
@@ -223,9 +223,11 @@ export default function HomeBanner({ className }: Props) {
       href: (current as any)?.href ?? '/',
       imageUrl: (current as any)?.imageUrl ?? null,
       subtitle: (current as any)?.subtitle ?? null,
+      // categoryLabel opcional, se quiser
       categoryLabel: (current as any)?.tag ?? null,
     } as any);
 
+    // pop só quando vira favorito
     const becameFav = !!(res && typeof res === 'object' && (res as any).active === true);
     if (becameFav) {
       setHeartPop(false);
@@ -324,7 +326,6 @@ export default function HomeBanner({ className }: Props) {
     setIsDragging(false);
     draggingRef.current = false;
     hasMovedRef.current = false;
-    lockHorizontalRef.current = false;
     startXRef.current = null;
     startYRef.current = null;
     setDragX(0);
@@ -388,7 +389,6 @@ export default function HomeBanner({ className }: Props) {
     startYRef.current = e.clientY;
     draggingRef.current = true;
     hasMovedRef.current = false;
-    lockHorizontalRef.current = false;
 
     setDragX(0);
     (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
@@ -404,7 +404,6 @@ export default function HomeBanner({ className }: Props) {
     if (!hasMovedRef.current) {
       if (Math.abs(dx) < DEADZONE_PX && Math.abs(dy) < DEADZONE_PX) return;
 
-      // se o gesto é mais vertical, liberamos (não trava scroll/zoom do browser)
       if (Math.abs(dy) > Math.abs(dx)) {
         draggingRef.current = false;
         setIsDragging(false);
@@ -412,14 +411,11 @@ export default function HomeBanner({ className }: Props) {
         return;
       }
 
-      // agora sim: virou swipe horizontal
       hasMovedRef.current = true;
-      lockHorizontalRef.current = true;
       setIsDragging(true);
     }
 
-    // ✅ só impede o comportamento padrão quando já confirmamos swipe horizontal
-    if (lockHorizontalRef.current) e.preventDefault();
+    e.preventDefault();
 
     const w = widthRef.current || 1;
     setDragX(clamp(dx, -w, w));
@@ -435,7 +431,6 @@ export default function HomeBanner({ className }: Props) {
     const dx = e.clientX - sx;
     startXRef.current = null;
     startYRef.current = null;
-    lockHorizontalRef.current = false;
 
     if (!hasMovedRef.current) {
       setIsDragging(false);
@@ -459,6 +454,7 @@ export default function HomeBanner({ className }: Props) {
   if (!current) return null;
 
   const slideTransitionClass = !isDragging && !snapping ? `transition-transform duration-[${SLIDE_MS}ms]` : '';
+
   const stop = (e: React.SyntheticEvent) => e.stopPropagation();
 
   const SHADOW_STRONG = '0 3px 22px rgba(0,0,0,0.92)';
@@ -476,7 +472,7 @@ export default function HomeBanner({ className }: Props) {
     ].join(' ');
 
     return (
-      <div className="absolute inset-0 z-[35] px-14 pb-4 pt-6">
+      <div className="absolute inset-0 z-[35] px-14 pb-4 pt-6 -translate-y-[0px]">
         <div className={[`flex h-full w-full flex-col justify-end gap-1 ${contentAlign}`, centerLiftClass].join(' ')}>
           <div className="text-[11px] font-semibold tracking-wide" style={{ color: '#7CFFB2', textShadow: SHADOW_SOFT }}>
             {(item as any).tag}
@@ -513,21 +509,12 @@ export default function HomeBanner({ className }: Props) {
   const fadeItem = fadeTo != null ? items[fadeTo] : null;
   const elapsedMs = clamp(DURATION_MS - remainingRef.current, 0, DURATION_MS);
 
-  // ✅ altura responsiva: evita “corte agressivo” em vários aparelhos
-  // - mobile pequeno: ~220px
-  // - cresce com viewport
-  // - trava em ~290px
-  const bannerHeightClass = 'h-[clamp(220px,42vw,290px)]';
-
   return (
     <section className={className}>
-      <div className="relative w-full overflow-x-hidden">
+      <div className="relative w-full">
         <div
           ref={containerRef}
-          className={[
-            'relative w-full overflow-hidden select-none',
-            bannerHeightClass,
-          ].join(' ')}
+          className="relative h-[250px] w-full overflow-hidden"
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
@@ -542,7 +529,7 @@ export default function HomeBanner({ className }: Props) {
                   <img
                     src={(current as any).imageUrl}
                     alt={(current as any).title}
-                    className="absolute inset-0 h-full w-full object-cover object-center"
+                    className="absolute inset-0 h-full w-full object-cover"
                     loading="lazy"
                     draggable={false}
                     decoding="async"
@@ -559,7 +546,7 @@ export default function HomeBanner({ className }: Props) {
                   <img
                     src={(fadeItem as any).imageUrl}
                     alt={(fadeItem as any).title}
-                    className="absolute inset-0 h-full w-full object-cover object-center"
+                    className="absolute inset-0 h-full w-full object-cover"
                     loading="lazy"
                     draggable={false}
                     decoding="async"
@@ -586,7 +573,7 @@ export default function HomeBanner({ className }: Props) {
                   <img
                     src={(prevItem as any).imageUrl}
                     alt={(prevItem as any).title}
-                    className="absolute inset-0 h-full w-full object-cover object-center"
+                    className="absolute inset-0 h-full w-full object-cover"
                     loading="lazy"
                     draggable={false}
                     decoding="async"
@@ -608,7 +595,7 @@ export default function HomeBanner({ className }: Props) {
                   <img
                     src={(current as any).imageUrl}
                     alt={(current as any).title}
-                    className="absolute inset-0 h-full w-full object-cover object-center"
+                    className="absolute inset-0 h-full w-full object-cover"
                     loading="lazy"
                     draggable={false}
                     decoding="async"
@@ -630,7 +617,7 @@ export default function HomeBanner({ className }: Props) {
                   <img
                     src={(nextItem as any).imageUrl}
                     alt={(nextItem as any).title}
-                    className="absolute inset-0 h-full w-full object-cover object-center"
+                    className="absolute inset-0 h-full w-full object-cover"
                     loading="lazy"
                     draggable={false}
                     decoding="async"
@@ -696,7 +683,7 @@ export default function HomeBanner({ className }: Props) {
               type="button"
               aria-label={userPaused ? 'Ativar banner' : 'Pausar banner'}
               onClick={() => setUserPaused((v) => !v)}
-              className="p-2"
+              className="p2"
               style={{ touchAction: 'manipulation' }}
             >
               {userPaused ? <PlayIcon className="h-10 w-10 text-white" /> : <PauseIcon className="h-10 w-10 text-white" />}
@@ -706,7 +693,7 @@ export default function HomeBanner({ className }: Props) {
               type="button"
               aria-label="Compartilhar"
               onClick={onShare}
-              className="p-2 -ml-2"
+              className="p2 -ml-2"
               style={{ touchAction: 'manipulation' }}
             >
               <PlaneIcon className="h-7 w-7 text-white rotate-[25deg]" />
