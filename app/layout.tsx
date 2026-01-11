@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import AppChrome from './_components/header/AppChrome';
 
@@ -16,17 +16,24 @@ export const metadata: Metadata = {
   description: 'Clube de benefícios e descontos.',
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+/**
+ * ✅ Opcional (mas resolve “zoom” no mobile)
+ * - Se você REALMENTE não quer o usuário ampliando/reduzindo, deixe assim.
+ * - Se preferir permitir zoom, remova maximumScale e userScalable.
+ */
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  maximumScale: 1,
+  userScalable: false,
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
-      <body suppressHydrationWarning>
-        <AppChrome>
-          {children}
-        </AppChrome>
+      <body suppressHydrationWarning className="overflow-x-hidden">
+        <AppChrome>{children}</AppChrome>
       </body>
     </html>
   );
