@@ -18,14 +18,14 @@ type Props = {
 };
 
 export default function Step07ThankYou({
-  title = 'Muito obrigado por utilizar o Clube Turista.',
+  title = 'Muito obrigado por utilizar o Clube Plug Descontos.',
   subtitle = 'Você já está economizando e poderá economizar muito mais. Continue usando.',
   onClose,
   disabled = false,
 }: Props) {
   return (
     <div className="w-full px-4 py-5">
-      <div className="mx-auto w-full max-w-[420px] rounded-2xl border border-black/10 bg-white p-6 shadow-sm">
+      <div className="mx-auto w-full max-w-[420px] rounded-md border border-black/10 bg-white p-6 shadow-sm">
         <div className="text-center">
           <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100">
             <span className="text-2xl text-emerald-700 transition-transform duration-200 ease-out active:scale-[0.98]">
@@ -48,7 +48,7 @@ export default function Step07ThankYou({
             onClick={onClose}
             disabled={disabled}
             className={[
-              'h-10 w-full rounded-xl bg-emerald-600 text-[13px] font-semibold text-white shadow-sm transition',
+              'h-10 w-full rounded-md bg-emerald-600 text-[13px] font-semibold text-white shadow-sm transition',
               'active:scale-[0.99]',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40',
               'disabled:opacity-60 disabled:pointer-events-none',

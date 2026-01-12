@@ -1,5 +1,6 @@
 // app/_components/header/AppChrome.tsx
 'use client';
+
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 
@@ -7,6 +8,10 @@ import FloatingHeader from './FloatingHeader';
 import MenuCarouselModal from '../menu/MenuCarouselModal';
 
 import { getFavorites, onFavoritesChange, type FavoriteItem } from '../favorites/favoritesStore';
+
+// ✅ Bottom Nav
+import BottomNav from '@/app/_components/bottom-nav/BottomNav';
+import { BOTTOM_NAV_ITEMS } from '@/app/_components/bottom-nav/items';
 
 type Props = {
   children: React.ReactNode;
@@ -31,6 +36,9 @@ function safeHref(v: any) {
   const s = typeof v === 'string' ? v.trim() : '';
   return s.length ? s : '/';
 }
+
+// ✅ mesma altura default do BottomNav
+const BOTTOM_NAV_HEIGHT_PX = 74;
 
 export default function AppChrome({ children }: Props) {
   const [favoritesCount, setFavoritesCount] = useState<number>(0);
@@ -329,9 +337,19 @@ export default function AppChrome({ children }: Props) {
         </div>
       )}
 
-      <div className="pt-14" style={{ paddingTop: 'var(--app-header-h, 56px)' }}>
+      {/* ✅ Conteúdo do app (com espaço pro BottomNav) */}
+      <div
+        className="pt-14"
+        style={{
+          paddingTop: 'var(--app-header-h, 56px)',
+          paddingBottom: `calc(${BOTTOM_NAV_HEIGHT_PX}px + env(safe-area-inset-bottom))`,
+        }}
+      >
         {children}
       </div>
+
+      {/* ✅ BottomNav real */}
+      <BottomNav items={BOTTOM_NAV_ITEMS} heightPx={BOTTOM_NAV_HEIGHT_PX} />
 
       <div className="hidden" data-destino={destinoId} />
     </div>

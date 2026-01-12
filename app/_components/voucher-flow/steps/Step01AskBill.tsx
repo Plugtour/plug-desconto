@@ -27,7 +27,7 @@ export default function Step01AskBill({
 
   return (
     <div className="w-full px-4 py-5">
-      <div className="mx-auto w-full max-w-[420px] rounded-2xl border border-black/10 bg-white p-5 shadow-sm">
+      <div className="mx-auto w-full max-w-[420px] rounded-md border border-black/10 bg-white p-5 shadow-sm">
         <div className="text-center">
           {name ? (
             <p className="text-[13px] leading-5 text-black/70">Olá, {name}!</p>
@@ -50,7 +50,7 @@ export default function Step01AskBill({
             onClick={onYes}
             disabled={disabled}
             className={[
-              'h-10 rounded-xl bg-emerald-600 text-[13px] font-semibold text-white shadow-sm transition',
+              'h-10 rounded-md bg-emerald-600 text-[13px] font-semibold text-white shadow-sm transition',
               'active:scale-[0.99]',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40',
               'disabled:opacity-60 disabled:pointer-events-none',
@@ -64,7 +64,7 @@ export default function Step01AskBill({
             onClick={onNo}
             disabled={disabled}
             className={[
-              'h-10 rounded-xl bg-red-600 text-[13px] font-semibold text-white shadow-sm transition',
+              'h-10 rounded-md bg-red-600 text-[13px] font-semibold text-white shadow-sm transition',
               'active:scale-[0.99]',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/35',
               'disabled:opacity-60 disabled:pointer-events-none',

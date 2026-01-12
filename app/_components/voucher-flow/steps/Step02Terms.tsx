@@ -40,7 +40,7 @@ export default function Step02Terms({
 }: Props) {
   return (
     <div className="w-full px-4 py-5">
-      <div className="mx-auto w-full max-w-[420px] rounded-2xl border border-black/10 bg-white p-5 shadow-sm">
+      <div className="mx-auto w-full max-w-[420px] rounded-md border border-black/10 bg-white p-5 shadow-sm">
         <div className="text-center">
           <p className="text-[13px] leading-5 text-black/70">
             Condições do desconto
@@ -53,7 +53,7 @@ export default function Step02Terms({
           </h2>
         </div>
 
-        <div className="mt-4 rounded-xl border border-black/10 bg-black/[0.02] p-4">
+        <div className="mt-4 rounded-md border border-black/10 bg-black/[0.02] p-4">
           <p className="text-[13px] font-semibold text-black">
             Excetos:
           </p>
@@ -77,7 +77,7 @@ export default function Step02Terms({
             onClick={onAgree}
             disabled={disabled}
             className={[
-              'h-10 w-full rounded-xl bg-emerald-600 text-[13px] font-semibold text-white shadow-sm transition',
+              'h-10 w-full rounded-md bg-emerald-600 text-[13px] font-semibold text-white shadow-sm transition',
               'active:scale-[0.99]',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40',
               'disabled:opacity-60 disabled:pointer-events-none',
@@ -92,7 +92,7 @@ export default function Step02Terms({
               onClick={onClose}
               disabled={disabled}
               className={[
-                'mt-2 h-10 w-full rounded-xl border border-black/10 bg-white text-[13px] font-semibold text-black/80 transition',
+                'mt-2 h-10 w-full rounded-md border border-black/10 bg-white text-[13px] font-semibold text-black/80 transition',
                 'active:scale-[0.99]',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20',
                 'disabled:opacity-60 disabled:pointer-events-none',

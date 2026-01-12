@@ -47,7 +47,7 @@ export default function Step03Voucher({
 
   return (
     <div className="w-full px-4 py-5">
-      <div className="mx-auto w-full max-w-[420px] rounded-2xl border border-black/10 bg-white p-5 shadow-sm">
+      <div className="mx-auto w-full max-w-[420px] rounded-md border border-black/10 bg-white p-5 shadow-sm">
         <div className="text-center">
           <p className="text-[13px] leading-5 text-black/70">Voucher</p>
 
@@ -63,7 +63,7 @@ export default function Step03Voucher({
           </p>
         </div>
 
-        <div className="mt-4 rounded-xl border border-amber-300 bg-amber-100 px-4 py-3 text-center">
+        <div className="mt-4 rounded-md border border-amber-300 bg-amber-100 px-4 py-3 text-center">
           <p className="text-[12px] font-semibold text-amber-900">
             Utilizado em
           </p>
@@ -72,7 +72,7 @@ export default function Step03Voucher({
           </p>
         </div>
 
-        <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+        <div className="mt-4 rounded-md border border-red-200 bg-red-50 px-4 py-3">
           <p className="text-[12px] font-semibold text-red-700">Atenção:</p>
           <p className="mt-1 text-[12px] leading-5 text-red-700/90">
             Chame o garçom, apresente esta tela do aplicativo e peça a sua conta.
@@ -85,7 +85,7 @@ export default function Step03Voucher({
             onClick={onNext}
             disabled={disabled}
             className={[
-              'h-10 w-full rounded-xl bg-emerald-600 text-[13px] font-semibold text-white shadow-sm transition',
+              'h-10 w-full rounded-md bg-emerald-600 text-[13px] font-semibold text-white shadow-sm transition',
               'active:scale-[0.99]',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40',
               'disabled:opacity-60 disabled:pointer-events-none',
@@ -100,7 +100,7 @@ export default function Step03Voucher({
               onClick={onClose}
               disabled={disabled}
               className={[
-                'mt-2 h-10 w-full rounded-xl border border-black/10 bg-white text-[13px] font-semibold text-black/80 transition',
+                'mt-2 h-10 w-full rounded-md border border-black/10 bg-white text-[13px] font-semibold text-black/80 transition',
                 'active:scale-[0.99]',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20',
                 'disabled:opacity-60 disabled:pointer-events-none',

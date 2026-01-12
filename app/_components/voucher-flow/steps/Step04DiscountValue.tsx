@@ -55,7 +55,7 @@ export default function Step04DiscountValue({
 
   return (
     <div className="w-full px-4 py-5">
-      <div className="mx-auto w-full max-w-[420px] rounded-2xl border border-black/10 bg-white p-5 shadow-sm">
+      <div className="mx-auto w-full max-w-[420px] rounded-md border border-black/10 bg-white p-5 shadow-sm">
         <div className="text-center">
           <p className="text-[13px] leading-5 text-black/70">
             Informe o desconto
@@ -74,7 +74,7 @@ export default function Step04DiscountValue({
             onChange={handleChange}
             disabled={disabled}
             className={[
-              'h-11 w-full rounded-xl border border-black/15 bg-white px-3 text-center text-[15px] font-semibold text-emerald-700 outline-none',
+              'h-11 w-full rounded-md border border-black/15 bg-white px-3 text-center text-[15px] font-semibold text-emerald-700 outline-none',
               'focus-visible:border-emerald-600 focus-visible:ring-2 focus-visible:ring-emerald-500/30',
               'disabled:opacity-60 disabled:pointer-events-none',
             ].join(' ')}
@@ -87,7 +87,7 @@ export default function Step04DiscountValue({
             onClick={handleNext}
             disabled={disabled}
             className={[
-              'h-10 w-full rounded-xl bg-emerald-600 text-[13px] font-semibold text-white shadow-sm transition',
+              'h-10 w-full rounded-md bg-emerald-600 text-[13px] font-semibold text-white shadow-sm transition',
               'active:scale-[0.99]',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40',
               'disabled:opacity-60 disabled:pointer-events-none',
@@ -102,7 +102,7 @@ export default function Step04DiscountValue({
               onClick={onClose}
               disabled={disabled}
               className={[
-                'mt-2 h-10 w-full rounded-xl border border-black/10 bg-white text-[13px] font-semibold text-black/80 transition',
+                'mt-2 h-10 w-full rounded-md border border-black/10 bg-white text-[13px] font-semibold text-black/80 transition',
                 'active:scale-[0.99]',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20',
                 'disabled:opacity-60 disabled:pointer-events-none',
