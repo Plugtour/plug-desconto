@@ -1,9 +1,6 @@
-// app/api/offers/route.ts
-
 import { NextResponse } from 'next/server';
 import { getTenantFromRequest } from '@/lib/tenant';
-import type { Offer } from '@/lib/offers';
-import { getOffersByTenant, getOffersByCity, getOffersByCityAndCategory, normalizeCat } from '@/lib/offers';
+import { prisma } from '@/lib/prisma';
 
 function normalizeCity(value: string) {
   return value
@@ -11,6 +8,15 @@ function normalizeCity(value: string) {
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '');
+}
+
+function normalizeCat(value: string) {
+  return (value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, '-');
 }
 
 export async function GET(request: Request) {
@@ -22,43 +28,27 @@ export async function GET(request: Request) {
 
     const cityParam = cityParamRaw ? normalizeCity(cityParamRaw) : null;
 
-    // ✅ evita erro de assinatura do tenant.ts
+    // mantém compatibilidade com seu tenant.ts atual
     const tenant: any = (getTenantFromRequest as any)(request);
 
-    let items: Offer[] = [];
+    const tenantKey =
+      cityParam ||
+      (typeof tenant === 'string'
+        ? tenant
+        : (tenant?.city as string) || (tenant?.tenant as string) || '');
 
-    // Prioridade:
-    // 1) city + categoryId
-    // 2) city
-    // 3) tenant (fallback)
-    if (cityParam && categoryParam) {
-      // tenta por city+category
-      items = getOffersByCityAndCategory(cityParam, categoryParam);
+    const where: any = {
+      status: 'publicado',
+    };
 
-      // ✅ fallback: se city não existir no dataset, tenta como tenantKey
-      if (!items.length) {
-        items = getOffersByTenant(cityParam);
-      }
-    } else if (cityParam) {
-      // tenta por city
-      items = getOffersByCity(cityParam);
+    if (tenantKey) where.city = normalizeCity(tenantKey);
+    if (categoryParam) where.categoryId = normalizeCat(categoryParam);
 
-      // ✅ fallback: se city não existir no dataset, tenta como tenantKey
-      if (!items.length) {
-        items = getOffersByTenant(cityParam);
-      }
-    } else {
-      const tenantKey =
-        typeof tenant === 'string' ? tenant : (tenant?.city as string) || (tenant?.tenant as string) || '';
-
-      items = tenantKey ? getOffersByTenant(tenantKey) : [];
-    }
-
-    // Normaliza categoryId se vier diferente
-    if (categoryParam) {
-      const cat = normalizeCat(categoryParam);
-      items = items.filter((o) => normalizeCat(String((o as any).categoryId ?? '')) === cat);
-    }
+    const items = await prisma.offer.findMany({
+      where,
+      orderBy: { updatedAt: 'desc' },
+      take: 200,
+    });
 
     return NextResponse.json({ items, total: items.length }, { status: 200 });
   } catch (e: any) {

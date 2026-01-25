@@ -1,0 +1,40 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum OfferStatus {
+  rascunho
+  publicado
+  pausado
+  arquivado
+}
+
+model Offer {
+  id          String      @id @default(cuid())
+  slug        String      @unique
+
+  title       String
+  partnerName String
+
+  city        String
+  categoryId  String
+  status      OfferStatus @default(rascunho)
+
+  // Campos opcionais (para crescer sem dor)
+  description String?
+  imageUrl    String?
+  priceText   String?
+
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([city])
+  @@index([categoryId])
+  @@index([status])
+  @@index([partnerName])
+}
