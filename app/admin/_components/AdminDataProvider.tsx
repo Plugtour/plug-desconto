@@ -2,7 +2,9 @@
 
 // app/admin/_components/AdminDataProvider.tsx
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import type { OfferStatus } from '../_data/adminMappers';
+import type { OfferStatus, AffiliateStatus } from '../_data/adminMappers';
+import { adminMock } from '../_data/adminMock';
+import { mapOffer, mapPartner, mapAffiliate } from '../_data/adminMappers';
 
 type AdminOfferRow = {
   id: string;
@@ -25,6 +27,10 @@ type AdminAffiliateRow = {
   nome: string;
   status: 'publicado' | 'rascunho' | 'pausado' | 'arquivado';
   atualizadoEm?: string;
+  email: string;
+  whatsapp: string;
+  cupom: string;
+  whatsappHref?: string;
 };
 
 type AdminDataContextValue = {
@@ -32,7 +38,10 @@ type AdminDataContextValue = {
   partners: AdminPartnerRow[];
   affiliates: AdminAffiliateRow[];
   refreshOffers: () => Promise<void>;
-  setOfferStatus: (id: string, status: OfferStatus) => void; // mantém compatível com sua tela
+  setOfferStatus: (id: string, status: OfferStatus) => void;
+
+  // ✅ ADICIONADO: usado em app/admin/afiliados/page.tsx
+  setAffiliateStatus: (id: string, status: AffiliateStatus) => void;
 };
 
 const AdminDataContext = createContext<AdminDataContextValue | null>(null);
@@ -57,12 +66,12 @@ function mapDbOfferToRow(db: any): AdminOfferRow {
 
 export function AdminDataProvider({ children }: { children: React.ReactNode }) {
   const [offers, setOffers] = useState<AdminOfferRow[]>([]);
-  // IMPORTANTE: manter arrays para o dashboard não quebrar (partners/affiliates)
-  const [partners] = useState<AdminPartnerRow[]>([]);
-  const [affiliates] = useState<AdminAffiliateRow[]>([]);
+  const [partners, setPartners] = useState<AdminPartnerRow[]>([]);
+  const [affiliates, setAffiliates] = useState<AdminAffiliateRow[]>([]);
 
   const [loaded, setLoaded] = useState(false);
 
+  // ✅ Ofertas continuam vindo da API (banco)
   const refreshOffers = async () => {
     const res = await fetch('/api/admin/offers', { cache: 'no-store' });
     const data = await res.json().catch(() => ({}));
@@ -75,10 +84,25 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
     setOffers(items.map(mapDbOfferToRow));
   };
 
+  // ✅ Partners/Affiliates (por enquanto) vêm do mock para o admin não ficar vazio
+  const refreshMockLists = () => {
+    try {
+      setPartners((adminMock.partners || []).map(mapPartner) as any);
+      setAffiliates((adminMock.affiliates || []).map(mapAffiliate) as any);
+    } catch {
+      // mantém vazio se algo falhar
+      setPartners([]);
+      setAffiliates([]);
+    }
+  };
+
   useEffect(() => {
     if (loaded) return;
     setLoaded(true);
+
+    refreshMockLists();
     refreshOffers().catch(() => {});
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loaded]);
 
@@ -95,16 +119,27 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({ status }),
       });
 
-      // se falhar ou sucesso, garante sincronizar
       await refreshOffers().catch(() => {});
       if (!res.ok) {
-        // opcional: aqui você pode disparar toast se quiser (mas não mexo no layout)
+        // opcional: toast
       }
     })();
   };
 
+  // ✅ NOVO: atualiza status do afiliado (mock/state)
+  const setAffiliateStatus = (id: string, status: AffiliateStatus) => {
+    setAffiliates((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)));
+  };
+
   const value = useMemo(
-    () => ({ offers, partners, affiliates, refreshOffers, setOfferStatus }),
+    () => ({
+      offers,
+      partners,
+      affiliates,
+      refreshOffers,
+      setOfferStatus,
+      setAffiliateStatus,
+    }),
     [offers, partners, affiliates]
   );
 
