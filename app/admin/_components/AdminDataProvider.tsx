@@ -6,6 +6,8 @@ import type { OfferStatus, AffiliateStatus } from '../_data/adminMappers';
 import { adminMock } from '../_data/adminMock';
 import { mapPartner, mapAffiliate } from '../_data/adminMappers';
 
+type PartnerStatus = 'publicado' | 'rascunho' | 'pausado' | 'arquivado';
+
 type AdminOfferRow = {
   id: string;
   titulo: string;
@@ -20,7 +22,7 @@ type AdminPartnerRow = {
   nome: string;
   categoria: string;
   cidade: string;
-  status: 'publicado' | 'rascunho' | 'pausado' | 'arquivado';
+  status: PartnerStatus;
   ofertasAtivas: number;
   atualizadoEm: string;
 };
@@ -28,7 +30,7 @@ type AdminPartnerRow = {
 type AdminAffiliateRow = {
   id: string;
   nome: string;
-  status: 'publicado' | 'rascunho' | 'pausado' | 'arquivado';
+  status: PartnerStatus;
   atualizadoEm: string;
   email: string;
   whatsapp: string;
@@ -46,7 +48,11 @@ type AdminDataContextValue = {
   refreshOffers: () => Promise<void>;
   setOfferStatus: (id: string, status: OfferStatus) => void;
 
+  // ✅ usado em /admin/afiliados
   setAffiliateStatus: (id: string, status: AffiliateStatus) => void;
+
+  // ✅ usado em /admin/parceiros
+  setPartnerStatus: (id: string, status: PartnerStatus) => void;
 };
 
 const AdminDataContext = createContext<AdminDataContextValue | null>(null);
@@ -98,7 +104,7 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
         nome: String(m.nome ?? ''),
         categoria: String(m.categoria ?? ''),
         cidade: String(m.cidade ?? ''),
-        status: (m.status ?? 'rascunho') as AdminPartnerRow['status'],
+        status: (m.status ?? 'rascunho') as PartnerStatus,
         ofertasAtivas: Number(m.ofertasAtivas ?? 0),
         atualizadoEm: String(m.atualizadoEm ?? '-'),
       } satisfies AdminPartnerRow;
@@ -109,7 +115,7 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
       return {
         id: String(m.id ?? ''),
         nome: String(m.nome ?? ''),
-        status: (m.status ?? 'rascunho') as AdminAffiliateRow['status'],
+        status: (m.status ?? 'rascunho') as PartnerStatus,
         atualizadoEm: String(m.atualizadoEm ?? '-'),
         email: String(m.email ?? ''),
         whatsapp: String(m.whatsapp ?? ''),
@@ -156,6 +162,11 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
     setAffiliates((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)));
   };
 
+  // ✅ NOVO: atualiza status do parceiro (mock/state)
+  const setPartnerStatus = (id: string, status: PartnerStatus) => {
+    setPartners((prev) => prev.map((p) => (p.id === id ? { ...p, status } : p)));
+  };
+
   const value = useMemo(
     () => ({
       offers,
@@ -164,6 +175,7 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
       refreshOffers,
       setOfferStatus,
       setAffiliateStatus,
+      setPartnerStatus,
     }),
     [offers, partners, affiliates]
   );
