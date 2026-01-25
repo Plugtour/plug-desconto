@@ -42,6 +42,7 @@ export type AdminPartnerRow = {
   nome: string;
   categoria: string;
   cidade: string;
+  whatsapp: string; // ✅ aqui é a correção principal
   status: PartnerStatus;
   ofertasAtivas: number;
   atualizadoEm: string;
@@ -65,7 +66,6 @@ export type AdminAffiliateRow = {
 // OFFERS
 // =========================
 
-// DB shape (ex.: db.title / db.partnerName / db.updatedAt)
 export function mapDbOfferToAdminRow(db: any): AdminOfferRow {
   return {
     id: String(db?.id ?? ''),
@@ -77,7 +77,6 @@ export function mapDbOfferToAdminRow(db: any): AdminOfferRow {
   };
 }
 
-// Mock shape (ex.: mock.titulo / mock.parceiro / mock.createdAt)
 export function mapMockOfferToAdminRow(m: any): AdminOfferRow {
   return {
     id: String(m?.id ?? ''),
@@ -89,11 +88,6 @@ export function mapMockOfferToAdminRow(m: any): AdminOfferRow {
   };
 }
 
-/**
- * mapOffer: aceita tanto mock quanto db
- * - se vier "titulo", assume mock
- * - senão, assume db
- */
 export const mapOffer = (x: any): AdminOfferRow => {
   if (x && typeof x === 'object' && 'titulo' in x) return mapMockOfferToAdminRow(x);
   return mapDbOfferToAdminRow(x);
@@ -109,6 +103,7 @@ export const mapPartner = (p: any): AdminPartnerRow => {
     nome: String(p?.nome ?? p?.name ?? ''),
     categoria: String(p?.categoria ?? p?.category ?? ''),
     cidade: String(p?.cidade ?? p?.city ?? ''),
+    whatsapp: String(p?.whatsapp ?? p?.phone ?? ''), // ✅ garante campo
     status: (p?.status ?? 'rascunho') as PartnerStatus,
     ofertasAtivas: Number(p?.ofertasAtivas ?? p?.activeOffers ?? 0),
     atualizadoEm: formatDateBR(p?.updatedAt ?? p?.createdAt),
@@ -123,18 +118,11 @@ export const mapAffiliate = (a: any): AdminAffiliateRow => {
   const id = String(a?.id ?? '');
   const nome = String(a?.nome ?? a?.name ?? '');
 
-  // Se já vier pronto, mantém. Se não vier, cria um padrão (mock).
-  const email =
-    String(a?.email ?? '').trim() ||
-    `${slugify(nome || id).toLowerCase()}@afiliado.local`;
+  const email = String(a?.email ?? '').trim() || `${slugify(nome || id).toLowerCase()}@afiliado.local`;
 
-  const whatsapp =
-    String(a?.whatsapp ?? '').trim() ||
-    '51999999999'; // padrão (mock) só pra não quebrar UI
+  const whatsapp = String(a?.whatsapp ?? '').trim() || '51999999999';
 
-  const cupom =
-    String(a?.cupom ?? '').trim() ||
-    (slugify(nome || id) || 'CUPOM');
+  const cupom = String(a?.cupom ?? '').trim() || slugify(nome || id) || 'CUPOM';
 
   const whatsappHref = String(a?.whatsappHref ?? '').trim() || buildWhatsappHref(whatsapp);
 

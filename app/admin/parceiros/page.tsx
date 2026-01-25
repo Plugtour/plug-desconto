@@ -26,18 +26,15 @@ const buildWhatsappHref = (raw: string) => {
 const isPartnerStatus = (v: string | null): v is PartnerStatus =>
   v === 'rascunho' || v === 'publicado' || v === 'pausado' || v === 'arquivado';
 
-// aceita "DD/MM/AA" ou "DD-MM-AA" e também "YYYY-MM-DD"
 const parseAnyDate = (s: string) => {
   const raw = (s || '').trim();
   if (!raw) return 0;
 
-  // YYYY-MM-DD
   if (/^\d{4}-\d{2}-\d{2}/.test(raw)) {
     const t = new Date(raw.slice(0, 10)).getTime();
     return Number.isNaN(t) ? 0 : t;
   }
 
-  // DD/MM/AA ou DD-MM-AA
   const clean = raw.replace(/-/g, '/');
   const parts = clean.split('/');
   if (parts.length < 3) return 0;
@@ -73,7 +70,6 @@ export default function AdminParceirosPage() {
   const [status, setStatus] = useState<PartnerStatus | 'todos'>('todos');
   const [q, setQ] = useState('');
 
-  // ✅ ordenação
   const [sortKey, setSortKey] = useState<SortKey>('atualizadoEm');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
 
@@ -97,10 +93,8 @@ export default function AdminParceirosPage() {
     );
   };
 
-  // evita loop entre ler URL -> setState -> reescrever URL
   const didInitRef = useRef(false);
 
-  // ✅ inicia lendo ?q= e ?status= da URL (mesma aba ou vindo do dashboard)
   useEffect(() => {
     if (didInitRef.current) return;
 
@@ -114,18 +108,15 @@ export default function AdminParceirosPage() {
     didInitRef.current = true;
   }, []);
 
-  // ✅ mantém URL refletindo o estado atual (q + status)
   useEffect(() => {
     if (!didInitRef.current) return;
 
     const sp = new URLSearchParams(window.location.search);
 
-    // q
     const nextQ = q.trim();
     if (nextQ) sp.set('q', nextQ);
     else sp.delete('q');
 
-    // status
     if (status && status !== 'todos') sp.set('status', status);
     else sp.delete('status');
 
@@ -138,7 +129,6 @@ export default function AdminParceirosPage() {
   const clearFilters = () => {
     setStatus('todos');
     setQ('');
-    // URL vai atualizar via effect acima
   };
 
   const getNameById = (id: string) => partners.find((p) => p.id === id)?.nome || id;
@@ -180,7 +170,6 @@ export default function AdminParceirosPage() {
       });
   }, [partners, status, q]);
 
-  // ✅ ordenação aplicada ao resultado filtrado
   const sorted = useMemo(() => {
     const dir = sortDir === 'asc' ? 1 : -1;
 
@@ -210,7 +199,6 @@ export default function AdminParceirosPage() {
       if (va < vb) return -1 * dir;
       if (va > vb) return 1 * dir;
 
-      // desempate: por nome
       const na = (a.nome || '').toLowerCase();
       const nb = (b.nome || '').toLowerCase();
       if (na < nb) return -1;
@@ -359,7 +347,7 @@ export default function AdminParceirosPage() {
               </tr>
             ) : (
               sorted.map((p) => {
-                const whatsappHref = (p as any).whatsappHref || buildWhatsappHref(p.whatsapp);
+                const whatsappHref = buildWhatsappHref(p.whatsapp);
 
                 return (
                   <tr key={p.id} className="text-sm">

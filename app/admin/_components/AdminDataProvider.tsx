@@ -22,6 +22,7 @@ type AdminPartnerRow = {
   nome: string;
   categoria: string;
   cidade: string;
+  whatsapp: string; // ✅ precisa existir (a tela usa)
   status: PartnerStatus;
   ofertasAtivas: number;
   atualizadoEm: string;
@@ -79,7 +80,6 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
   const [offers, setOffers] = useState<AdminOfferRow[]>([]);
   const [partners, setPartners] = useState<AdminPartnerRow[]>([]);
   const [affiliates, setAffiliates] = useState<AdminAffiliateRow[]>([]);
-
   const [loaded, setLoaded] = useState(false);
 
   // Ofertas continuam vindo da API (banco)
@@ -99,11 +99,13 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
   const refreshMockLists = () => {
     const nextPartners = (adminMock.partners || []).map((p) => {
       const m = mapPartner(p) as any;
+
       return {
         id: String(m.id ?? ''),
         nome: String(m.nome ?? ''),
         categoria: String(m.categoria ?? ''),
         cidade: String(m.cidade ?? ''),
+        whatsapp: String(m.whatsapp ?? ''), // ✅ aqui também
         status: (m.status ?? 'rascunho') as PartnerStatus,
         ofertasAtivas: Number(m.ofertasAtivas ?? 0),
         atualizadoEm: String(m.atualizadoEm ?? '-'),
@@ -162,7 +164,7 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
     setAffiliates((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)));
   };
 
-  // ✅ NOVO: atualiza status do parceiro (mock/state)
+  // Atualiza status do parceiro (mock/state)
   const setPartnerStatus = (id: string, status: PartnerStatus) => {
     setPartners((prev) => prev.map((p) => (p.id === id ? { ...p, status } : p)));
   };
