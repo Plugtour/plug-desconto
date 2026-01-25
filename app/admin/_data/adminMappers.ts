@@ -28,3 +28,4 @@ export function mapDbOfferToAdminRow(db: any): AdminOfferRow {
     atualizadoEm: formatDateBR(db?.updatedAt ?? db?.createdAt),
   };
 }
+
