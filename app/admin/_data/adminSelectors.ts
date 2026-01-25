@@ -19,7 +19,7 @@ export function getDashboardData() {
   const chart = {
     yearLabel: '2026',
     isMock: true,
-    months: adminMock.dashboard.months, // [{label,value}]
+    months: adminMock.dashboard.months,
     bars: adminMock.dashboard.months.map((m) => m.value),
   };
 

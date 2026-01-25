@@ -29,3 +29,24 @@ export function mapDbOfferToAdminRow(db: any): AdminOfferRow {
   };
 }
 
+/**
+ * Alias para uso com dados mock / selectors
+ * Mantém compatibilidade com adminSelectors.ts
+ */
+export const mapOffer = mapDbOfferToAdminRow;
+
+/**
+ * Placeholders seguros para evitar erro de build
+ * Ajustaremos depois conforme o mock evoluir
+ */
+export const mapPartner = (p: any) => ({
+  id: String(p?.id ?? ''),
+  nome: String(p?.name ?? ''),
+  status: p?.status ?? 'rascunho',
+});
+
+export const mapAffiliate = (a: any) => ({
+  id: String(a?.id ?? ''),
+  nome: String(a?.name ?? ''),
+  status: a?.status ?? 'rascunho',
+});
