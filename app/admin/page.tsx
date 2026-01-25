@@ -40,11 +40,7 @@ const MiniBar = ({
 }) => {
   const pct = max > 0 ? Math.max(6, Math.round((value / max) * 100)) : 6;
 
-  const barClass = highlightCurrent
-    ? 'bg-zinc-700'
-    : highlightMax
-      ? 'bg-zinc-600'
-      : 'bg-zinc-800';
+  const barClass = highlightCurrent ? 'bg-zinc-700' : highlightMax ? 'bg-zinc-600' : 'bg-zinc-800';
 
   return (
     <div className="flex h-24 items-end">
@@ -64,8 +60,7 @@ export default function AdminDashboardPage() {
   const affiliatesPublished = affiliates.filter((a) => a.status === 'publicado').length;
 
   // ===== Downloads (mock calculado, mas consistente) =====
-  const totalDownloads =
-    offers.length * 220 + partners.length * 90 + affiliates.length * 45 + offersPublished * 180;
+  const totalDownloads = offers.length * 220 + partners.length * 90 + affiliates.length * 45 + offersPublished * 180;
 
   const activeDownloads = Math.max(0, Math.round(totalDownloads * 0.22)); // ~22% ativos (mock)
 
@@ -101,15 +96,10 @@ export default function AdminDashboardPage() {
     return { trend, pct, delta };
   })();
 
-  const TrendIcon =
-    compare.trend === 'up' ? ArrowUpRight : compare.trend === 'down' ? ArrowDownRight : Minus;
+  const TrendIcon = compare.trend === 'up' ? ArrowUpRight : compare.trend === 'down' ? ArrowDownRight : Minus;
 
   const trendColor =
-    compare.trend === 'up'
-      ? 'text-emerald-300'
-      : compare.trend === 'down'
-        ? 'text-rose-300'
-        : 'text-zinc-400';
+    compare.trend === 'up' ? 'text-emerald-300' : compare.trend === 'down' ? 'text-rose-300' : 'text-zinc-400';
 
   // ===== previews (recentes de verdade) =====
   const parseDDMMYY = (s: string) => {
@@ -127,11 +117,11 @@ export default function AdminDashboardPage() {
   };
 
   const topPartners = [...partners]
-    .sort((a, b) => parseDDMMYY(b.atualizadoEm) - parseDDMMYY(a.atualizadoEm))
+    .sort((a, b) => parseDDMMYY(b.atualizadoEm ?? '') - parseDDMMYY(a.atualizadoEm ?? ''))
     .slice(0, 3);
 
   const topAffiliates = [...affiliates]
-    .sort((a, b) => parseDDMMYY(b.atualizadoEm) - parseDDMMYY(a.atualizadoEm))
+    .sort((a, b) => parseDDMMYY(b.atualizadoEm ?? '') - parseDDMMYY(a.atualizadoEm ?? ''))
     .slice(0, 3);
 
   // ===== row inteiro clicável (nova aba) =====

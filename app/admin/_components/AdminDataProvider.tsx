@@ -4,7 +4,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { OfferStatus, AffiliateStatus } from '../_data/adminMappers';
 import { adminMock } from '../_data/adminMock';
-import { mapOffer, mapPartner, mapAffiliate } from '../_data/adminMappers';
+import { mapPartner, mapAffiliate } from '../_data/adminMappers';
 
 type AdminOfferRow = {
   id: string;
@@ -18,19 +18,25 @@ type AdminOfferRow = {
 type AdminPartnerRow = {
   id: string;
   nome: string;
+  categoria: string;
+  cidade: string;
   status: 'publicado' | 'rascunho' | 'pausado' | 'arquivado';
-  atualizadoEm?: string;
+  ofertasAtivas: number;
+  atualizadoEm: string;
 };
 
 type AdminAffiliateRow = {
   id: string;
   nome: string;
   status: 'publicado' | 'rascunho' | 'pausado' | 'arquivado';
-  atualizadoEm?: string;
+  atualizadoEm: string;
   email: string;
   whatsapp: string;
   cupom: string;
   whatsappHref?: string;
+  canal?: string;
+  leadsMes?: number;
+  vendasMes?: number;
 };
 
 type AdminDataContextValue = {
@@ -40,7 +46,6 @@ type AdminDataContextValue = {
   refreshOffers: () => Promise<void>;
   setOfferStatus: (id: string, status: OfferStatus) => void;
 
-  // ✅ ADICIONADO: usado em app/admin/afiliados/page.tsx
   setAffiliateStatus: (id: string, status: AffiliateStatus) => void;
 };
 
@@ -71,7 +76,7 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
 
   const [loaded, setLoaded] = useState(false);
 
-  // ✅ Ofertas continuam vindo da API (banco)
+  // Ofertas continuam vindo da API (banco)
   const refreshOffers = async () => {
     const res = await fetch('/api/admin/offers', { cache: 'no-store' });
     const data = await res.json().catch(() => ({}));
@@ -84,16 +89,40 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
     setOffers(items.map(mapDbOfferToRow));
   };
 
-  // ✅ Partners/Affiliates (por enquanto) vêm do mock para o admin não ficar vazio
+  // Partners/Affiliates por enquanto vêm do mock (para não ficar vazio)
   const refreshMockLists = () => {
-    try {
-      setPartners((adminMock.partners || []).map(mapPartner) as any);
-      setAffiliates((adminMock.affiliates || []).map(mapAffiliate) as any);
-    } catch {
-      // mantém vazio se algo falhar
-      setPartners([]);
-      setAffiliates([]);
-    }
+    const nextPartners = (adminMock.partners || []).map((p) => {
+      const m = mapPartner(p) as any;
+      return {
+        id: String(m.id ?? ''),
+        nome: String(m.nome ?? ''),
+        categoria: String(m.categoria ?? ''),
+        cidade: String(m.cidade ?? ''),
+        status: (m.status ?? 'rascunho') as AdminPartnerRow['status'],
+        ofertasAtivas: Number(m.ofertasAtivas ?? 0),
+        atualizadoEm: String(m.atualizadoEm ?? '-'),
+      } satisfies AdminPartnerRow;
+    });
+
+    const nextAffiliates = (adminMock.affiliates || []).map((a) => {
+      const m = mapAffiliate(a) as any;
+      return {
+        id: String(m.id ?? ''),
+        nome: String(m.nome ?? ''),
+        status: (m.status ?? 'rascunho') as AdminAffiliateRow['status'],
+        atualizadoEm: String(m.atualizadoEm ?? '-'),
+        email: String(m.email ?? ''),
+        whatsapp: String(m.whatsapp ?? ''),
+        cupom: String(m.cupom ?? ''),
+        whatsappHref: m.whatsappHref ? String(m.whatsappHref) : undefined,
+        canal: m.canal ? String(m.canal) : undefined,
+        leadsMes: typeof m.leadsMes === 'number' ? m.leadsMes : undefined,
+        vendasMes: typeof m.vendasMes === 'number' ? m.vendasMes : undefined,
+      } satisfies AdminAffiliateRow;
+    });
+
+    setPartners(nextPartners);
+    setAffiliates(nextAffiliates);
   };
 
   useEffect(() => {
@@ -102,16 +131,12 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
 
     refreshMockLists();
     refreshOffers().catch(() => {});
-
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loaded]);
 
-  // Mantém assinatura SEM async pra não quebrar sua página atual
   const setOfferStatus = (id: string, status: OfferStatus) => {
-    // otimista
     setOffers((prev) => prev.map((o) => (o.id === id ? { ...o, status } : o)));
 
-    // persiste no banco
     (async () => {
       const res = await fetch(`/api/admin/offers/${id}`, {
         method: 'PATCH',
@@ -126,7 +151,7 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
     })();
   };
 
-  // ✅ NOVO: atualiza status do afiliado (mock/state)
+  // Atualiza status do afiliado (mock/state)
   const setAffiliateStatus = (id: string, status: AffiliateStatus) => {
     setAffiliates((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)));
   };
