@@ -13,7 +13,7 @@ function formatDateBR(value: string | Date | null | undefined) {
 
 const digitsOnly = (v: string) => (v || '').replace(/\D/g, '');
 
-const buildWhatsappHref = (raw: string) => {
+export const buildWhatsappHref = (raw: string) => {
   const digits = digitsOnly(raw);
   if (!digits) return 'https://wa.me/55';
   const withCountry = digits.startsWith('55') ? digits : `55${digits}`;
@@ -42,7 +42,8 @@ export type AdminPartnerRow = {
   nome: string;
   categoria: string;
   cidade: string;
-  whatsapp: string; // ✅ aqui é a correção principal
+  whatsapp: string;
+  whatsappHref: string;
   status: PartnerStatus;
   ofertasAtivas: number;
   atualizadoEm: string;
@@ -98,12 +99,22 @@ export const mapOffer = (x: any): AdminOfferRow => {
 // =========================
 
 export const mapPartner = (p: any): AdminPartnerRow => {
+  const id = String(p?.id ?? '');
+  const nome = String(p?.nome ?? p?.name ?? '');
+
+  const whatsapp =
+    String(p?.whatsapp ?? '').trim() ||
+    '51999999999'; // padrão (mock) pra não quebrar UI
+
+  const whatsappHref = String(p?.whatsappHref ?? '').trim() || buildWhatsappHref(whatsapp);
+
   return {
-    id: String(p?.id ?? ''),
-    nome: String(p?.nome ?? p?.name ?? ''),
+    id,
+    nome,
     categoria: String(p?.categoria ?? p?.category ?? ''),
     cidade: String(p?.cidade ?? p?.city ?? ''),
-    whatsapp: String(p?.whatsapp ?? p?.phone ?? ''), // ✅ garante campo
+    whatsapp,
+    whatsappHref,
     status: (p?.status ?? 'rascunho') as PartnerStatus,
     ofertasAtivas: Number(p?.ofertasAtivas ?? p?.activeOffers ?? 0),
     atualizadoEm: formatDateBR(p?.updatedAt ?? p?.createdAt),
@@ -118,11 +129,17 @@ export const mapAffiliate = (a: any): AdminAffiliateRow => {
   const id = String(a?.id ?? '');
   const nome = String(a?.nome ?? a?.name ?? '');
 
-  const email = String(a?.email ?? '').trim() || `${slugify(nome || id).toLowerCase()}@afiliado.local`;
+  const email =
+    String(a?.email ?? '').trim() ||
+    `${slugify(nome || id).toLowerCase()}@afiliado.local`;
 
-  const whatsapp = String(a?.whatsapp ?? '').trim() || '51999999999';
+  const whatsapp =
+    String(a?.whatsapp ?? '').trim() ||
+    '51999999999'; // padrão (mock) pra não quebrar UI
 
-  const cupom = String(a?.cupom ?? '').trim() || slugify(nome || id) || 'CUPOM';
+  const cupom =
+    String(a?.cupom ?? '').trim() ||
+    (slugify(nome || id) || 'CUPOM');
 
   const whatsappHref = String(a?.whatsappHref ?? '').trim() || buildWhatsappHref(whatsapp);
 
