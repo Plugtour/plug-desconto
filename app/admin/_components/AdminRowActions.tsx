@@ -8,7 +8,6 @@ type AdminStatus = 'rascunho' | 'publicado' | 'pausado' | 'arquivado';
 type ClickEvent = React.MouseEvent<HTMLButtonElement>;
 
 function safeStop(e: ClickEvent) {
-  // impede o "row click" e qualquer navegação do container
   e.preventDefault();
   e.stopPropagation();
 }
@@ -37,13 +36,22 @@ function RowAction({
       onClick={onClick}
       disabled={disabled}
       className={[
-        'grid h-9 w-9 place-items-center rounded-lg',
+        'group grid h-9 w-9 place-items-center rounded-lg transition',
+        // ✅ cores seguras no claro/escuro (sem "quadrado preto" agressivo)
         disabled
           ? 'cursor-not-allowed opacity-40'
-          : 'hover:bg-zinc-900 active:bg-zinc-900/70',
+          : [
+              'text-zinc-500 hover:text-zinc-900 active:text-zinc-900',
+              'hover:bg-zinc-100 active:bg-zinc-200',
+              'dark:text-zinc-400 dark:hover:text-zinc-100 dark:active:text-zinc-100',
+              'dark:hover:bg-zinc-900/60 dark:active:bg-zinc-900/80',
+            ].join(' '),
       ].join(' ')}
     >
-      {children}
+      {/* garante que o SVG herde cor corretamente */}
+      <span className="grid place-items-center [&_svg]:transition [&_svg]:text-current">
+        {children}
+      </span>
     </button>
   );
 }
@@ -57,8 +65,6 @@ export default function AdminRowActions({
   onPause,
   onArchive,
   onRestore,
-
-  // ✅ novos (opcionais): abre em nova aba sem depender de rotas prontas
   viewBaseHref,
   editBaseHref,
 }: {
@@ -70,9 +76,8 @@ export default function AdminRowActions({
   onPause: (id: string) => void;
   onArchive: (id: string) => void;
   onRestore: (id: string) => void;
-
-  viewBaseHref?: string; // ex: "/admin/parceiros" ou "/admin/afiliados"
-  editBaseHref?: string; // ex: "/admin/parceiros/editar" (pode ser só mock)
+  viewBaseHref?: string;
+  editBaseHref?: string;
 }) {
   const canPublish = status === 'rascunho' || status === 'pausado';
   const canPause = status === 'publicado';
@@ -80,25 +85,21 @@ export default function AdminRowActions({
 
   const handleView = (e: ClickEvent) => {
     safeStop(e);
-
     if (viewBaseHref) {
       const url = `${viewBaseHref}?id=${encodeURIComponent(id)}`;
       openInNewTab(url);
       return;
     }
-
     onView(id);
   };
 
   const handleEdit = (e: ClickEvent) => {
     safeStop(e);
-
     if (editBaseHref) {
       const url = `${editBaseHref}?id=${encodeURIComponent(id)}`;
       openInNewTab(url);
       return;
     }
-
     onEdit(id);
   };
 

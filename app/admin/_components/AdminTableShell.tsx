@@ -9,7 +9,13 @@ export default function AdminTableShell({
   footer?: ReactNode;
 }) {
   return (
-    <section className="overflow-hidden rounded-xl border border-zinc-900 bg-zinc-950">
+    <section
+      className={[
+        'overflow-hidden rounded-xl border',
+        'border-zinc-200 bg-white text-zinc-900',
+        'dark:border-zinc-900 dark:bg-zinc-950 dark:text-zinc-100',
+      ].join(' ')}
+    >
       <div
         className={[
           'min-h-[120px] overflow-x-auto [scrollbar-gutter:stable]',
@@ -26,7 +32,13 @@ export default function AdminTableShell({
       </div>
 
       {footer && (
-        <div className="border-t border-zinc-900 px-4 py-3 text-xs text-zinc-500">
+        <div
+          className={[
+            'border-t px-4 py-3 text-xs',
+            'border-zinc-200 text-zinc-500',
+            'dark:border-zinc-900 dark:text-zinc-500',
+          ].join(' ')}
+        >
           <div className="flex items-center justify-between gap-3">{footer}</div>
         </div>
       )}

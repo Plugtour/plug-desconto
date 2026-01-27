@@ -43,32 +43,61 @@ type AdminAffiliateRow = {
   vendasMes?: number;
 };
 
+// ✅ sessão para o AdminShell mostrar "Logado como"
+type SessionRole = 'guest' | 'user' | 'affiliate' | 'partner' | 'master';
+type Session = {
+  role: SessionRole;
+  planActive: boolean;
+  userName?: string;
+};
+
 type AdminDataContextValue = {
+  session: Session | null;
+
   offers: AdminOfferRow[];
   partners: AdminPartnerRow[];
   affiliates: AdminAffiliateRow[];
-  refreshOffers: () => Promise<void>;
-  setOfferStatus: (id: string, status: OfferStatus) => void;
 
+  refreshOffers: () => Promise<void>;
+  refreshSession: () => Promise<void>;
+
+  setOfferStatus: (id: string, status: OfferStatus) => void;
   setAffiliateStatus: (id: string, status: AffiliateStatus) => void;
   setPartnerStatus: (id: string, status: PartnerStatus) => void;
 };
 
 const AdminDataContext = createContext<AdminDataContextValue | null>(null);
 
+async function fetchJson(url: string) {
+  const res = await fetch(url, { cache: 'no-store' });
+  const data = await res.json().catch(() => null);
+  return { res, data };
+}
+
 export function AdminDataProvider({ children }: { children: React.ReactNode }) {
+  const [session, setSession] = useState<Session | null>(null);
+
   const [offers, setOffers] = useState<AdminOfferRow[]>([]);
   const [partners, setPartners] = useState<AdminPartnerRow[]>([]);
   const [affiliates, setAffiliates] = useState<AdminAffiliateRow[]>([]);
   const [loaded, setLoaded] = useState(false);
 
+  const refreshSession = async () => {
+    const { res, data } = await fetchJson('/api/auth/me');
+    if (!res.ok) {
+      setSession(null);
+      return;
+    }
+    setSession((data?.session ?? null) as Session | null);
+  };
+
   // Ofertas vêm da API (banco)
   const refreshOffers = async () => {
-    const res = await fetch('/api/admin/offers', { cache: 'no-store' });
-    const data = await res.json().catch(() => ({}));
+    const { res, data } = await fetchJson('/api/admin/offers');
 
     if (!res.ok) {
-      throw new Error(data?.error || 'Falha ao carregar ofertas');
+      const msg = data?.error ? String(data.error) : 'Falha ao carregar ofertas';
+      throw new Error(msg);
     }
 
     const items = Array.isArray(data?.items) ? data.items : [];
@@ -89,23 +118,24 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
     setLoaded(true);
 
     refreshMockLists();
+    refreshSession().catch(() => {});
     refreshOffers().catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loaded]);
 
   const setOfferStatus = (id: string, status: OfferStatus) => {
+    // otimista
     setOffers((prev) => prev.map((o) => (o.id === id ? { ...o, status } : o)));
 
     (async () => {
-      const res = await fetch(`/api/admin/offers/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
-      });
-
-      await refreshOffers().catch(() => {});
-      if (!res.ok) {
-        // opcional: toast
+      try {
+        await fetch(`/api/admin/offers/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status }),
+        });
+      } finally {
+        await refreshOffers().catch(() => {});
       }
     })();
   };
@@ -120,15 +150,20 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo(
     () => ({
+      session,
+
       offers,
       partners,
       affiliates,
+
       refreshOffers,
+      refreshSession,
+
       setOfferStatus,
       setAffiliateStatus,
       setPartnerStatus,
     }),
-    [offers, partners, affiliates]
+    [session, offers, partners, affiliates]
   );
 
   return <AdminDataContext.Provider value={value}>{children}</AdminDataContext.Provider>;

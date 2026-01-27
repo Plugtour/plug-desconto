@@ -69,8 +69,7 @@ export default function AdminNovaOfertaPage() {
 
     setSaving(true);
     try {
-      const selectedCategory =
-        categories.find((c) => c.label === categoriaLabel) ?? categories[0];
+      const selectedCategory = categories.find((c) => c.label === categoriaLabel) ?? categories[0];
 
       const payload = {
         title: titulo.trim(),
@@ -93,27 +92,35 @@ export default function AdminNovaOfertaPage() {
 
       if (!res.ok) {
         alert(
-          data?.error
-            ? `${data.error}${data?.detail ? `\n${data.detail}` : ''}`
-            : 'Falha ao salvar.'
+          data?.error ? `${data.error}${data?.detail ? `\n${data.detail}` : ''}` : 'Falha ao salvar.'
         );
         return;
       }
 
-      // 1) Atualiza o provider antes de voltar (isso evita precisar de F5)
       await refreshOffers();
-
-      // 2) Volta para a listagem
       router.push('/admin/ofertas');
-
-      // opcional: se quiser, pode remover o alert
-      // alert(`Oferta criada!\nSlug: ${data?.offer?.slug ?? '(sem slug)'}`);
     } catch (e: any) {
       alert(`Falha ao salvar.\n${e?.message ?? String(e)}`);
     } finally {
       setSaving(false);
     }
   };
+
+  const card = [
+    'rounded-xl border p-4',
+    'border-zinc-200 bg-white',
+    'dark:border-zinc-900 dark:bg-zinc-950',
+  ].join(' ');
+
+  const label = 'block text-sm text-zinc-700 dark:text-zinc-300';
+
+  const inputBase = [
+    'mt-2 w-full rounded-lg border px-3 py-2 text-sm outline-none',
+    'border-zinc-200 bg-white text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-400',
+    'dark:border-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 dark:placeholder:text-zinc-600 dark:focus:border-zinc-700',
+  ].join(' ');
+
+  const help = 'mt-2 text-xs text-zinc-500';
 
   return (
     <main className="space-y-4">
@@ -122,7 +129,11 @@ export default function AdminNovaOfertaPage() {
           <div className="mb-2">
             <Link
               href="/admin/ofertas"
-              className="inline-flex items-center gap-2 rounded-lg px-2 py-1 text-sm text-zinc-300 hover:bg-zinc-900"
+              className={[
+                'inline-flex items-center gap-2 rounded-lg px-2 py-1 text-sm transition',
+                'text-zinc-700 hover:bg-zinc-100',
+                'dark:text-zinc-300 dark:hover:bg-zinc-900',
+              ].join(' ')}
             >
               <ArrowLeft className="h-4 w-4" />
               Voltar
@@ -130,7 +141,7 @@ export default function AdminNovaOfertaPage() {
           </div>
 
           <h1 className="text-2xl font-semibold tracking-tight">Nova oferta</h1>
-          <p className="mt-1 text-sm text-zinc-400">
+          <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
             Cadastro real no Supabase via Prisma.
           </p>
         </div>
@@ -140,10 +151,13 @@ export default function AdminNovaOfertaPage() {
           onClick={onSave}
           disabled={!canSave || saving}
           className={[
-            'inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium',
+            'inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition',
             canSave && !saving
-              ? 'bg-zinc-100 text-zinc-950 hover:bg-white'
-              : 'bg-zinc-800 text-zinc-400',
+              ? [
+                  'bg-zinc-900 text-white hover:bg-zinc-800',
+                  'dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-white',
+                ].join(' ')
+              : 'bg-zinc-200 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400',
           ].join(' ')}
         >
           <Save className="h-4 w-4" />
@@ -154,61 +168,57 @@ export default function AdminNovaOfertaPage() {
       <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
         {/* Coluna principal */}
         <div className="md:col-span-2 space-y-4">
-          <div className="rounded-xl border border-zinc-900 bg-zinc-950 p-4">
-            <label className="block text-sm text-zinc-300">Título</label>
+          <div className={card}>
+            <label className={label}>Título</label>
             <input
               value={titulo}
               onChange={(e) => setTitulo(e.target.value)}
               placeholder="Ex: 10% off em fondue na Serra"
-              className="mt-2 w-full rounded-lg border border-zinc-900 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-zinc-700"
+              className={inputBase}
             />
-            <p className="mt-2 text-xs text-zinc-500">Mínimo: 4 caracteres.</p>
+            <p className={help}>Mínimo: 4 caracteres.</p>
           </div>
 
-          <div className="rounded-xl border border-zinc-900 bg-zinc-950 p-4">
-            <label className="block text-sm text-zinc-300">Descrição</label>
+          <div className={card}>
+            <label className={label}>Descrição</label>
             <textarea
               value={descricao}
               onChange={(e) => setDescricao(e.target.value)}
               placeholder="Escreva uma descrição clara do benefício..."
               rows={6}
-              className="mt-2 w-full resize-none rounded-lg border border-zinc-900 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-zinc-700"
+              className={[inputBase, 'resize-none'].join(' ')}
             />
-            <p className="mt-2 text-xs text-zinc-500">Mínimo: 10 caracteres.</p>
+            <p className={help}>Mínimo: 10 caracteres.</p>
           </div>
 
-          <div className="rounded-xl border border-zinc-900 bg-zinc-950 p-4">
-            <label className="block text-sm text-zinc-300">Imagem (URL)</label>
+          <div className={card}>
+            <label className={label}>Imagem (URL)</label>
             <input
               value={imageUrl}
               onChange={(e) => setImageUrl(e.target.value)}
               placeholder="https://..."
-              className="mt-2 w-full rounded-lg border border-zinc-900 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-zinc-700"
+              className={inputBase}
             />
-            <p className="mt-2 text-xs text-zinc-500">Opcional.</p>
+            <p className={help}>Opcional.</p>
           </div>
 
-          <div className="rounded-xl border border-zinc-900 bg-zinc-950 p-4">
-            <label className="block text-sm text-zinc-300">Preço (texto)</label>
+          <div className={card}>
+            <label className={label}>Preço (texto)</label>
             <input
               value={priceText}
               onChange={(e) => setPriceText(e.target.value)}
               placeholder='Ex: "R$ 125,00" ou "10% off"'
-              className="mt-2 w-full rounded-lg border border-zinc-900 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-zinc-700"
+              className={inputBase}
             />
-            <p className="mt-2 text-xs text-zinc-500">Opcional.</p>
+            <p className={help}>Opcional.</p>
           </div>
         </div>
 
         {/* Lateral */}
         <div className="space-y-4">
-          <div className="rounded-xl border border-zinc-900 bg-zinc-950 p-4">
-            <label className="block text-sm text-zinc-300">Parceiro</label>
-            <select
-              value={parceiro}
-              onChange={(e) => setParceiro(e.target.value)}
-              className="mt-2 w-full rounded-lg border border-zinc-900 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-zinc-700"
-            >
+          <div className={card}>
+            <label className={label}>Parceiro</label>
+            <select value={parceiro} onChange={(e) => setParceiro(e.target.value)} className={inputBase}>
               {partners.map((p) => (
                 <option key={p} value={p}>
                   {p}
@@ -217,12 +227,12 @@ export default function AdminNovaOfertaPage() {
             </select>
           </div>
 
-          <div className="rounded-xl border border-zinc-900 bg-zinc-950 p-4">
-            <label className="block text-sm text-zinc-300">Categoria</label>
+          <div className={card}>
+            <label className={label}>Categoria</label>
             <select
               value={categoriaLabel}
               onChange={(e) => setCategoriaLabel(e.target.value)}
-              className="mt-2 w-full rounded-lg border border-zinc-900 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-zinc-700"
+              className={inputBase}
             >
               {categories.map((c) => (
                 <option key={c.id} value={c.label}>
@@ -231,49 +241,47 @@ export default function AdminNovaOfertaPage() {
               ))}
             </select>
 
-            <p className="mt-2 text-xs text-zinc-500">
+            <p className={help}>
               Será salvo como:{' '}
-              <span className="text-zinc-300">
-                {normalizeCategoryId(
-                  categories.find((c) => c.label === categoriaLabel)?.id ?? ''
-                )}
+              <span className="font-medium text-zinc-900 dark:text-zinc-200">
+                {normalizeCategoryId(categories.find((c) => c.label === categoriaLabel)?.id ?? '')}
               </span>
             </p>
           </div>
 
-          <div className="rounded-xl border border-zinc-900 bg-zinc-950 p-4">
-            <label className="block text-sm text-zinc-300">Status</label>
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value as OfferStatus)}
-              className="mt-2 w-full rounded-lg border border-zinc-900 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-zinc-700"
-            >
+          <div className={card}>
+            <label className={label}>Status</label>
+            <select value={status} onChange={(e) => setStatus(e.target.value as OfferStatus)} className={inputBase}>
               <option value="rascunho">Rascunho</option>
               <option value="publicado">Publicado</option>
               <option value="pausado">Pausado</option>
               <option value="arquivado">Arquivado</option>
             </select>
 
-            <p className="mt-2 text-xs text-zinc-500">
-              Para remover do ar, use “Pausado” ou “Arquivado”.
-            </p>
+            <p className={help}>Para remover do ar, use “Pausado” ou “Arquivado”.</p>
           </div>
 
-          <div className="rounded-xl border border-zinc-900 bg-zinc-950 p-4">
-            <label className="block text-sm text-zinc-300">Região (cidade no banco)</label>
+          <div className={card}>
+            <label className={label}>Região (cidade no banco)</label>
             <input
               value={regiao}
               onChange={(e) => setRegiao(e.target.value)}
               placeholder="Ex: Serra Gaúcha"
-              className="mt-2 w-full rounded-lg border border-zinc-900 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-zinc-700"
+              className={inputBase}
             />
-            <p className="mt-2 text-xs text-zinc-500">
+            <p className={help}>
               Será salvo como:{' '}
-              <span className="text-zinc-300">{normalizeCity(regiao)}</span>
+              <span className="font-medium text-zinc-900 dark:text-zinc-200">{normalizeCity(regiao)}</span>
             </p>
           </div>
 
-          <div className="rounded-xl border border-dashed border-zinc-800 bg-zinc-950 p-4 text-xs text-zinc-500">
+          <div
+            className={[
+              'rounded-xl border border-dashed p-4 text-xs',
+              'border-zinc-300 bg-white text-zinc-500',
+              'dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-500',
+            ].join(' ')}
+          >
             Próximo: listar ofertas no admin, editar e deletar (ou arquivar).
           </div>
         </div>

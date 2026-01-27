@@ -38,3 +38,30 @@ model Offer {
   @@index([status])
   @@index([partnerName])
 }
+
+model AdminAuditLog {
+  id         String   @id @default(cuid())
+  createdAt  DateTime @default(now())
+
+  // Multi-tenant (já preparado)
+  tenantId   String?
+
+  // Quem fez
+  actorRole  String
+  actorName  String?
+
+  // O que aconteceu
+  action     String
+  entityType String
+  entityId   String?
+
+  // Antes/depois
+  before     Json?
+  after      Json?
+
+  @@index([createdAt])
+  @@index([tenantId])
+  @@index([entityType, entityId])
+  @@index([action])
+  @@index([actorRole])
+}

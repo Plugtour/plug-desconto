@@ -3,6 +3,7 @@
 // app/admin/parceiros/AdminParceirosClient.tsx
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 
@@ -19,7 +20,31 @@ import type { PartnerStatus, AdminPartnerRow } from '../_data/adminMappers';
 const isPartnerStatus = (v: string | null): v is PartnerStatus =>
   v === 'rascunho' || v === 'publicado' || v === 'pausado' || v === 'arquivado';
 
-// aceita "DD/MM/AA" ou "DD-MM-AA" e também "YYYY-MM-DD"
+const onlyDigits = (v: string) => (v || '').replace(/\D/g, '');
+
+const buildWhatsappHref = (raw: string) => {
+  const digits = onlyDigits(raw);
+  if (!digits) return 'https://wa.me/55';
+  const withCountry = digits.startsWith('55') ? digits : `55${digits}`;
+  return `https://wa.me/${withCountry}`;
+};
+
+const formatBRPhone = (raw: string) => {
+  let d = onlyDigits(raw);
+  if (!d) return '';
+
+  if (d.startsWith('55') && d.length >= 12) d = d.slice(2);
+  if (d.length < 10) return raw;
+
+  const ddd = d.slice(0, 2);
+  const rest = d.slice(2);
+
+  if (rest.length === 9) return `(${ddd}) ${rest.slice(0, 5)}-${rest.slice(5)}`;
+  if (rest.length === 8) return `(${ddd}) ${rest.slice(0, 4)}-${rest.slice(4)}`;
+
+  return `(${ddd}) ${rest}`;
+};
+
 const parseAnyDate = (s: string) => {
   const raw = (s || '').trim();
   if (!raw) return 0;
@@ -51,7 +76,7 @@ const statusWeight: Record<PartnerStatus, number> = {
   arquivado: 4,
 };
 
-type SortKey = 'nome' | 'categoria' | 'cidade' | 'whatsapp' | 'status' | 'atualizadoEm';
+type SortKey = 'nome' | 'cidade' | 'telefone' | 'categoria' | 'status' | 'atualizadoEm';
 type SortDir = 'asc' | 'desc';
 
 export default function AdminParceirosClient() {
@@ -81,9 +106,9 @@ export default function AdminParceirosClient() {
   const SortIcon = ({ k }: { k: SortKey }) => {
     if (sortKey !== k) return null;
     return sortDir === 'asc' ? (
-      <ChevronUp className="h-3.5 w-3.5 text-zinc-300" />
+      <ChevronUp className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-300" />
     ) : (
-      <ChevronDown className="h-3.5 w-3.5 text-zinc-300" />
+      <ChevronDown className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-300" />
     );
   };
 
@@ -158,7 +183,7 @@ export default function AdminParceirosClient() {
           p.nome.toLowerCase().includes(term) ||
           p.categoria.toLowerCase().includes(term) ||
           p.cidade.toLowerCase().includes(term) ||
-          p.whatsapp.toLowerCase().includes(term) ||
+          (p.whatsapp || '').toLowerCase().includes(term) ||
           p.id.toLowerCase().includes(term)
         );
       });
@@ -171,12 +196,12 @@ export default function AdminParceirosClient() {
       switch (key) {
         case 'nome':
           return (p.nome || '').toLowerCase();
-        case 'categoria':
-          return (p.categoria || '').toLowerCase();
         case 'cidade':
           return (p.cidade || '').toLowerCase();
-        case 'whatsapp':
+        case 'telefone':
           return (p.whatsapp || '').toLowerCase();
+        case 'categoria':
+          return (p.categoria || '').toLowerCase();
         case 'status':
           return statusWeight[p.status] ?? 999;
         case 'atualizadoEm':
@@ -226,28 +251,36 @@ export default function AdminParceirosClient() {
 
   const hasFilters = q.trim().length > 0 || status !== 'todos';
 
+  // ✅ deslocar SOMENTE o conteúdo interno
+  const shiftInner = '-ml-10';
+
   const ThSort = ({
     k,
     children,
     align = 'left',
+    className = '',
+    innerClassName = '',
   }: {
     k: SortKey;
-    children: React.ReactNode;
+    children: ReactNode;
     align?: 'left' | 'right';
+    className?: string;
+    innerClassName?: string;
   }) => {
     return (
-      <th className={`px-4 py-3 font-medium ${align === 'right' ? 'text-right' : ''}`}>
+      <th className={`px-3 py-3 font-medium ${align === 'right' ? 'text-right' : ''} ${className}`}>
         <button
           type="button"
           onClick={() => toggleSort(k)}
           className={[
-            'inline-flex items-center gap-1 rounded-md px-1 py-0.5',
-            'hover:bg-zinc-900 hover:text-zinc-200',
-            'text-xs text-zinc-400',
+            'inline-flex items-center gap-1 rounded-md px-1 py-0.5 transition',
+            'text-xs text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900',
+            'dark:text-zinc-400 dark:hover:bg-zinc-900/60 dark:hover:text-zinc-100',
+            innerClassName,
           ].join(' ')}
           title="Ordenar"
         >
-          <span className="text-xs text-zinc-400">{children}</span>
+          <span className="text-xs">{children}</span>
           <SortIcon k={k} />
         </button>
       </th>
@@ -259,7 +292,7 @@ export default function AdminParceirosClient() {
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Parceiros</h1>
-          <p className="mt-1 text-sm text-zinc-400">
+          <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
             MVP: listar, buscar e filtrar por status. Nada é apagado — tudo é arquivado.
           </p>
         </div>
@@ -267,7 +300,11 @@ export default function AdminParceirosClient() {
         <div className="flex items-center gap-2">
           <Link
             href="/admin/parceiros/novo"
-            className="rounded-lg bg-zinc-100 px-3 py-2 text-sm font-medium text-zinc-950 hover:bg-white"
+            className={[
+              'rounded-lg px-3 py-2 text-sm font-medium transition',
+              'border border-zinc-200 bg-zinc-100 text-zinc-900 hover:bg-zinc-200',
+              'dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800',
+            ].join(' ')}
           >
             Novo parceiro
           </Link>
@@ -284,19 +321,37 @@ export default function AdminParceirosClient() {
       />
 
       {hasFilters && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-zinc-900 bg-zinc-950 px-4 py-3">
-          <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-400">
-            <span className="text-zinc-500">Filtrado por:</span>
+        <div
+          className={[
+            'flex flex-wrap items-center justify-between gap-2 rounded-xl border px-4 py-3',
+            'border-zinc-200 bg-white',
+            'dark:border-zinc-900 dark:bg-zinc-950',
+          ].join(' ')}
+        >
+          <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400">
+            <span className="text-zinc-500 dark:text-zinc-500">Filtrado por:</span>
 
             {status !== 'todos' && (
-              <span className="rounded-full border border-zinc-800 bg-zinc-900 px-2 py-1 text-zinc-200">
-                status: <span className="text-zinc-100">{status}</span>
+              <span
+                className={[
+                  'rounded-full border px-2 py-1',
+                  'border-zinc-200 bg-zinc-100 text-zinc-700',
+                  'dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200',
+                ].join(' ')}
+              >
+                status: <span className="font-medium text-zinc-900 dark:text-zinc-100">{status}</span>
               </span>
             )}
 
             {q.trim() && (
-              <span className="rounded-full border border-zinc-800 bg-zinc-900 px-2 py-1 text-zinc-200">
-                busca: <span className="text-zinc-100">"{q.trim()}"</span>
+              <span
+                className={[
+                  'rounded-full border px-2 py-1',
+                  'border-zinc-200 bg-zinc-100 text-zinc-700',
+                  'dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200',
+                ].join(' ')}
+              >
+                busca: <span className="font-medium text-zinc-900 dark:text-zinc-100">"{q.trim()}"</span>
               </span>
             )}
           </div>
@@ -304,7 +359,11 @@ export default function AdminParceirosClient() {
           <button
             type="button"
             onClick={clearFilters}
-            className="rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-xs text-zinc-200 hover:bg-zinc-900"
+            className={[
+              'rounded-lg border px-3 py-1.5 text-xs transition',
+              'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50',
+              'dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900/60',
+            ].join(' ')}
           >
             Limpar filtros
           </button>
@@ -314,70 +373,131 @@ export default function AdminParceirosClient() {
       <AdminTableShell
         footer={
           <>
-            Mostrando <span className="text-zinc-300">{sorted.length}</span> de{' '}
-            <span className="text-zinc-300">{partners.length}</span> parceiros (mock).
+            Mostrando <span className="text-zinc-900 dark:text-zinc-300">{sorted.length}</span> de{' '}
+            <span className="text-zinc-900 dark:text-zinc-300">{partners.length}</span> parceiros (mock).
           </>
         }
       >
-        <table className="w-full min-w-[920px] text-left">
-          <thead className="border-b border-zinc-900 bg-zinc-950">
-            <tr className="text-xs text-zinc-400">
+        <table className="w-full min-w-[1120px] table-fixed text-left">
+          <colgroup>
+            <col />
+            <col />
+            <col style={{ width: '170px' }} />
+            <col style={{ width: '150px' }} />
+            <col style={{ width: '140px' }} />
+            <col style={{ width: '170px' }} />
+            <col style={{ width: '190px' }} />
+          </colgroup>
+
+          <thead className="border-b border-zinc-200 bg-white dark:border-zinc-900 dark:bg-zinc-950">
+            <tr className="text-xs text-zinc-600 dark:text-zinc-400">
               <ThSort k="nome">Nome</ThSort>
-              <ThSort k="categoria">Categoria</ThSort>
               <ThSort k="cidade">Cidade</ThSort>
-              <ThSort k="whatsapp">WhatsApp</ThSort>
-              <ThSort k="status">Status</ThSort>
-              <ThSort k="atualizadoEm">Atualizado</ThSort>
-              <th className="px-4 py-3 font-medium text-right">Ações</th>
+
+              <ThSort k="telefone" innerClassName={shiftInner}>
+                Telefone
+              </ThSort>
+              <ThSort k="categoria" innerClassName={shiftInner}>
+                Categoria
+              </ThSort>
+              <ThSort k="status" innerClassName={shiftInner}>
+                Status
+              </ThSort>
+              <ThSort k="atualizadoEm" innerClassName={shiftInner}>
+                Atualizado
+              </ThSort>
+
+              <th className="px-3 py-3 font-medium text-right">Ações</th>
             </tr>
           </thead>
 
-          <tbody className="divide-y divide-zinc-900">
+          <tbody className="divide-y divide-zinc-200 dark:divide-zinc-900">
             {sorted.length === 0 ? (
-              <tr>
-                <td className="px-4 py-6 text-sm text-zinc-500" colSpan={7}>
+              <tr className="h-[64px]">
+                <td className="px-3 py-6 text-sm text-zinc-600 dark:text-zinc-500" colSpan={7}>
                   Nenhum parceiro encontrado com os filtros atuais.
                 </td>
               </tr>
             ) : (
               sorted.map((p) => {
+                const whatsappHref = (p as any).whatsappHref || buildWhatsappHref(p.whatsapp);
+                const phoneLabel = formatBRPhone(p.whatsapp) || p.whatsapp;
+
                 return (
-                  <tr key={p.id} className="text-sm">
-                    <td className="px-4 py-3">
-                      <div className="font-medium text-zinc-100">{p.nome}</div>
-                      <div className="mt-0.5 text-xs text-zinc-500">{p.id}</div>
+                  <tr
+                    key={p.id}
+                    className="h-[54px] text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900/30"
+                  >
+                    <td className="px-3 py-2 align-middle">
+                      <div className="flex h-[54px] flex-col justify-center leading-[1.05]">
+                        <div className="truncate font-medium text-zinc-900 dark:text-zinc-100" title={p.nome}>
+                          {p.nome}
+                        </div>
+                        <div className="mt-1 truncate text-xs text-zinc-500 dark:text-zinc-500" title={p.id}>
+                          {p.id}
+                        </div>
+                      </div>
                     </td>
-                    <td className="px-4 py-3 text-zinc-200">{p.categoria}</td>
-                    <td className="px-4 py-3 text-zinc-200">{p.cidade}</td>
-                    <td className="px-4 py-3">
-                      <AdminTag>
-                        <a
-                          href={p.whatsappHref}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="hover:underline"
-                        >
-                          {p.whatsapp}
-                        </a>
-                      </AdminTag>
+
+                    <td className="px-3 py-2 align-middle text-zinc-700 dark:text-zinc-200">
+                      <span className="block truncate" title={p.cidade}>
+                        {p.cidade}
+                      </span>
                     </td>
-                    <td className="px-4 py-3">
-                      <AdminStatusPill status={p.status} />
+
+                    <td className="px-3 py-2 align-middle">
+                      <div className={shiftInner}>
+                        <AdminTag>
+                          <a
+                            href={whatsappHref}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block w-full whitespace-nowrap hover:underline"
+                            title={phoneLabel}
+                          >
+                            {phoneLabel}
+                          </a>
+                        </AdminTag>
+                      </div>
                     </td>
-                    <td className="px-4 py-3 text-zinc-300">{p.atualizadoEm}</td>
-                    <td className="px-4 py-3">
-                      <AdminRowActions
-                        id={p.id}
-                        status={p.status}
-                        onView={(id) => showToast(`Visualizar: ${getNameById(id)}`, 'success')}
-                        onEdit={(id) => showToast(`Editar: ${getNameById(id)}`, 'success')}
-                        onPublish={handlePublish}
-                        onPause={handlePause}
-                        onArchive={handleArchive}
-                        onRestore={handleRestore}
-                        viewBaseHref="/admin/parceiros"
-                        editBaseHref="/admin/parceiros/editar"
-                      />
+
+                    <td className="px-2 py-2 align-middle">
+                      <div className={shiftInner}>
+                        <span className="block truncate text-zinc-700 dark:text-zinc-200" title={p.categoria}>
+                          {p.categoria}
+                        </span>
+                      </div>
+                    </td>
+
+                    <td className="px-2 py-2 align-middle">
+                      <div className={shiftInner}>
+                        <div className="whitespace-nowrap">
+                          <AdminStatusPill status={p.status} />
+                        </div>
+                      </div>
+                    </td>
+
+                    <td className="px-3 py-2 align-middle text-zinc-600 dark:text-zinc-300">
+                      <div className={shiftInner}>
+                        <span className="whitespace-nowrap">{p.atualizadoEm}</span>
+                      </div>
+                    </td>
+
+                    <td className="px-3 py-2 align-middle">
+                      <div className="flex justify-end whitespace-nowrap">
+                        <AdminRowActions
+                          id={p.id}
+                          status={p.status}
+                          onView={(id) => showToast(`Visualizar: ${getNameById(id)}`, 'success')}
+                          onEdit={(id) => showToast(`Editar: ${getNameById(id)}`, 'success')}
+                          onPublish={handlePublish}
+                          onPause={handlePause}
+                          onArchive={handleArchive}
+                          onRestore={handleRestore}
+                          viewBaseHref="/admin/parceiros"
+                          editBaseHref="/admin/parceiros/editar"
+                        />
+                      </div>
                     </td>
                   </tr>
                 );
@@ -389,4 +509,3 @@ export default function AdminParceirosClient() {
     </main>
   );
 }
- 

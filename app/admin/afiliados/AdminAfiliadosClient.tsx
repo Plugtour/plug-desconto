@@ -1,6 +1,6 @@
 'use client';
 
-// app/admin/afiliados/page.client.tsx
+// app/admin/afiliados/AdminAfiliadosClient.tsx
 import Link from 'next/link';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
@@ -16,11 +16,29 @@ import { useAdminData } from '../_components/AdminDataProvider';
 
 import type { AffiliateStatus } from '../_data/adminMappers';
 
+const onlyDigits = (v: string) => (v || '').replace(/\D/g, '');
+
 const buildWhatsappHref = (raw: string) => {
-  const digits = (raw || '').replace(/\D/g, '');
+  const digits = onlyDigits(raw);
   if (!digits) return 'https://wa.me/55';
   const withCountry = digits.startsWith('55') ? digits : `55${digits}`;
   return `https://wa.me/${withCountry}`;
+};
+
+const formatBRPhone = (raw: string) => {
+  let d = onlyDigits(raw);
+  if (!d) return '';
+
+  if (d.startsWith('55') && d.length >= 12) d = d.slice(2);
+  if (d.length < 10) return raw;
+
+  const ddd = d.slice(0, 2);
+  const rest = d.slice(2);
+
+  if (rest.length === 9) return `(${ddd}) ${rest.slice(0, 5)}-${rest.slice(5)}`;
+  if (rest.length === 8) return `(${ddd}) ${rest.slice(0, 4)}-${rest.slice(4)}`;
+
+  return `(${ddd}) ${rest}`;
 };
 
 const isAffiliateStatus = (v: string | null): v is AffiliateStatus =>
@@ -87,9 +105,9 @@ export default function AdminAfiliadosClient() {
   const SortIcon = ({ k }: { k: SortKey }) => {
     if (sortKey !== k) return null;
     return sortDir === 'asc' ? (
-      <ChevronUp className="h-3.5 w-3.5 text-zinc-300" />
+      <ChevronUp className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-300" />
     ) : (
-      <ChevronDown className="h-3.5 w-3.5 text-zinc-300" />
+      <ChevronDown className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-300" />
     );
   };
 
@@ -232,32 +250,38 @@ export default function AdminAfiliadosClient() {
 
   const hasFilters = q.trim().length > 0 || status !== 'todos';
 
+  const shiftInner = '-ml-10';
+
   const ThSort = ({
     k,
     children,
     align = 'left',
     className = '',
+    innerClassName = '',
   }: {
     k: SortKey;
     children: React.ReactNode;
     align?: 'left' | 'right';
     className?: string;
+    innerClassName?: string;
   }) => {
     return (
       <th className={`px-3 py-3 font-medium ${align === 'right' ? 'text-right' : ''} ${className}`}>
-        <button
-          type="button"
-          onClick={() => toggleSort(k)}
-          className={[
-            'inline-flex items-center gap-1 rounded-md px-1 py-0.5',
-            'hover:bg-zinc-900 hover:text-zinc-200',
-            'text-xs text-zinc-400',
-          ].join(' ')}
-          title="Ordenar"
-        >
-          <span className="text-xs text-zinc-400">{children}</span>
-          <SortIcon k={k} />
-        </button>
+        <div className={innerClassName}>
+          <button
+            type="button"
+            onClick={() => toggleSort(k)}
+            className={[
+              'inline-flex items-center gap-1 rounded-md px-1 py-0.5 transition',
+              'text-xs text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900',
+              'dark:text-zinc-400 dark:hover:bg-zinc-900/60 dark:hover:text-zinc-100',
+            ].join(' ')}
+            title="Ordenar"
+          >
+            <span className="text-xs">{children}</span>
+            <SortIcon k={k} />
+          </button>
+        </div>
       </th>
     );
   };
@@ -276,7 +300,7 @@ export default function AdminAfiliadosClient() {
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Afiliados</h1>
-          <p className="mt-1 text-sm text-zinc-400">
+          <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
             MVP: listar, buscar e filtrar por status. Comissões entram depois.
           </p>
         </div>
@@ -284,7 +308,11 @@ export default function AdminAfiliadosClient() {
         <div className="flex items-center gap-2">
           <Link
             href="/admin/afiliados/novo"
-            className="rounded-lg bg-zinc-100 px-3 py-2 text-sm font-medium text-zinc-950 hover:bg-white"
+            className={[
+              'rounded-lg px-3 py-2 text-sm font-medium transition',
+              'border border-zinc-200 bg-zinc-100 text-zinc-900 hover:bg-zinc-200',
+              'dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800',
+            ].join(' ')}
           >
             Novo afiliado
           </Link>
@@ -301,19 +329,37 @@ export default function AdminAfiliadosClient() {
       />
 
       {hasFilters && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-zinc-900 bg-zinc-950 px-4 py-3">
-          <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-400">
-            <span className="text-zinc-500">Filtrado por:</span>
+        <div
+          className={[
+            'flex flex-wrap items-center justify-between gap-2 rounded-xl border px-4 py-3',
+            'border-zinc-200 bg-white',
+            'dark:border-zinc-900 dark:bg-zinc-950',
+          ].join(' ')}
+        >
+          <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400">
+            <span className="text-zinc-500 dark:text-zinc-500">Filtrado por:</span>
 
             {status !== 'todos' && (
-              <span className="rounded-full border border-zinc-800 bg-zinc-900 px-2 py-1 text-zinc-200">
-                status: <span className="text-zinc-100">{status}</span>
+              <span
+                className={[
+                  'rounded-full border px-2 py-1',
+                  'border-zinc-200 bg-zinc-100 text-zinc-700',
+                  'dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200',
+                ].join(' ')}
+              >
+                status: <span className="font-medium text-zinc-900 dark:text-zinc-100">{status}</span>
               </span>
             )}
 
             {q.trim() && (
-              <span className="rounded-full border border-zinc-800 bg-zinc-900 px-2 py-1 text-zinc-200">
-                busca: <span className="text-zinc-100">"{q.trim()}"</span>
+              <span
+                className={[
+                  'rounded-full border px-2 py-1',
+                  'border-zinc-200 bg-zinc-100 text-zinc-700',
+                  'dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200',
+                ].join(' ')}
+              >
+                busca: <span className="font-medium text-zinc-900 dark:text-zinc-100">"{q.trim()}"</span>
               </span>
             )}
           </div>
@@ -321,7 +367,11 @@ export default function AdminAfiliadosClient() {
           <button
             type="button"
             onClick={clearFilters}
-            className="rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-xs text-zinc-200 hover:bg-zinc-900"
+            className={[
+              'rounded-lg border px-3 py-1.5 text-xs transition',
+              'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50',
+              'dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900/60',
+            ].join(' ')}
           >
             Limpar filtros
           </button>
@@ -331,107 +381,127 @@ export default function AdminAfiliadosClient() {
       <AdminTableShell
         footer={
           <>
-            Mostrando <span className="text-zinc-300">{sorted.length}</span> de{' '}
-            <span className="text-zinc-300">{affiliates.length}</span> afiliados (mock).
+            Mostrando <span className="text-zinc-900 dark:text-zinc-300">{sorted.length}</span> de{' '}
+            <span className="text-zinc-900 dark:text-zinc-300">{affiliates.length}</span> afiliados (mock).
           </>
         }
       >
-        <table className="w-full table-fixed text-left">
+        <table className="w-full min-w-[1120px] table-fixed text-left">
           <colgroup>
             <col />
             <col />
-            <col style={{ width: '140px' }} />
+            <col style={{ width: '170px' }} />
             <col style={{ width: '150px' }} />
-            <col style={{ width: '120px' }} />
-            <col style={{ width: '90px' }} />
+            <col style={{ width: '140px' }} />
+            <col style={{ width: '170px' }} />
             <col style={{ width: '190px' }} />
           </colgroup>
 
-          <thead className="border-b border-zinc-900 bg-zinc-950">
-            <tr className="text-xs text-zinc-400">
+          <thead className="border-b border-zinc-200 bg-white dark:border-zinc-900 dark:bg-zinc-950">
+            <tr className="text-xs text-zinc-600 dark:text-zinc-400">
               <ThSort k="nome">Nome</ThSort>
               <ThSort k="email">Email</ThSort>
-              <ThSort k="whatsapp">WhatsApp</ThSort>
-              <ThSort k="cupom">Cupom</ThSort>
-              <ThSort k="status">Status</ThSort>
-              <ThSort k="atualizadoEm">Atualizado</ThSort>
+              <ThSort k="whatsapp" innerClassName={shiftInner}>
+                WhatsApp
+              </ThSort>
+              <ThSort k="cupom" innerClassName={shiftInner}>
+                Cupom
+              </ThSort>
+              <ThSort k="status" innerClassName={shiftInner}>
+                Status
+              </ThSort>
+              <ThSort k="atualizadoEm" innerClassName={shiftInner}>
+                Atualizado
+              </ThSort>
+
               <th className="px-3 py-3 font-medium text-right">Ações</th>
             </tr>
           </thead>
 
-          <tbody className="divide-y divide-zinc-900">
+          <tbody className="divide-y divide-zinc-200 dark:divide-zinc-900">
             {sorted.length === 0 ? (
               <tr className="h-[64px]">
-                <td className="px-3 py-6 text-sm text-zinc-500" colSpan={7}>
+                <td className="px-3 py-6 text-sm text-zinc-600 dark:text-zinc-500" colSpan={7}>
                   Nenhum afiliado encontrado com os filtros atuais.
                 </td>
               </tr>
             ) : (
               sorted.map((a) => {
                 const whatsappHref = (a as any).whatsappHref || buildWhatsappHref(a.whatsapp);
+                const whatsappLabel = formatBRPhone(a.whatsapp) || a.whatsapp;
 
                 return (
-                  <tr key={a.id} className="h-[54px] text-sm">
-                    <td className="px-2 py-1 align-middle">
+                  <tr key={a.id} className="h-[54px] text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900/30">
+                    <td className="px-3 py-2 align-middle">
                       <div className="flex h-[54px] flex-col justify-center leading-[1.05]">
-                        <div className="truncate font-medium text-zinc-100" title={a.nome}>
+                        <div className="truncate font-medium text-zinc-900 dark:text-zinc-100" title={a.nome}>
                           {a.nome}
                         </div>
-                        <div className="mt-1 truncate text-xs text-zinc-500" title={a.id}>
+                        <div className="mt-1 truncate text-xs text-zinc-500 dark:text-zinc-500" title={a.id}>
                           {a.id}
                         </div>
                       </div>
                     </td>
 
-                    <td className="px-2 py-1 align-middle">
+                    <td className="px-3 py-2 align-middle">
                       <button
                         type="button"
                         onClick={() => copyText(a.email, 'Email copiado')}
                         title={a.email}
-                        className="block w-full truncate text-left text-zinc-200 hover:underline"
+                        className="block w-full truncate text-left text-zinc-700 hover:underline dark:text-zinc-200"
                       >
                         {a.email}
                       </button>
                     </td>
 
-                    <td className="px-2 py-1 align-middle">
-                      <a
-                        href={whatsappHref}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="block w-full truncate text-[12px] text-zinc-200 hover:underline"
-                        title={a.whatsapp}
-                      >
-                        {a.whatsapp}
-                      </a>
-                    </td>
-
-                    <td className="px-2 py-1 align-middle">
-                      <button
-                        type="button"
-                        onClick={() => copyText(a.cupom, 'Cupom copiado')}
-                        title="Clique para copiar"
-                        className="inline-flex max-w-full items-center"
-                      >
+                    <td className="px-3 py-2 align-middle">
+                      <div className={shiftInner}>
                         <AdminTag>
-                          <span className="block max-w-full truncate" title={a.cupom}>
-                            {a.cupom}
-                          </span>
+                          <a
+                            href={whatsappHref}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block w-full whitespace-nowrap hover:underline"
+                            title={whatsappLabel}
+                          >
+                            {whatsappLabel}
+                          </a>
                         </AdminTag>
-                      </button>
-                    </td>
-
-                    <td className="px-2 py-2 align-middle">
-                      <div className="whitespace-nowrap">
-                        <AdminStatusPill status={a.status} />
                       </div>
                     </td>
 
-                    <td className="px-2 py-2 align-middle text-zinc-300">
-                      <span className="whitespace-nowrap">{a.atualizadoEm}</span>
+                    <td className="px-2 py-2 align-middle">
+                      <div className={shiftInner}>
+                        <button
+                          type="button"
+                          onClick={() => copyText(a.cupom, 'Cupom copiado')}
+                          title="Clique para copiar"
+                          className="inline-flex max-w-full items-center"
+                        >
+                          <AdminTag>
+                            <span className="block max-w-full truncate" title={a.cupom}>
+                              {a.cupom}
+                            </span>
+                          </AdminTag>
+                        </button>
+                      </div>
                     </td>
 
                     <td className="px-2 py-2 align-middle">
+                      <div className={shiftInner}>
+                        <div className="whitespace-nowrap">
+                          <AdminStatusPill status={a.status} />
+                        </div>
+                      </div>
+                    </td>
+
+                    <td className="px-3 py-2 align-middle text-zinc-600 dark:text-zinc-300">
+                      <div className={shiftInner}>
+                        <span className="whitespace-nowrap">{a.atualizadoEm}</span>
+                      </div>
+                    </td>
+
+                    <td className="px-3 py-2 align-middle">
                       <div className="flex justify-end whitespace-nowrap">
                         <AdminRowActions
                           id={a.id}
