@@ -11,11 +11,14 @@ import { useAdminData } from '../../_components/AdminDataProvider';
 type OfferStatus = 'rascunho' | 'publicado' | 'pausado' | 'arquivado';
 
 function normalizeCity(value: string) {
-  return value
+  return (value || '')
     .trim()
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, '-') // ✅ padroniza espaços
+    .replace(/-+/g, '-')  // ✅ evita "--"
+    .replace(/(^-|-$)+/g, '');
 }
 
 function normalizeCategoryId(value: string) {
@@ -99,8 +102,9 @@ export default function AdminNovaOfertaPage() {
 
       await refreshOffers();
       router.push('/admin/ofertas');
-    } catch (e: any) {
-      alert(`Falha ao salvar.\n${e?.message ?? String(e)}`);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e);
+      alert(`Falha ao salvar.\n${message}`);
     } finally {
       setSaving(false);
     }
