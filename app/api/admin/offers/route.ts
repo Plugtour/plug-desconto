@@ -1,23 +1,17 @@
 // app/api/admin/offers/route.ts
 import { NextResponse } from 'next/server';
-import { Prisma } from '@prisma/client';
+import { Prisma, OfferStatus } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { decodeSession, getSessionCookieName } from '@/lib/session';
 import { cookies, headers } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
 
-/**
- * ✅ Status como union type
- * (porque NÃO existe enum no Prisma)
- */
-type OfferStatus = 'rascunho' | 'publicado' | 'pausado' | 'arquivado';
-
 const allowed = new Set<OfferStatus>([
-  'rascunho',
-  'publicado',
-  'pausado',
-  'arquivado',
+  OfferStatus.rascunho,
+  OfferStatus.publicado,
+  OfferStatus.pausado,
+  OfferStatus.arquivado,
 ]);
 
 async function requireMaster() {
@@ -37,6 +31,29 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
+function slugify(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)+/g, '');
+}
+
+async function ensureUniqueSlug(base: string) {
+  const cleanBase = slugify(base || 'oferta') || 'oferta';
+  let slug = cleanBase;
+  let i = 2;
+
+  while (true) {
+    const exists = await prisma.offer.findUnique({ where: { slug } });
+    if (!exists) return slug;
+    slug = `${cleanBase}-${i}`;
+    i += 1;
+  }
+}
+
 // ========================
 // ADMIN: LISTA OFERTAS
 // ========================
@@ -51,10 +68,7 @@ export async function GET() {
       orderBy: { createdAt: 'desc' },
     });
 
-    return NextResponse.json(
-      { ok: true, items, total: items.length },
-      { status: 200 }
-    );
+    return NextResponse.json({ ok: true, items, total: items.length }, { status: 200 });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : String(e);
     return NextResponse.json(
@@ -81,7 +95,11 @@ export async function POST(request: Request) {
     const partnerName = String(body.partnerName ?? '').trim();
     const city = String(body.city ?? '').trim();
     const categoryId = String(body.categoryId ?? '').trim();
-    const status = String(body.status ?? 'rascunho') as OfferStatus;
+
+    const statusRaw = String(body.status ?? OfferStatus.rascunho);
+    const status = (Object.values(OfferStatus).includes(statusRaw as OfferStatus)
+      ? (statusRaw as OfferStatus)
+      : OfferStatus.rascunho) as OfferStatus;
 
     const description = body.description ? String(body.description) : null;
     const imageUrl = body.imageUrl ? String(body.imageUrl) : null;
@@ -104,10 +122,11 @@ export async function POST(request: Request) {
     }
 
     const tenantId = await getTenantId();
+    const slug = await ensureUniqueSlug(title);
 
     const created = await prisma.offer.create({
       data: {
-        slug: title.toLowerCase().replace(/\s+/g, '-'),
+        slug,
         title,
         partnerName,
         city,
@@ -132,6 +151,9 @@ export async function POST(request: Request) {
           id: created.id,
           slug: created.slug,
           title: created.title,
+          partnerName: created.partnerName,
+          city: created.city,
+          categoryId: created.categoryId,
           status: created.status,
         } as Prisma.InputJsonValue,
       },
