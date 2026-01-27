@@ -3,6 +3,7 @@ import type { MetadataRoute } from 'next';
 
 import { OFFERS } from '@/config/offers';
 import { benefitPath } from '@/lib/urls';
+import type { Offer } from '@/lib/offers';
 
 const siteUrl =
   process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, '') ||
@@ -21,7 +22,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 1,
   });
 
-  // Páginas principais (se existirem no seu app, pode manter)
+  // Página de ofertas
   items.push({
     url: `${siteUrl}/ofertas`,
     lastModified: new Date(),
@@ -29,7 +30,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.8,
   });
 
-  for (const offer of OFFERS as any[]) {
+  const offers: Offer[] = Array.isArray(OFFERS) ? (OFFERS as Offer[]) : [];
+
+  for (const offer of offers) {
     const path = benefitPath(offer); // /beneficio/{slug ou id}
 
     // garante que só entram URLs de benefício

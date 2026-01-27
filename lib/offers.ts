@@ -15,14 +15,15 @@ export type Offer = {
   categoryId?: string | null;
   tenantId?: string | null;
 
-  [key: string]: any;
+  // permite campos extras sem "any"
+  [key: string]: unknown;
 };
 
 /* =========================
    NORMALIZAÇÃO
 ========================= */
 
-function safeDecode(value: string) {
+function safeDecode(value: string): string {
   try {
     return decodeURIComponent(value);
   } catch {
@@ -30,7 +31,7 @@ function safeDecode(value: string) {
   }
 }
 
-export function normalizeCat(value: string) {
+export function normalizeCat(value: string): string {
   return safeDecode(String(value ?? ''))
     .trim()
     .toLowerCase()
@@ -40,7 +41,7 @@ export function normalizeCat(value: string) {
     .replace(/[^a-z0-9\-]/g, '');
 }
 
-export function normalizeSlugOrId(value: string) {
+export function normalizeSlugOrId(value: string): string {
   return normalizeCat(value);
 }
 
@@ -49,6 +50,7 @@ export function normalizeSlugOrId(value: string) {
 ========================= */
 
 function asOfferArray(): Offer[] {
+  // OFFERS pode vir com qualquer shape; garantimos array e fazemos cast único aqui
   return Array.isArray(OFFERS) ? (OFFERS as Offer[]) : [];
 }
 
@@ -62,29 +64,20 @@ export function getAllOffers(): Offer[] {
 
 export function getOffersByTenant(tenantId: string): Offer[] {
   const t = normalizeCat(tenantId);
-  return asOfferArray().filter(
-    (o) => normalizeCat(String(o.tenantId ?? '')) === t
-  );
+  return asOfferArray().filter((o) => normalizeCat(String(o.tenantId ?? '')) === t);
 }
 
 export function getOffersByCity(city: CityId): Offer[] {
   const c = normalizeCat(city);
-  return asOfferArray().filter(
-    (o) => normalizeCat(String(o.city ?? '')) === c
-  );
+  return asOfferArray().filter((o) => normalizeCat(String(o.city ?? '')) === c);
 }
 
-export function getOffersByCityAndCategory(
-  city: CityId,
-  categoryId: string
-): Offer[] {
+export function getOffersByCityAndCategory(city: CityId, categoryId: string): Offer[] {
   const c = normalizeCat(city);
   const cat = normalizeCat(categoryId);
 
   return asOfferArray().filter(
-    (o) =>
-      normalizeCat(String(o.city ?? '')) === c &&
-      normalizeCat(String(o.categoryId ?? '')) === cat
+    (o) => normalizeCat(String(o.city ?? '')) === c && normalizeCat(String(o.categoryId ?? '')) === cat
   );
 }
 
@@ -92,14 +85,10 @@ export function getOfferBySlugOrId(slugOrId: string): Offer | null {
   const key = normalizeSlugOrId(slugOrId);
   const all = asOfferArray();
 
-  const bySlug = all.find(
-    (o) => normalizeSlugOrId(String(o.slug ?? '')) === key
-  );
+  const bySlug = all.find((o) => normalizeSlugOrId(String(o.slug ?? '')) === key);
   if (bySlug) return bySlug;
 
-  const byId = all.find(
-    (o) => normalizeSlugOrId(String(o.id ?? '')) === key
-  );
+  const byId = all.find((o) => normalizeSlugOrId(String(o.id ?? '')) === key);
   if (byId) return byId;
 
   return null;

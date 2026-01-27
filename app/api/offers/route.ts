@@ -1,9 +1,12 @@
+// app/api/offers/route.ts
 import { NextResponse } from 'next/server';
-import { getTenantFromRequest } from '@/lib/tenant';
+import { Prisma } from '@prisma/client';
+
 import { prisma } from '@/lib/prisma';
+import { getTenantFromRequest } from '@/lib/tenant';
 
 function normalizeCity(value: string) {
-  return value
+  return (value || '')
     .trim()
     .toLowerCase()
     .normalize('NFD')
@@ -19,26 +22,41 @@ function normalizeCat(value: string) {
     .replace(/\s+/g, '-');
 }
 
+function extractTenantKey(tenant: unknown): string {
+  if (!tenant) return '';
+
+  if (typeof tenant === 'string') return tenant;
+
+  if (typeof tenant === 'object') {
+    const t = tenant as Record<string, unknown>;
+
+    const city = typeof t.city === 'string' ? t.city : '';
+    const id = typeof t.id === 'string' ? t.id : '';
+    const tenantKey = typeof t.tenant === 'string' ? t.tenant : '';
+
+    return city || id || tenantKey || '';
+  }
+
+  return '';
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
 
+    // URL pode mandar city, mas se não mandar, usamos o tenant
     const cityParamRaw = searchParams.get('city');
     const categoryParam = searchParams.get('categoryId');
 
-    const cityParam = cityParamRaw ? normalizeCity(cityParamRaw) : null;
+    const cityParam = cityParamRaw ? normalizeCity(cityParamRaw) : '';
 
-    // mantém compatibilidade com seu tenant.ts atual
-    const tenant: any = (getTenantFromRequest as any)(request);
+    // ✅ sua função NÃO recebe request
+    const tenant = await getTenantFromRequest();
+    const tenantKey = cityParam || extractTenantKey(tenant);
 
-    const tenantKey =
-      cityParam ||
-      (typeof tenant === 'string'
-        ? tenant
-        : (tenant?.city as string) || (tenant?.tenant as string) || '');
-
-    const where: any = {
-      status: 'publicado',
+    const where: Prisma.OfferWhereInput = {
+      // ⚠️ evita erro de enum/string no schema
+      status: 'publicado' as any,
     };
 
     if (tenantKey) where.city = normalizeCity(tenantKey);
@@ -51,10 +69,8 @@ export async function GET(request: Request) {
     });
 
     return NextResponse.json({ items, total: items.length }, { status: 200 });
-  } catch (e: any) {
-    return NextResponse.json(
-      { error: 'Falha ao buscar ofertas', detail: e?.message ?? String(e) },
-      { status: 500 }
-    );
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ error: 'Falha ao buscar ofertas', detail: message }, { status: 500 });
   }
 }

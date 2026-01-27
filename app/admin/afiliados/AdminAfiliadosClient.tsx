@@ -78,6 +78,74 @@ const statusWeight: Record<AffiliateStatus, number> = {
 type SortKey = 'nome' | 'email' | 'whatsapp' | 'cupom' | 'status' | 'atualizadoEm';
 type SortDir = 'asc' | 'desc';
 
+type AffiliateItem = {
+  id: string;
+  nome: string;
+  email: string;
+  whatsapp: string;
+  cupom: string;
+  status: AffiliateStatus;
+  atualizadoEm: string;
+  whatsappHref?: string | null;
+};
+
+function SortIcon({
+  colKey,
+  activeKey,
+  dir,
+}: {
+  colKey: SortKey;
+  activeKey: SortKey;
+  dir: SortDir;
+}) {
+  if (activeKey !== colKey) return null;
+  return dir === 'asc' ? (
+    <ChevronUp className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-300" />
+  ) : (
+    <ChevronDown className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-300" />
+  );
+}
+
+function ThSort({
+  k,
+  children,
+  align = 'left',
+  className = '',
+  innerClassName = '',
+  sortKey,
+  sortDir,
+  onToggle,
+}: {
+  k: SortKey;
+  children: React.ReactNode;
+  align?: 'left' | 'right';
+  className?: string;
+  innerClassName?: string;
+  sortKey: SortKey;
+  sortDir: SortDir;
+  onToggle: (key: SortKey) => void;
+}) {
+  return (
+    <th className={`px-3 py-3 font-medium ${align === 'right' ? 'text-right' : ''} ${className}`}>
+      <div className={innerClassName}>
+        <button
+          type="button"
+          onClick={() => onToggle(k)}
+          className={[
+            'inline-flex items-center gap-1 rounded-md px-1 py-0.5 transition',
+            'text-xs text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900',
+            'dark:text-zinc-400 dark:hover:bg-zinc-900/60 dark:hover:text-zinc-100',
+          ].join(' ')}
+          title="Ordenar"
+        >
+          <span className="text-xs">{children}</span>
+          <SortIcon colKey={k} activeKey={sortKey} dir={sortDir} />
+        </button>
+      </div>
+    </th>
+  );
+}
+
 export default function AdminAfiliadosClient() {
   const { showToast } = useAdminToast();
   const { affiliates, setAffiliateStatus } = useAdminData();
@@ -100,15 +168,6 @@ export default function AdminAfiliadosClient() {
       setSortDir((prevDir) => (prevDir === 'asc' ? 'desc' : 'asc'));
       return prevKey;
     });
-  };
-
-  const SortIcon = ({ k }: { k: SortKey }) => {
-    if (sortKey !== k) return null;
-    return sortDir === 'asc' ? (
-      <ChevronUp className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-300" />
-    ) : (
-      <ChevronDown className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-300" />
-    );
   };
 
   const didInitRef = useRef(false);
@@ -149,7 +208,7 @@ export default function AdminAfiliadosClient() {
     setQ('');
   };
 
-  const getNameById = (id: string) => affiliates.find((a) => a.id === id)?.nome || id;
+  const getNameById = (id: string) => (affiliates as AffiliateItem[]).find((a) => a.id === id)?.nome || id;
 
   const handlePublish = (id: string) => {
     setAffiliateStatus(id, 'publicado');
@@ -174,7 +233,7 @@ export default function AdminAfiliadosClient() {
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
 
-    return affiliates
+    return (affiliates as AffiliateItem[])
       .filter((a) => (status === 'todos' ? true : a.status === status))
       .filter((a) => {
         if (!term) return true;
@@ -191,7 +250,7 @@ export default function AdminAfiliadosClient() {
   const sorted = useMemo(() => {
     const dir = sortDir === 'asc' ? 1 : -1;
 
-    const getValue = (a: any, key: SortKey) => {
+    const getValue = (a: AffiliateItem, key: SortKey) => {
       switch (key) {
         case 'nome':
           return (a.nome || '').toLowerCase();
@@ -202,7 +261,7 @@ export default function AdminAfiliadosClient() {
         case 'cupom':
           return (a.cupom || '').toLowerCase();
         case 'status':
-          return statusWeight[a.status as AffiliateStatus] ?? 999;
+          return statusWeight[a.status] ?? 999;
         case 'atualizadoEm':
           return parseAnyDate(a.atualizadoEm);
         default:
@@ -210,7 +269,7 @@ export default function AdminAfiliadosClient() {
       }
     };
 
-    return [...filtered].sort((a: any, b: any) => {
+    return [...filtered].sort((a, b) => {
       const va = getValue(a, sortKey);
       const vb = getValue(b, sortKey);
 
@@ -226,14 +285,15 @@ export default function AdminAfiliadosClient() {
   }, [filtered, sortKey, sortDir]);
 
   const counts = useMemo(() => {
+    const rows = affiliates as AffiliateItem[];
     const base: Record<'todos' | AffiliateStatus, number> = {
-      todos: affiliates.length,
+      todos: rows.length,
       rascunho: 0,
       publicado: 0,
       pausado: 0,
       arquivado: 0,
     };
-    for (const a of affiliates) base[a.status] += 1;
+    for (const a of rows) base[a.status] += 1;
     return base;
   }, [affiliates]);
 
@@ -250,41 +310,8 @@ export default function AdminAfiliadosClient() {
 
   const hasFilters = q.trim().length > 0 || status !== 'todos';
 
+  // ✅ deslocar SOMENTE o conteúdo interno (sem “buraco” na linha)
   const shiftInner = '-ml-10';
-
-  const ThSort = ({
-    k,
-    children,
-    align = 'left',
-    className = '',
-    innerClassName = '',
-  }: {
-    k: SortKey;
-    children: React.ReactNode;
-    align?: 'left' | 'right';
-    className?: string;
-    innerClassName?: string;
-  }) => {
-    return (
-      <th className={`px-3 py-3 font-medium ${align === 'right' ? 'text-right' : ''} ${className}`}>
-        <div className={innerClassName}>
-          <button
-            type="button"
-            onClick={() => toggleSort(k)}
-            className={[
-              'inline-flex items-center gap-1 rounded-md px-1 py-0.5 transition',
-              'text-xs text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900',
-              'dark:text-zinc-400 dark:hover:bg-zinc-900/60 dark:hover:text-zinc-100',
-            ].join(' ')}
-            title="Ordenar"
-          >
-            <span className="text-xs">{children}</span>
-            <SortIcon k={k} />
-          </button>
-        </div>
-      </th>
-    );
-  };
 
   const copyText = async (text: string, okMsg: string) => {
     try {
@@ -359,7 +386,10 @@ export default function AdminAfiliadosClient() {
                   'dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200',
                 ].join(' ')}
               >
-                busca: <span className="font-medium text-zinc-900 dark:text-zinc-100">"{q.trim()}"</span>
+                busca:{' '}
+                <span className="font-medium text-zinc-900 dark:text-zinc-100">
+                  &quot;{q.trim()}&quot;
+                </span>
               </span>
             )}
           </div>
@@ -382,7 +412,8 @@ export default function AdminAfiliadosClient() {
         footer={
           <>
             Mostrando <span className="text-zinc-900 dark:text-zinc-300">{sorted.length}</span> de{' '}
-            <span className="text-zinc-900 dark:text-zinc-300">{affiliates.length}</span> afiliados (mock).
+            <span className="text-zinc-900 dark:text-zinc-300">{(affiliates as AffiliateItem[]).length}</span>{' '}
+            afiliados (mock).
           </>
         }
       >
@@ -399,18 +430,46 @@ export default function AdminAfiliadosClient() {
 
           <thead className="border-b border-zinc-200 bg-white dark:border-zinc-900 dark:bg-zinc-950">
             <tr className="text-xs text-zinc-600 dark:text-zinc-400">
-              <ThSort k="nome">Nome</ThSort>
-              <ThSort k="email">Email</ThSort>
-              <ThSort k="whatsapp" innerClassName={shiftInner}>
+              <ThSort k="nome" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>
+                Nome
+              </ThSort>
+              <ThSort k="email" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>
+                Email
+              </ThSort>
+              <ThSort
+                k="whatsapp"
+                innerClassName={shiftInner}
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onToggle={toggleSort}
+              >
                 WhatsApp
               </ThSort>
-              <ThSort k="cupom" innerClassName={shiftInner}>
+              <ThSort
+                k="cupom"
+                innerClassName={shiftInner}
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onToggle={toggleSort}
+              >
                 Cupom
               </ThSort>
-              <ThSort k="status" innerClassName={shiftInner}>
+              <ThSort
+                k="status"
+                innerClassName={shiftInner}
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onToggle={toggleSort}
+              >
                 Status
               </ThSort>
-              <ThSort k="atualizadoEm" innerClassName={shiftInner}>
+              <ThSort
+                k="atualizadoEm"
+                innerClassName={shiftInner}
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onToggle={toggleSort}
+              >
                 Atualizado
               </ThSort>
 
@@ -427,7 +486,7 @@ export default function AdminAfiliadosClient() {
               </tr>
             ) : (
               sorted.map((a) => {
-                const whatsappHref = (a as any).whatsappHref || buildWhatsappHref(a.whatsapp);
+                const whatsappHref = a.whatsappHref || buildWhatsappHref(a.whatsapp);
                 const whatsappLabel = formatBRPhone(a.whatsapp) || a.whatsapp;
 
                 return (

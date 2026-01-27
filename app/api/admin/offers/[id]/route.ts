@@ -1,3 +1,4 @@
+// app/api/admin/offers/[id]/route.ts
 import { NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
@@ -22,23 +23,34 @@ async function getTenantId() {
   return h.get('x-tenant-id') ?? undefined;
 }
 
-type Params = { id: string };
+/**
+ * 🔧 AJUSTE AQUI:
+ * Next 16 exige params como Promise
+ */
+type RouteCtx = { params: Promise<{ id: string }> };
 
-export async function PATCH(req: Request, { params }: { params: Promise<Params> }) {
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
+export async function PATCH(req: Request, context: RouteCtx) {
   const session = await requireMaster();
   if (!session) {
     return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
   }
 
   try {
-    const { id } = await params;
+    // 🔧 AJUSTE AQUI
+    const { id } = await context.params;
 
     if (!id || typeof id !== 'string') {
       return NextResponse.json({ ok: false, error: 'ID inválido' }, { status: 400 });
     }
 
-    const body = await req.json().catch(() => null);
-    const status = body?.status as OfferStatus | undefined;
+    const bodyRaw: unknown = await req.json().catch(() => null);
+    const body = isPlainObject(bodyRaw) ? bodyRaw : {};
+
+    const status = (typeof body.status === 'string' ? body.status : '') as OfferStatus;
 
     if (!status || !allowed.has(status)) {
       return NextResponse.json({ ok: false, error: 'Status inválido' }, { status: 400 });
@@ -56,7 +68,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<Params> 
 
       const updated = await tx.offer.update({
         where: { id },
-        data: { status: status as any },
+        data: { status }, // mantém exatamente como estava
         select: { id: true, status: true, updatedAt: true },
       });
 
@@ -81,9 +93,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<Params> 
     }
 
     return NextResponse.json({ ok: true, item: result.updated }, { status: 200 });
-  } catch (e: any) {
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : String(e);
     return NextResponse.json(
-      { ok: false, error: e?.message || 'Erro ao atualizar oferta' },
+      { ok: false, error: message || 'Erro ao atualizar oferta' },
       { status: 500 }
     );
   }

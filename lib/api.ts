@@ -1,27 +1,46 @@
 // lib/api.ts
-
 import { headers } from 'next/headers';
 
-async function readHeader(name: string) {
-  try {
-    // ✅ Next 16: headers() retorna Promise
-    const h: any = await headers();
+type HeadersLike = {
+  get: (name: string) => string | null;
+};
 
-    // Caso padrão (Headers)
-    if (h && typeof h.get === 'function') return h.get(name);
+type EntriesLike = {
+  entries: () => IterableIterator<[string, string]>;
+};
+
+function isObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null;
+}
+
+function hasGet(v: unknown): v is HeadersLike {
+  return isObject(v) && typeof (v as Record<string, unknown>).get === 'function';
+}
+
+function hasEntries(v: unknown): v is EntriesLike {
+  return isObject(v) && typeof (v as Record<string, unknown>).entries === 'function';
+}
+
+async function readHeader(name: string): Promise<string | null> {
+  try {
+    // Next 16: headers() pode ser Promise
+    const hUnknown: unknown = await headers();
+
+    // Caso padrão (Headers/ReadonlyHeaders)
+    if (hasGet(hUnknown)) return hUnknown.get(name);
 
     // Caso iterável (entries)
-    if (h && typeof h.entries === 'function') {
+    if (hasEntries(hUnknown)) {
       const map = new Map<string, string>();
-      for (const [k, v] of h.entries()) map.set(String(k).toLowerCase(), String(v));
+      for (const [k, v] of hUnknown.entries()) map.set(String(k).toLowerCase(), String(v));
       return map.get(name.toLowerCase()) ?? null;
     }
 
     // Caso "plain object"
-    if (h && typeof h === 'object') {
+    if (isObject(hUnknown)) {
       const key = name.toLowerCase();
-      for (const k of Object.keys(h)) {
-        if (k.toLowerCase() === key) return String(h[k]);
+      for (const k of Object.keys(hUnknown)) {
+        if (k.toLowerCase() === key) return String(hUnknown[k]);
       }
     }
 
@@ -31,14 +50,15 @@ async function readHeader(name: string) {
   }
 }
 
-async function getBaseUrl() {
+async function getBaseUrl(): Promise<string> {
   const env =
     process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, '') ||
     process.env.SITE_URL?.replace(/\/+$/, '');
 
   if (env) return env;
 
-  const host = (await readHeader('x-forwarded-host')) ?? (await readHeader('host')) ?? 'localhost:3000';
+  const host =
+    (await readHeader('x-forwarded-host')) ?? (await readHeader('host')) ?? 'localhost:3000';
 
   const proto = (await readHeader('x-forwarded-proto')) ?? 'http';
 
@@ -56,12 +76,12 @@ export type ApiOffer = {
   description: string;
 };
 
-export async function apiGetOffers(category?: string) {
+export async function apiGetOffers(categoryId?: string): Promise<ApiOffer[]> {
   const base = await getBaseUrl();
   const url = new URL('/api/offers', base);
 
-  // ✅ Corrigido: a API espera "categoryId", não "category"
-  if (category) url.searchParams.set('categoryId', category);
+  // a API espera "categoryId"
+  if (categoryId) url.searchParams.set('categoryId', categoryId);
 
   const res = await fetch(url.toString(), {
     cache: 'no-store',
@@ -79,7 +99,7 @@ export async function apiGetOffers(category?: string) {
   return json.items ?? [];
 }
 
-export async function apiGetOffer(slugOrId: string) {
+export async function apiGetOffer(slugOrId: string): Promise<ApiOffer | null> {
   const base = await getBaseUrl();
   const url = new URL(`/api/offers/${encodeURIComponent(slugOrId)}`, base);
 

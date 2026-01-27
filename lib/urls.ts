@@ -17,7 +17,7 @@ function normalize(value: string) {
   return safeDecode(value).trim();
 }
 
-// ✅ precisa ser exportado (seu erro estava aqui)
+// ✅ precisa ser exportado
 export function safeEncode(value: string) {
   return encodeURIComponent(normalize(value));
 }
@@ -39,10 +39,7 @@ export function benefitPath(input: BenefitLike | string) {
 /**
  * URL absoluta do benefício (canônica).
  */
-export function benefitCanonicalUrl(
-  input: BenefitLike | string,
-  baseUrl?: string
-) {
+export function benefitCanonicalUrl(input: BenefitLike | string, baseUrl?: string) {
   const siteUrl =
     baseUrl?.replace(/\/+$/, '') ||
     process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, '') ||

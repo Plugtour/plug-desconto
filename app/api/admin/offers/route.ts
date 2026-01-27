@@ -1,3 +1,4 @@
+// app/api/admin/offers/route.ts
 import { NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
@@ -6,8 +7,18 @@ import { cookies, headers } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * ✅ Status como union type
+ * (porque NÃO existe enum no Prisma)
+ */
 type OfferStatus = 'rascunho' | 'publicado' | 'pausado' | 'arquivado';
-const allowed = new Set<OfferStatus>(['rascunho', 'publicado', 'pausado', 'arquivado']);
+
+const allowed = new Set<OfferStatus>([
+  'rascunho',
+  'publicado',
+  'pausado',
+  'arquivado',
+]);
 
 async function requireMaster() {
   const c = await cookies();
@@ -22,30 +33,13 @@ async function getTenantId() {
   return h.get('x-tenant-id') ?? undefined;
 }
 
-function slugify(value: string) {
-  return value
-    .trim()
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)+/g, '');
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
-async function ensureUniqueSlug(base: string) {
-  const cleanBase = slugify(base || 'oferta') || 'oferta';
-  let slug = cleanBase;
-  let i = 2;
-
-  while (true) {
-    const exists = await prisma.offer.findUnique({ where: { slug } });
-    if (!exists) return slug;
-    slug = `${cleanBase}-${i}`;
-    i += 1;
-  }
-}
-
-// ADMIN: lista tudo
+// ========================
+// ADMIN: LISTA OFERTAS
+// ========================
 export async function GET() {
   const session = await requireMaster();
   if (!session) {
@@ -57,16 +51,22 @@ export async function GET() {
       orderBy: { createdAt: 'desc' },
     });
 
-    return NextResponse.json({ ok: true, items, total: items.length }, { status: 200 });
-  } catch (e: any) {
     return NextResponse.json(
-      { ok: false, error: 'Falha ao buscar ofertas', detail: e?.message ?? String(e) },
+      { ok: true, items, total: items.length },
+      { status: 200 }
+    );
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : String(e);
+    return NextResponse.json(
+      { ok: false, error: 'Falha ao buscar ofertas', detail: message },
       { status: 500 }
     );
   }
 }
 
-// ADMIN: cria oferta (com auditoria)
+// ========================
+// ADMIN: CRIA OFERTA
+// ========================
 export async function POST(request: Request) {
   const session = await requireMaster();
   if (!session) {
@@ -74,17 +74,18 @@ export async function POST(request: Request) {
   }
 
   try {
-    const body = await request.json().catch(() => null);
+    const bodyRaw: unknown = await request.json().catch(() => null);
+    const body = isPlainObject(bodyRaw) ? bodyRaw : {};
 
-    const title = String(body?.title ?? '').trim();
-    const partnerName = String(body?.partnerName ?? '').trim();
-    const city = String(body?.city ?? '').trim();
-    const categoryId = String(body?.categoryId ?? '').trim();
-    const status = String(body?.status ?? 'rascunho') as OfferStatus;
+    const title = String(body.title ?? '').trim();
+    const partnerName = String(body.partnerName ?? '').trim();
+    const city = String(body.city ?? '').trim();
+    const categoryId = String(body.categoryId ?? '').trim();
+    const status = String(body.status ?? 'rascunho') as OfferStatus;
 
-    const description = body?.description ? String(body.description) : null;
-    const imageUrl = body?.imageUrl ? String(body.imageUrl) : null;
-    const priceText = body?.priceText ? String(body.priceText) : null;
+    const description = body.description ? String(body.description) : null;
+    const imageUrl = body.imageUrl ? String(body.imageUrl) : null;
+    const priceText = body.priceText ? String(body.priceText) : null;
 
     if (title.length < 4) {
       return NextResponse.json({ ok: false, error: 'Título inválido' }, { status: 400 });
@@ -102,25 +103,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: 'Status inválido' }, { status: 400 });
     }
 
-    const slug = await ensureUniqueSlug(title);
     const tenantId = await getTenantId();
 
     const created = await prisma.offer.create({
       data: {
-        slug,
+        slug: title.toLowerCase().replace(/\s+/g, '-'),
         title,
         partnerName,
         city,
         categoryId,
-        status: status as any,
+        status,
         description,
         imageUrl,
         priceText,
       },
     });
 
-    // Auditoria: criação
-    // Json fields: usar Prisma.JsonNull em vez de null
     await prisma.adminAuditLog.create({
       data: {
         tenantId,
@@ -134,18 +132,16 @@ export async function POST(request: Request) {
           id: created.id,
           slug: created.slug,
           title: created.title,
-          partnerName: created.partnerName,
-          city: created.city,
-          categoryId: created.categoryId,
           status: created.status,
         } as Prisma.InputJsonValue,
       },
     });
 
     return NextResponse.json({ ok: true, offer: created }, { status: 201 });
-  } catch (e: any) {
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : String(e);
     return NextResponse.json(
-      { ok: false, error: 'Falha ao criar oferta', detail: e?.message ?? String(e) },
+      { ok: false, error: 'Falha ao criar oferta', detail: message },
       { status: 500 }
     );
   }

@@ -18,6 +18,15 @@ import type { OfferStatus } from '../_data/adminMappers';
 type SortKey = 'titulo' | 'parceiro' | 'categoria' | 'status' | 'atualizadoEm';
 type SortDir = 'asc' | 'desc';
 
+type OfferItem = {
+  id: string;
+  titulo: string;
+  parceiro: string;
+  categoria: string;
+  status: OfferStatus;
+  atualizadoEm: string;
+};
+
 const parseAnyDateTime = (s: string) => {
   const raw = (s || '').trim();
   if (!raw) return 0;
@@ -59,6 +68,63 @@ const statusWeight: Record<OfferStatus, number> = {
   arquivado: 4,
 };
 
+function SortIcon({
+  colKey,
+  activeKey,
+  dir,
+}: {
+  colKey: SortKey;
+  activeKey: SortKey;
+  dir: SortDir;
+}) {
+  if (activeKey !== colKey) return null;
+  return dir === 'asc' ? (
+    <ChevronUp className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-300" />
+  ) : (
+    <ChevronDown className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-300" />
+  );
+}
+
+function ThSort({
+  k,
+  children,
+  align = 'left',
+  className = '',
+  innerClassName = '',
+  sortKey,
+  sortDir,
+  onToggle,
+}: {
+  k: SortKey;
+  children: ReactNode;
+  align?: 'left' | 'right';
+  className?: string;
+  innerClassName?: string;
+  sortKey: SortKey;
+  sortDir: SortDir;
+  onToggle: (key: SortKey) => void;
+}) {
+  return (
+    <th className={`px-3 py-3 font-medium ${align === 'right' ? 'text-right' : ''} ${className}`}>
+      <div className={innerClassName}>
+        <button
+          type="button"
+          onClick={() => onToggle(k)}
+          className={[
+            'inline-flex items-center gap-1 rounded-md px-1 py-0.5 transition',
+            'text-xs text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900',
+            'dark:text-zinc-400 dark:hover:bg-zinc-900/60 dark:hover:text-zinc-100',
+          ].join(' ')}
+          title="Ordenar"
+        >
+          <span className="text-xs">{children}</span>
+          <SortIcon colKey={k} activeKey={sortKey} dir={sortDir} />
+        </button>
+      </div>
+    </th>
+  );
+}
+
 export default function AdminOfertasClient() {
   const { showToast } = useAdminToast();
   const { offers, setOfferStatus } = useAdminData();
@@ -80,52 +146,10 @@ export default function AdminOfertasClient() {
     });
   };
 
-  const SortIcon = ({ k }: { k: SortKey }) => {
-    if (sortKey !== k) return null;
-    return sortDir === 'asc' ? (
-      <ChevronUp className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-300" />
-    ) : (
-      <ChevronDown className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-300" />
-    );
-  };
-
   // ✅ deslocar SOMENTE o conteúdo interno (sem criar “buraco” na linha)
   const shiftInner = '-ml-10';
 
-  const ThSort = ({
-    k,
-    children,
-    align = 'left',
-    className = '',
-    innerClassName = '',
-  }: {
-    k: SortKey;
-    children: ReactNode;
-    align?: 'left' | 'right';
-    className?: string;
-    innerClassName?: string;
-  }) => {
-    return (
-      <th className={`px-3 py-3 font-medium ${align === 'right' ? 'text-right' : ''} ${className}`}>
-        <button
-          type="button"
-          onClick={() => toggleSort(k)}
-          className={[
-            'inline-flex items-center gap-1 rounded-md px-1 py-0.5 transition',
-            'text-xs text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900',
-            'dark:text-zinc-400 dark:hover:bg-zinc-900/60 dark:hover:text-zinc-100',
-            innerClassName,
-          ].join(' ')}
-          title="Ordenar"
-        >
-          <span className="text-xs">{children}</span>
-          <SortIcon k={k} />
-        </button>
-      </th>
-    );
-  };
-
-  const getTitleById = (id: string) => offers.find((o) => o.id === id)?.titulo || id;
+  const getTitleById = (id: string) => (offers as OfferItem[]).find((o) => o.id === id)?.titulo || id;
 
   const handlePublish = (id: string) => {
     setOfferStatus(id, 'publicado');
@@ -150,7 +174,7 @@ export default function AdminOfertasClient() {
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
 
-    return offers
+    return (offers as OfferItem[])
       .filter((o) => (status === 'todos' ? true : o.status === status))
       .filter((o) => {
         if (!term) return true;
@@ -166,7 +190,7 @@ export default function AdminOfertasClient() {
   const sorted = useMemo(() => {
     const dir = sortDir === 'asc' ? 1 : -1;
 
-    const getValue = (o: any, key: SortKey) => {
+    const getValue = (o: OfferItem, key: SortKey) => {
       switch (key) {
         case 'titulo':
           return (o.titulo || '').toLowerCase();
@@ -175,7 +199,7 @@ export default function AdminOfertasClient() {
         case 'categoria':
           return (o.categoria || '').toLowerCase();
         case 'status':
-          return statusWeight[o.status as OfferStatus] ?? 999;
+          return statusWeight[o.status] ?? 999;
         case 'atualizadoEm':
           return parseAnyDateTime(o.atualizadoEm);
         default:
@@ -183,7 +207,7 @@ export default function AdminOfertasClient() {
       }
     };
 
-    return [...filtered].sort((a: any, b: any) => {
+    return [...filtered].sort((a, b) => {
       const va = getValue(a, sortKey);
       const vb = getValue(b, sortKey);
 
@@ -200,13 +224,13 @@ export default function AdminOfertasClient() {
 
   const counts = useMemo(() => {
     const base: Record<'todos' | OfferStatus, number> = {
-      todos: offers.length,
+      todos: (offers as OfferItem[]).length,
       rascunho: 0,
       publicado: 0,
       pausado: 0,
       arquivado: 0,
     };
-    for (const o of offers) base[o.status] += 1;
+    for (const o of offers as OfferItem[]) base[o.status] += 1;
     return base;
   }, [offers]);
 
@@ -290,7 +314,8 @@ export default function AdminOfertasClient() {
                   'dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200',
                 ].join(' ')}
               >
-                busca: <span className="font-medium text-zinc-900 dark:text-zinc-100">"{q.trim()}"</span>
+                busca:{' '}
+                <span className="font-medium text-zinc-900 dark:text-zinc-100">&quot;{q.trim()}&quot;</span>
               </span>
             )}
           </div>
@@ -313,7 +338,7 @@ export default function AdminOfertasClient() {
         footer={
           <>
             Mostrando <span className="text-zinc-900 dark:text-zinc-300">{sorted.length}</span> de{' '}
-            <span className="text-zinc-900 dark:text-zinc-300">{offers.length}</span> ofertas (mock).
+            <span className="text-zinc-900 dark:text-zinc-300">{(offers as OfferItem[]).length}</span> ofertas (mock).
           </>
         }
       >
@@ -329,18 +354,44 @@ export default function AdminOfertasClient() {
 
           <thead className="border-b border-zinc-200 bg-white dark:border-zinc-900 dark:bg-zinc-950">
             <tr className="text-xs text-zinc-600 dark:text-zinc-400">
-              <ThSort k="titulo">Título</ThSort>
+              <ThSort k="titulo" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>
+                Título
+              </ThSort>
 
-              <ThSort k="parceiro" innerClassName={shiftInner}>
+              <ThSort
+                k="parceiro"
+                innerClassName={shiftInner}
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onToggle={toggleSort}
+              >
                 Parceiro
               </ThSort>
-              <ThSort k="categoria" innerClassName={shiftInner}>
+              <ThSort
+                k="categoria"
+                innerClassName={shiftInner}
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onToggle={toggleSort}
+              >
                 Categoria
               </ThSort>
-              <ThSort k="status" innerClassName={shiftInner}>
+              <ThSort
+                k="status"
+                innerClassName={shiftInner}
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onToggle={toggleSort}
+              >
                 Status
               </ThSort>
-              <ThSort k="atualizadoEm" innerClassName={shiftInner}>
+              <ThSort
+                k="atualizadoEm"
+                innerClassName={shiftInner}
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onToggle={toggleSort}
+              >
                 Atualizado
               </ThSort>
 
@@ -357,10 +408,7 @@ export default function AdminOfertasClient() {
               </tr>
             ) : (
               sorted.map((o) => (
-                <tr
-                  key={o.id}
-                  className="h-[54px] text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900/30"
-                >
+                <tr key={o.id} className="h-[54px] text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900/30">
                   <td className="px-3 py-2 align-middle">
                     <div className="flex h-[54px] flex-col justify-center leading-[1.05]">
                       <div className="truncate font-medium text-zinc-900 dark:text-zinc-100" title={o.titulo}>

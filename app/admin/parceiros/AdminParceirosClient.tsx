@@ -79,6 +79,62 @@ const statusWeight: Record<PartnerStatus, number> = {
 type SortKey = 'nome' | 'cidade' | 'telefone' | 'categoria' | 'status' | 'atualizadoEm';
 type SortDir = 'asc' | 'desc';
 
+function SortIcon({
+  colKey,
+  activeKey,
+  dir,
+}: {
+  colKey: SortKey;
+  activeKey: SortKey;
+  dir: SortDir;
+}) {
+  if (activeKey !== colKey) return null;
+  return dir === 'asc' ? (
+    <ChevronUp className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-300" />
+  ) : (
+    <ChevronDown className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-300" />
+  );
+}
+
+function ThSort({
+  k,
+  children,
+  align = 'left',
+  className = '',
+  innerClassName = '',
+  sortKey,
+  sortDir,
+  onToggle,
+}: {
+  k: SortKey;
+  children: ReactNode;
+  align?: 'left' | 'right';
+  className?: string;
+  innerClassName?: string;
+  sortKey: SortKey;
+  sortDir: SortDir;
+  onToggle: (key: SortKey) => void;
+}) {
+  return (
+    <th className={`px-3 py-3 font-medium ${align === 'right' ? 'text-right' : ''} ${className}`}>
+      <button
+        type="button"
+        onClick={() => onToggle(k)}
+        className={[
+          'inline-flex items-center gap-1 rounded-md px-1 py-0.5 transition',
+          'text-xs text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900',
+          'dark:text-zinc-400 dark:hover:bg-zinc-900/60 dark:hover:text-zinc-100',
+          innerClassName,
+        ].join(' ')}
+        title="Ordenar"
+      >
+        <span className="text-xs">{children}</span>
+        <SortIcon colKey={k} activeKey={sortKey} dir={sortDir} />
+      </button>
+    </th>
+  );
+}
+
 export default function AdminParceirosClient() {
   const { showToast } = useAdminToast();
   const { partners, setPartnerStatus } = useAdminData();
@@ -101,15 +157,6 @@ export default function AdminParceirosClient() {
       setSortDir((prevDir) => (prevDir === 'asc' ? 'desc' : 'asc'));
       return prevKey;
     });
-  };
-
-  const SortIcon = ({ k }: { k: SortKey }) => {
-    if (sortKey !== k) return null;
-    return sortDir === 'asc' ? (
-      <ChevronUp className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-300" />
-    ) : (
-      <ChevronDown className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-300" />
-    );
   };
 
   const didInitRef = useRef(false);
@@ -150,7 +197,7 @@ export default function AdminParceirosClient() {
     setQ('');
   };
 
-  const getNameById = (id: string) => partners.find((p) => p.id === id)?.nome || id;
+  const getNameById = (id: string) => (partners as AdminPartnerRow[]).find((p) => p.id === id)?.nome || id;
 
   const handlePublish = (id: string) => {
     setPartnerStatus(id, 'publicado');
@@ -227,14 +274,15 @@ export default function AdminParceirosClient() {
   }, [filtered, sortKey, sortDir]);
 
   const counts = useMemo(() => {
+    const rows = partners as AdminPartnerRow[];
     const base: Record<'todos' | PartnerStatus, number> = {
-      todos: partners.length,
+      todos: rows.length,
       rascunho: 0,
       publicado: 0,
       pausado: 0,
       arquivado: 0,
     };
-    for (const p of partners as AdminPartnerRow[]) base[p.status] += 1;
+    for (const p of rows) base[p.status] += 1;
     return base;
   }, [partners]);
 
@@ -253,39 +301,6 @@ export default function AdminParceirosClient() {
 
   // ✅ deslocar SOMENTE o conteúdo interno
   const shiftInner = '-ml-10';
-
-  const ThSort = ({
-    k,
-    children,
-    align = 'left',
-    className = '',
-    innerClassName = '',
-  }: {
-    k: SortKey;
-    children: ReactNode;
-    align?: 'left' | 'right';
-    className?: string;
-    innerClassName?: string;
-  }) => {
-    return (
-      <th className={`px-3 py-3 font-medium ${align === 'right' ? 'text-right' : ''} ${className}`}>
-        <button
-          type="button"
-          onClick={() => toggleSort(k)}
-          className={[
-            'inline-flex items-center gap-1 rounded-md px-1 py-0.5 transition',
-            'text-xs text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900',
-            'dark:text-zinc-400 dark:hover:bg-zinc-900/60 dark:hover:text-zinc-100',
-            innerClassName,
-          ].join(' ')}
-          title="Ordenar"
-        >
-          <span className="text-xs">{children}</span>
-          <SortIcon k={k} />
-        </button>
-      </th>
-    );
-  };
 
   return (
     <main className="space-y-4">
@@ -339,7 +354,8 @@ export default function AdminParceirosClient() {
                   'dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200',
                 ].join(' ')}
               >
-                status: <span className="font-medium text-zinc-900 dark:text-zinc-100">{status}</span>
+                status:{' '}
+                <span className="font-medium text-zinc-900 dark:text-zinc-100">{status}</span>
               </span>
             )}
 
@@ -351,7 +367,8 @@ export default function AdminParceirosClient() {
                   'dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200',
                 ].join(' ')}
               >
-                busca: <span className="font-medium text-zinc-900 dark:text-zinc-100">"{q.trim()}"</span>
+                busca:{' '}
+                <span className="font-medium text-zinc-900 dark:text-zinc-100">&quot;{q.trim()}&quot;</span>
               </span>
             )}
           </div>
@@ -374,7 +391,8 @@ export default function AdminParceirosClient() {
         footer={
           <>
             Mostrando <span className="text-zinc-900 dark:text-zinc-300">{sorted.length}</span> de{' '}
-            <span className="text-zinc-900 dark:text-zinc-300">{partners.length}</span> parceiros (mock).
+            <span className="text-zinc-900 dark:text-zinc-300">{(partners as AdminPartnerRow[]).length}</span>{' '}
+            parceiros (mock).
           </>
         }
       >
@@ -391,19 +409,47 @@ export default function AdminParceirosClient() {
 
           <thead className="border-b border-zinc-200 bg-white dark:border-zinc-900 dark:bg-zinc-950">
             <tr className="text-xs text-zinc-600 dark:text-zinc-400">
-              <ThSort k="nome">Nome</ThSort>
-              <ThSort k="cidade">Cidade</ThSort>
+              <ThSort k="nome" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>
+                Nome
+              </ThSort>
+              <ThSort k="cidade" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>
+                Cidade
+              </ThSort>
 
-              <ThSort k="telefone" innerClassName={shiftInner}>
+              <ThSort
+                k="telefone"
+                innerClassName={shiftInner}
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onToggle={toggleSort}
+              >
                 Telefone
               </ThSort>
-              <ThSort k="categoria" innerClassName={shiftInner}>
+              <ThSort
+                k="categoria"
+                innerClassName={shiftInner}
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onToggle={toggleSort}
+              >
                 Categoria
               </ThSort>
-              <ThSort k="status" innerClassName={shiftInner}>
+              <ThSort
+                k="status"
+                innerClassName={shiftInner}
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onToggle={toggleSort}
+              >
                 Status
               </ThSort>
-              <ThSort k="atualizadoEm" innerClassName={shiftInner}>
+              <ThSort
+                k="atualizadoEm"
+                innerClassName={shiftInner}
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onToggle={toggleSort}
+              >
                 Atualizado
               </ThSort>
 
@@ -420,14 +466,12 @@ export default function AdminParceirosClient() {
               </tr>
             ) : (
               sorted.map((p) => {
-                const whatsappHref = (p as any).whatsappHref || buildWhatsappHref(p.whatsapp);
+                const whatsappHref =
+                  (p as AdminPartnerRow & { whatsappHref?: string }).whatsappHref || buildWhatsappHref(p.whatsapp);
                 const phoneLabel = formatBRPhone(p.whatsapp) || p.whatsapp;
 
                 return (
-                  <tr
-                    key={p.id}
-                    className="h-[54px] text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900/30"
-                  >
+                  <tr key={p.id} className="h-[54px] text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900/30">
                     <td className="px-3 py-2 align-middle">
                       <div className="flex h-[54px] flex-col justify-center leading-[1.05]">
                         <div className="truncate font-medium text-zinc-900 dark:text-zinc-100" title={p.nome}>
