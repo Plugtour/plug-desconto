@@ -1,5 +1,6 @@
 // app/ofertas/page.tsx
 import Link from 'next/link';
+import Image from 'next/image';
 import { getTenantFromRequest } from '@/lib/tenant';
 import { getSession } from '@/lib/session';
 import { apiGetOffers } from '@/lib/api';
@@ -47,9 +48,6 @@ export default async function OfertasPage({
 
   const canUseBenefits = session.role === 'user' && session.planActive;
 
-  // ✅ vem da API (mantém como você já tinha)
-  // Observação: como não sabemos se apiGetOffers aceita city,
-  // filtramos city aqui no front com base no campo offer.city.
   const offersFromApi = await apiGetOffers(cat);
 
   const offers = offersFromApi.filter((offer: any) => {
@@ -89,7 +87,6 @@ export default async function OfertasPage({
         </div>
       </header>
 
-      {/* Sessão / Plano (mantido) */}
       <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 text-sm text-zinc-200">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-zinc-400">Perfil:</span>
@@ -108,7 +105,6 @@ export default async function OfertasPage({
         )}
       </div>
 
-      {/* Filtros */}
       <section className="rounded-xl border border-zinc-800 bg-zinc-950 p-5">
         <div className="flex flex-col gap-4">
           <div>
@@ -191,7 +187,7 @@ export default async function OfertasPage({
               </div>
             </div>
 
-            {hasFilters ? (
+            {hasFilters && (
               <div className="pt-1">
                 <Link
                   href="/ofertas"
@@ -200,12 +196,11 @@ export default async function OfertasPage({
                   Limpar filtros
                 </Link>
               </div>
-            ) : null}
+            )}
           </div>
         </div>
       </section>
 
-      {/* Lista */}
       <section className="space-y-3">
         <div className="flex items-center justify-between gap-4">
           <h2 className="text-lg font-semibold text-zinc-50">Lista de ofertas</h2>
@@ -227,25 +222,30 @@ export default async function OfertasPage({
                 <Link
                   key={offer.id}
                   href={href}
-                  className="block rounded-xl border border-zinc-800 bg-zinc-950 p-4 hover:bg-zinc-900"
+                  className="block overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 hover:bg-zinc-900"
                 >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <p className="text-xs text-zinc-400">{offer.partner}</p>
-                      <h3 className="truncate text-base font-semibold text-zinc-50">
-                        {offer.title}
-                      </h3>
-                      <p className="mt-1 text-sm text-zinc-300">{offer.benefit}</p>
-                      <p className="mt-2 line-clamp-2 text-sm text-zinc-400">
-                        {offer.description}
-                      </p>
+                  {offer.imageUrl && (
+                    <div className="relative h-44 w-full">
+                      <Image
+                        src={offer.imageUrl}
+                        alt={offer.title}
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 768px) 100vw, 50vw"
+                        priority={false}
+                      />
                     </div>
+                  )}
 
-                    <div className="shrink-0">
-                      <span className="rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-200">
-                        Ver
-                      </span>
-                    </div>
+                  <div className="p-4">
+                    <p className="text-xs text-zinc-400">{offer.partner}</p>
+                    <h3 className="mt-1 truncate text-base font-semibold text-zinc-50">
+                      {offer.title}
+                    </h3>
+                    <p className="mt-1 text-sm text-zinc-300">{offer.benefit}</p>
+                    <p className="mt-2 line-clamp-2 text-sm text-zinc-400">
+                      {offer.description}
+                    </p>
                   </div>
                 </Link>
               );

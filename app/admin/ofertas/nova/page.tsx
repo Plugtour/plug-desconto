@@ -16,8 +16,8 @@ function normalizeCity(value: string) {
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
-    .replace(/\s+/g, '-') // ✅ padroniza espaços
-    .replace(/-+/g, '-')  // ✅ evita "--"
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
     .replace(/(^-|-$)+/g, '');
 }
 
@@ -59,7 +59,6 @@ export default function AdminNovaOfertaPage() {
   const [descricao, setDescricao] = useState('');
   const [regiao, setRegiao] = useState('Serra Gaúcha');
 
-  // opcionais
   const [imageUrl, setImageUrl] = useState('');
   const [priceText, setPriceText] = useState('');
 
@@ -170,7 +169,6 @@ export default function AdminNovaOfertaPage() {
       </div>
 
       <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        {/* Coluna principal */}
         <div className="md:col-span-2 space-y-4">
           <div className={card}>
             <label className={label}>Título</label>
@@ -196,14 +194,49 @@ export default function AdminNovaOfertaPage() {
           </div>
 
           <div className={card}>
-            <label className={label}>Imagem (URL)</label>
+            <label className={label}>Imagens da oferta</label>
+
             <input
-              value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
-              placeholder="https://..."
+              type="file"
+              multiple
+              accept="image/png,image/jpeg,image/webp"
               className={inputBase}
+              onChange={async (e) => {
+                const files = e.target.files;
+                if (!files || files.length === 0) return;
+
+                const form = new FormData();
+                Array.from(files).forEach((file) => {
+                  form.append('files', file);
+                });
+
+                const res = await fetch('/api/admin/upload/offer-image', {
+                  method: 'POST',
+                  body: form,
+                });
+
+                const data = await res.json();
+
+                if (!res.ok || !data.urls) {
+                  alert('Erro ao subir imagens');
+                  return;
+                }
+
+                setImageUrl(data.urls[0]);
+              }}
             />
-            <p className={help}>Opcional.</p>
+
+            {imageUrl && (
+              <img
+                src={imageUrl}
+                alt="Preview"
+                className="mt-3 max-h-40 rounded-lg border"
+              />
+            )}
+
+            <p className={help}>
+              PNG/JPEG são convertidas para WebP. WebP é mantido.
+            </p>
           </div>
 
           <div className={card}>
@@ -218,7 +251,6 @@ export default function AdminNovaOfertaPage() {
           </div>
         </div>
 
-        {/* Lateral */}
         <div className="space-y-4">
           <div className={card}>
             <label className={label}>Parceiro</label>

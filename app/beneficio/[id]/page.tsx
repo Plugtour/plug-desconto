@@ -1,5 +1,7 @@
+// app/beneficio/[id]/page.tsx
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import Image from 'next/image';
 import { notFound, redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
@@ -7,11 +9,7 @@ import { revalidatePath } from 'next/cache';
 import { getSession } from '@/lib/session';
 import { generateVoucherCode } from '@/lib/vouchers';
 import { apiGetOffer } from '@/lib/api';
-import {
-  benefitUrl,
-  benefitCanonicalUrl,
-  benefitPath,
-} from '@/lib/urls';
+import { benefitUrl, benefitCanonicalUrl, benefitPath } from '@/lib/urls';
 
 import CopyButton from './CopyButton';
 
@@ -41,9 +39,7 @@ function buildSeoDescription(offer: {
   const base = `${offer.benefit} em ${offer.partner}.`;
   const extra = (offer.description || '').replace(/\s+/g, ' ').trim();
   const combined = extra ? `${base} ${extra}` : base;
-  return combined.length > 160
-    ? combined.slice(0, 157).trimEnd() + '...'
-    : combined;
+  return combined.length > 160 ? combined.slice(0, 157).trimEnd() + '...' : combined;
 }
 
 /* =========================
@@ -59,16 +55,22 @@ export async function generateMetadata({
   const raw = normalizeSlugOrId(id);
 
   const offer = await apiGetOffer(raw);
-
-  // ⚠️ não define metadata aqui para deixar o not-found.tsx assumir
-  if (!offer) {
-    return {};
-  }
+  if (!offer) return {};
 
   const title = `${offer.title} | Plug Desconto`;
-  const description = buildSeoDescription(offer);
+
+  const benefitText = offer.benefit || offer.title || '';
+  const partnerText = offer.partner || '';
+  const description = buildSeoDescription({
+    benefit: benefitText,
+    partner: partnerText,
+    description: offer.description || undefined,
+  });
 
   const canonicalPath = benefitCanonicalUrl(offer);
+
+  const img =
+    Array.isArray(offer.images) && offer.images.length > 0 ? offer.images[0] : null;
 
   return {
     title,
@@ -80,15 +82,15 @@ export async function generateMetadata({
       title,
       description,
       siteName: 'Plug Desconto',
-      images: [
-        { url: '/og.png', width: 1200, height: 630, alt: 'Plug Desconto' },
-      ],
+      images: img
+        ? [{ url: img, width: 1200, height: 630 }]
+        : [{ url: '/og.png', width: 1200, height: 630 }],
     },
     twitter: {
       card: 'summary_large_image',
       title,
       description,
-      images: ['/og.png'],
+      images: img ? [img] : ['/og.png'],
     },
     robots: { index: true, follow: true },
   };
@@ -111,13 +113,9 @@ function Badge({
       : 'bg-emerald-950/40 text-emerald-200 border-emerald-900/60';
 
   return (
-    <span
-      className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${cls}`}
-    >
+    <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${cls}`}>
       <span
-        className={`h-2 w-2 rounded-full ${
-          variant === 'used' ? 'bg-rose-400' : 'bg-emerald-400'
-        }`}
+        className={`h-2 w-2 rounded-full ${variant === 'used' ? 'bg-rose-400' : 'bg-emerald-400'}`}
         aria-hidden="true"
       />
       {children}
@@ -132,11 +130,7 @@ function Card({
   children: React.ReactNode;
   className?: string;
 }) {
-  return (
-    <section className={`rounded-2xl border border-zinc-800 bg-zinc-950 ${className}`}>
-      {children}
-    </section>
-  );
+  return <section className={`rounded-2xl border border-zinc-800 bg-zinc-950 ${className}`}>{children}</section>;
 }
 
 /* =========================
@@ -148,49 +142,30 @@ export default async function BenefitPage({ params }: { params: PageParams }) {
   const raw = normalizeSlugOrId(id);
   const rawLower = raw.toLowerCase();
 
-  // oferta vem da API (aceita slug OU id)
   const offer = await apiGetOffer(raw);
   if (!offer) return notFound();
 
   const safeOffer = offer;
 
-  /* =========================
-     Redirect ID antigo → slug
-  ========================= */
-
   const slugLower = (safeOffer.slug || '').toLowerCase().trim();
   const idLower = (safeOffer.id || '').toLowerCase().trim();
-  const hasSlug = !!safeOffer.slug;
 
-  const accessedByOldId =
-    hasSlug && rawLower === idLower && rawLower !== slugLower;
-
-  if (accessedByOldId) {
+  if (safeOffer.slug && rawLower === idLower && rawLower !== slugLower) {
     redirect(benefitUrl(safeOffer));
   }
-
-  /* =========================
-     Sessão / permissão
-  ========================= */
 
   const session = await getSession();
   const canUseBenefits = session.role === 'user' && session.planActive;
 
-  /* =========================
-     Cookie / status
-  ========================= */
-
   const cookieStore = await cookies();
   const usedCookieKey = `pd_offer_used_${safeOffer.id}`;
-  const isUsed =
-    canUseBenefits && cookieStore.get(usedCookieKey)?.value === '1';
+  const isUsed = canUseBenefits && cookieStore.get(usedCookieKey)?.value === '1';
 
   const voucher = canUseBenefits
-    ? generateVoucherCode({
-        offerId: safeOffer.id,
-        userId: 'user',
-      })
+    ? generateVoucherCode({ offerId: safeOffer.id, userId: 'user' })
     : null;
+
+  const benefitPathStr = benefitPath(safeOffer);
 
   async function toggleUsedAction() {
     'use server';
@@ -208,68 +183,56 @@ export default async function BenefitPage({ params }: { params: PageParams }) {
       maxAge: 60 * 60 * 24 * 365,
     });
 
-    revalidatePath(benefitPath(safeOffer));
+    revalidatePath(benefitPathStr);
   }
 
   const canonicalPath = benefitCanonicalUrl(safeOffer);
   const nextUrl = encodeURIComponent(canonicalPath);
 
-  /* =========================
-     Render
-  ========================= */
+  const heroImg =
+    Array.isArray(safeOffer.images) && safeOffer.images.length > 0 ? safeOffer.images[0] : null;
+
+  const benefitText = safeOffer.benefit || safeOffer.title || '';
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-6">
       <div className="space-y-4">
+        {heroImg && (
+          <div className="relative h-64 w-full overflow-hidden rounded-2xl border border-zinc-800">
+            <Image src={heroImg} alt={safeOffer.title} fill className="object-cover" sizes="100vw" priority />
+          </div>
+        )}
+
         <div className="flex flex-col gap-2">
           <div className="text-xs text-zinc-400">{safeOffer.category}</div>
 
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              <h1 className="text-2xl font-bold text-zinc-50">
-                {safeOffer.title}
-              </h1>
+              <h1 className="text-2xl font-bold text-zinc-50">{safeOffer.title}</h1>
               <p className="mt-1 text-sm text-zinc-300">
-                Parceiro:{' '}
-                <strong className="text-zinc-100">
-                  {safeOffer.partner}
-                </strong>
+                Parceiro: <strong className="text-zinc-100">{safeOffer.partner}</strong>
               </p>
             </div>
 
-            <Badge variant={isUsed ? 'used' : 'available'}>
-              {isUsed ? 'Utilizado' : 'Disponível'}
-            </Badge>
+            <Badge variant={isUsed ? 'used' : 'available'}>{isUsed ? 'Utilizado' : 'Disponível'}</Badge>
           </div>
         </div>
 
         <Card className="p-4">
           <div className="text-xs text-zinc-400">Benefício</div>
-          <div className="mt-1 text-lg font-semibold text-zinc-50">
-            {safeOffer.benefit}
-          </div>
+          <div className="mt-1 text-lg font-semibold text-zinc-50">{benefitText}</div>
 
-          {safeOffer.description && (
-            <p className="mt-3 text-sm leading-relaxed text-zinc-300">
-              {safeOffer.description}
-            </p>
+          {!!safeOffer.description && (
+            <p className="mt-3 text-sm leading-relaxed text-zinc-300">{safeOffer.description}</p>
           )}
         </Card>
-
-        {/* =========================
-           BLOCO VOUCHER
-        ========================= */}
 
         <Card className="p-4">
           {!canUseBenefits ? (
             <div className="space-y-4">
               <div className="text-sm text-zinc-300">
-                Você pode visualizar este benefício, mas o voucher fica
-                disponível apenas para{' '}
-                <strong className="text-zinc-100">
-                  usuários com plano ativo
-                </strong>
-                .
+                Você pode visualizar este benefício, mas o voucher fica disponível apenas para{' '}
+                <strong className="text-zinc-100">usuários com plano ativo</strong>.
               </div>
 
               <div className="relative overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/30 p-4">
@@ -303,20 +266,14 @@ export default async function BenefitPage({ params }: { params: PageParams }) {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-xs text-zinc-400">Seu voucher</div>
-                  <p className="mt-1 text-sm text-zinc-300">
-                    Mostre este código ao parceiro.
-                  </p>
+                  <p className="mt-1 text-sm text-zinc-300">Mostre este código ao parceiro.</p>
                 </div>
-                <Badge variant={isUsed ? 'used' : 'available'}>
-                  {isUsed ? 'Utilizado' : 'Disponível'}
-                </Badge>
+                <Badge variant={isUsed ? 'used' : 'available'}>{isUsed ? 'Utilizado' : 'Disponível'}</Badge>
               </div>
 
               <div className="relative overflow-hidden rounded-2xl border bg-zinc-900/40 p-4">
                 <div className="flex items-center justify-between gap-3">
-                  <div className="text-2xl font-extrabold tracking-wider text-zinc-50">
-                    {voucher}
-                  </div>
+                  <div className="text-2xl font-extrabold tracking-wider text-zinc-50">{voucher}</div>
                   <CopyButton value={voucher ?? ''} disabled={isUsed} />
                 </div>
               </div>
@@ -326,9 +283,7 @@ export default async function BenefitPage({ params }: { params: PageParams }) {
                   type="submit"
                   className="w-full rounded-xl border border-emerald-900/60 bg-emerald-950/25 px-4 py-3 text-sm font-semibold text-emerald-100 hover:bg-emerald-950/40"
                 >
-                  {isUsed
-                    ? 'Desmarcar como utilizado'
-                    : 'Marcar como utilizado'}
+                  {isUsed ? 'Desmarcar como utilizado' : 'Marcar como utilizado'}
                 </button>
               </form>
             </div>

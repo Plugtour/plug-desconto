@@ -1,17 +1,7 @@
 // app/api/offers/[slug]/route.ts
 import { NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
-
-import { getTenantFromRequest } from '@/lib/tenant';
 import { prisma } from '@/lib/prisma';
-
-function normalizeCity(value: string) {
-  return (value || '')
-    .trim()
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
-}
 
 function normalizeSlug(value: string) {
   return (value || '')
@@ -24,77 +14,163 @@ function normalizeSlug(value: string) {
     .replace(/(^-|-$)+/g, '');
 }
 
-// Prisma cuid() geralmente começa com "c" e tem ~25+ chars
 function looksLikeCuid(value: string) {
   return /^c[a-z0-9]{24,}$/i.test(value);
 }
 
-function extractTenantKey(tenant: unknown): string {
-  if (!tenant) return '';
+type RouteCtx = { params: Promise<{ slug: string }> };
 
-  if (typeof tenant === 'string') return tenant;
+type ApiOffer = {
+  id: string;
+  slug: string;
 
-  if (typeof tenant === 'object') {
-    const t = tenant as Record<string, unknown>;
+  city: string;
+  status: string;
 
-    const city = typeof t.city === 'string' ? t.city : '';
-    const id = typeof t.id === 'string' ? t.id : '';
-    const tenantKey = typeof t.tenant === 'string' ? t.tenant : '';
+  categoryId: string;
+  category: string;
 
-    return city || id || tenantKey || '';
-  }
+  title: string;
 
-  return '';
+  partnerName: string;
+  partner: string;
+
+  description: string | null;
+
+  priceText: string | null;
+  benefit: string;
+
+  imageUrl: string | null;
+  images: string[];
+
+  createdAt: string;
+  updatedAt: string;
+
+  tenantId: string;
+};
+
+function pickImages(imageUrl: string | null) {
+  const url = (imageUrl || '').trim();
+  return url ? [url] : [];
 }
 
-/**
- * 🔧 AJUSTE AQUI:
- * Next 16 exige params como Promise
- */
-type RouteCtx = { params: Promise<{ slug: string }> };
+function mapOffer(db: {
+  id: string;
+  slug: string;
+  city: string;
+  status: string;
+  categoryId: string;
+  title: string;
+  partnerName: string;
+  description: string | null;
+  imageUrl: string | null;
+  priceText: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}): ApiOffer {
+  return {
+    id: db.id,
+    slug: db.slug,
+
+    city: db.city,
+    status: db.status,
+
+    categoryId: db.categoryId,
+    category: db.categoryId,
+
+    title: db.title,
+
+    partnerName: db.partnerName,
+    partner: db.partnerName,
+
+    description: db.description ?? null,
+
+    priceText: db.priceText ?? null,
+    benefit: (db.priceText || '').trim() ? String(db.priceText) : db.title,
+
+    imageUrl: db.imageUrl ?? null,
+    images: pickImages(db.imageUrl),
+
+    createdAt: db.createdAt.toISOString(),
+    updatedAt: db.updatedAt.toISOString(),
+
+    tenantId: 'default',
+  };
+}
 
 export async function GET(_request: Request, context: RouteCtx) {
   try {
-    // 🔧 AJUSTE AQUI
     const { slug } = await context.params;
-
     const raw = decodeURIComponent(slug || '');
 
-    // ✅ sua função NÃO recebe request
-    const tenant = await getTenantFromRequest();
-    const tenantKey = extractTenantKey(tenant);
+    const whereBase: Prisma.OfferWhereInput = {};
 
-    const city = tenantKey ? normalizeCity(tenantKey) : '';
+    let row: {
+      id: string;
+      slug: string;
+      city: string;
+      status: string;
+      categoryId: string;
+      title: string;
+      partnerName: string;
+      description: string | null;
+      imageUrl: string | null;
+      priceText: string | null;
+      createdAt: Date;
+      updatedAt: Date;
+    } | null = null;
 
-    const whereBase: Prisma.OfferWhereInput = {
-      // ⚠️ mantém como estava para não mexer no schema agora
-      status: 'publicado' as any,
-      ...(city ? { city } : {}),
-    };
-
-    let offer = null;
-
-    // tenta por ID (cuid) ou por slug
     if (looksLikeCuid(raw)) {
-      offer = await prisma.offer.findFirst({
+      row = await prisma.offer.findFirst({
         where: { ...whereBase, id: raw },
+        select: {
+          id: true,
+          slug: true,
+          city: true,
+          status: true,
+          categoryId: true,
+          title: true,
+          partnerName: true,
+          description: true,
+          imageUrl: true,
+          priceText: true,
+          createdAt: true,
+          updatedAt: true,
+        },
       });
     }
 
-    if (!offer) {
+    if (!row) {
       const slugNorm = normalizeSlug(raw);
-      offer = await prisma.offer.findFirst({
+      row = await prisma.offer.findFirst({
         where: { ...whereBase, slug: slugNorm },
+        select: {
+          id: true,
+          slug: true,
+          city: true,
+          status: true,
+          categoryId: true,
+          title: true,
+          partnerName: true,
+          description: true,
+          imageUrl: true,
+          priceText: true,
+          createdAt: true,
+          updatedAt: true,
+        },
       });
     }
 
-    if (!offer) {
+    if (!row) {
       return NextResponse.json({ error: 'Oferta não encontrada' }, { status: 404 });
     }
 
-    return NextResponse.json({ offer }, { status: 200 });
+    return NextResponse.json({ item: mapOffer(row) }, { status: 200 });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : String(e);
-    return NextResponse.json({ error: 'Falha ao buscar oferta', detail: message }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Falha ao buscar oferta', detail: message },
+      { status: 500 }
+    );
   }
 }

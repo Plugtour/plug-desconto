@@ -23,10 +23,6 @@ async function getTenantId() {
   return h.get('x-tenant-id') ?? undefined;
 }
 
-/**
- * 🔧 AJUSTE AQUI:
- * Next 16 exige params como Promise
- */
 type RouteCtx = { params: Promise<{ id: string }> };
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
@@ -40,7 +36,6 @@ export async function PATCH(req: Request, context: RouteCtx) {
   }
 
   try {
-    // 🔧 AJUSTE AQUI
     const { id } = await context.params;
 
     if (!id || typeof id !== 'string') {
@@ -50,10 +45,29 @@ export async function PATCH(req: Request, context: RouteCtx) {
     const bodyRaw: unknown = await req.json().catch(() => null);
     const body = isPlainObject(bodyRaw) ? bodyRaw : {};
 
-    const status = (typeof body.status === 'string' ? body.status : '') as OfferStatus;
+    const data: Prisma.OfferUpdateInput = {};
 
-    if (!status || !allowed.has(status)) {
-      return NextResponse.json({ ok: false, error: 'Status inválido' }, { status: 400 });
+    if (typeof body.status === 'string') {
+      const status = body.status as OfferStatus;
+      if (!allowed.has(status)) {
+        return NextResponse.json({ ok: false, error: 'Status inválido' }, { status: 400 });
+      }
+      data.status = status;
+    }
+
+    if (typeof body.title === 'string') data.title = body.title.trim();
+    if (typeof body.partnerName === 'string') data.partnerName = body.partnerName.trim();
+    if (typeof body.city === 'string') data.city = body.city.trim();
+    if (typeof body.categoryId === 'string') data.categoryId = body.categoryId.trim();
+    if (typeof body.description === 'string' || body.description === null)
+      data.description = body.description;
+    if (typeof body.imageUrl === 'string' || body.imageUrl === null)
+      data.imageUrl = body.imageUrl;
+    if (typeof body.priceText === 'string' || body.priceText === null)
+      data.priceText = body.priceText;
+
+    if (Object.keys(data).length === 0) {
+      return NextResponse.json({ ok: false, error: 'Nada para atualizar' }, { status: 400 });
     }
 
     const tenantId = await getTenantId();
@@ -68,8 +82,7 @@ export async function PATCH(req: Request, context: RouteCtx) {
 
       const updated = await tx.offer.update({
         where: { id },
-        data: { status }, // mantém exatamente como estava
-        select: { id: true, status: true, updatedAt: true },
+        data,
       });
 
       await tx.adminAuditLog.create({
@@ -77,11 +90,11 @@ export async function PATCH(req: Request, context: RouteCtx) {
           tenantId,
           actorRole: session.role,
           actorName: session.userName ?? null,
-          action: 'OFFER_STATUS_CHANGED',
+          action: 'OFFER_UPDATED',
           entityType: 'offer',
           entityId: id,
-          before: { status: prev.status } as Prisma.InputJsonValue,
-          after: { status: updated.status } as Prisma.InputJsonValue,
+          before: prev as Prisma.InputJsonValue,
+          after: updated as Prisma.InputJsonValue,
         },
       });
 
