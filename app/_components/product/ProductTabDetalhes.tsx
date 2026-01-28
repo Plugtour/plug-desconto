@@ -205,6 +205,20 @@ export default function ProductTabDetalhes({ data }: { data: ProductModalData })
     return () => ro.disconnect();
   }, []);
 
+  // ✅ helper: acha o scroller do modal
+  function findScrollableParent(el: HTMLElement | null) {
+    let cur: HTMLElement | null = el;
+    while (cur) {
+      const cs = window.getComputedStyle(cur);
+      const oy = cs.overflowY;
+      const canScrollY = (oy === 'auto' || oy === 'scroll') && cur.scrollHeight > cur.clientHeight;
+      if (canScrollY) return cur;
+      cur = cur.parentElement;
+    }
+    return null;
+  }
+
+  // ✅ FIX: "Ver mais / Ver menos" ajusta scroll no scroller do MODAL (não usa window)
   function toggleDetailsAnchored() {
     const anchor = detailsAnchorRef.current;
     const prevTop = anchor?.getBoundingClientRect().top ?? null;
@@ -214,11 +228,14 @@ export default function ProductTabDetalhes({ data }: { data: ProductModalData })
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         if (!anchor || prevTop == null) return;
+
         const nextTop = anchor.getBoundingClientRect().top;
         const delta = nextTop - prevTop;
-        if (Math.abs(delta) > 0.5) {
-          window.scrollBy({ top: delta, left: 0, behavior: 'auto' });
-        }
+
+        if (Math.abs(delta) <= 0.5) return;
+
+        const scroller = findScrollableParent(rootRef.current);
+        if (scroller) scroller.scrollBy({ top: delta, left: 0, behavior: 'auto' });
       });
     });
   }
@@ -243,19 +260,6 @@ export default function ProductTabDetalhes({ data }: { data: ProductModalData })
 
     if (alertOpen) closeAlertBubble();
     else openAlertBubble();
-  }
-
-  // ✅ helper: acha o scroller do modal
-  function findScrollableParent(el: HTMLElement | null) {
-    let cur: HTMLElement | null = el;
-    while (cur) {
-      const cs = window.getComputedStyle(cur);
-      const oy = cs.overflowY;
-      const canScrollY = (oy === 'auto' || oy === 'scroll') && cur.scrollHeight > cur.clientHeight;
-      if (canScrollY) return cur;
-      cur = cur.parentElement;
-    }
-    return null;
   }
 
   // ✅ (1) Horários precisa estar visível no campo de visão
@@ -645,7 +649,8 @@ export default function ProductTabDetalhes({ data }: { data: ProductModalData })
                             O desconto oferecido é de acordo com o horário de sua chegada ao estabelecimento.
                             <br />
                             <br />
-                            Para solicitar a conta, selecione nas abas abaixo o horário que você chegou no estabelecimento.
+                            Para solicitar a conta, selecione nas abas abaixo o horário que você chegou no
+                            estabelecimento.
                           </div>
                         </div>
                       </button>

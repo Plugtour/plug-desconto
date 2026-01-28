@@ -63,7 +63,7 @@ const WHATSAPP_TMP_NUMBER = '9999999999';
 const WHATSAPP_TMP_LINK = `https://wa.me/${WHATSAPP_TMP_NUMBER}`;
 
 // ✅ posição do botão do WhatsApp (precisa bater com o bottom-[19px])
-const WA_BTN_BOTTOM_PX = 60;
+const WA_BTN_BOTTOM_PX = 65;
 const WA_BTN_SIZE_PX = 64;
 
 // ✅ agora o balão “volta” e fica até a metade do redondo verde
