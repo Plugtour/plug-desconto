@@ -3,11 +3,19 @@
 // app/admin/parceiros/novo/page.tsx
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { ArrowLeft, Save } from 'lucide-react';
+
+import { useAdminData } from '../../_components/AdminDataProvider';
 
 type PartnerStatus = 'rascunho' | 'publicado' | 'pausado' | 'arquivado';
 
+const onlyDigits = (v: string) => (v || '').replace(/\D/g, '');
+
 export default function AdminNovoParceiroPage() {
+  const router = useRouter();
+  const { createPartner } = useAdminData();
+
   const categories = useMemo(
     () => ['Gastronomia', 'Atrações', 'Passeios', 'Hospedagem', 'Transporte', 'Compras', 'Serviços'],
     []
@@ -20,33 +28,41 @@ export default function AdminNovoParceiroPage() {
   const [cidade, setCidade] = useState(cities[0] ?? '');
   const [whatsapp, setWhatsapp] = useState('');
   const [instagram, setInstagram] = useState('');
+
+  // ✅ imagens
+  const [images, setImages] = useState<string[]>([]);
+  const imageUrl = images[0] ?? '';
+
   const [status, setStatus] = useState<PartnerStatus>('rascunho');
   const [observacoes, setObservacoes] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const canSave = nome.trim().length >= 3 && whatsapp.trim().length >= 8;
+  const [uploading, setUploading] = useState(false);
+
+  const canSave = nome.trim().length >= 3 && onlyDigits(whatsapp).length >= 10;
 
   const onSave = async () => {
-    if (!canSave) return;
+    if (!canSave || saving) return;
     setSaving(true);
 
-    // MVP: mock
-    await new Promise((r) => setTimeout(r, 450));
+    try {
+      createPartner({
+        nome: nome.trim(),
+        categoria,
+        cidade,
+        whatsapp: whatsapp.trim(),
+        instagram: instagram.trim() || null,
+        imageUrl: imageUrl.trim() || null,
+        images: images.length ? images : null,
+        status,
+        observacoes: observacoes.trim() || null,
+      });
 
-    alert(
-      [
-        'Salvar parceiro (mock):',
-        `Nome: ${nome}`,
-        `Categoria: ${categoria}`,
-        `Cidade: ${cidade}`,
-        `WhatsApp: ${whatsapp}`,
-        `Instagram: ${instagram || '-'}`,
-        `Status: ${status}`,
-        `Obs: ${observacoes || '-'}`,
-      ].join('\n')
-    );
-
-    setSaving(false);
+      router.push('/admin/parceiros');
+      router.refresh();
+    } finally {
+      setSaving(false);
+    }
   };
 
   const card = [
@@ -85,7 +101,7 @@ export default function AdminNovoParceiroPage() {
 
           <h1 className="text-2xl font-semibold tracking-tight">Novo parceiro</h1>
           <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-            MVP: cadastro básico. Depois conectamos na fonte única do admin.
+            Cadastro rápido (admin). Ao salvar, já aparece na listagem.
           </p>
         </div>
 
@@ -143,6 +159,100 @@ export default function AdminNovoParceiroPage() {
             />
           </div>
 
+          {/* ✅ Upload de imagens */}
+          <div className={card}>
+            <label className={label}>Imagens do parceiro</label>
+
+            <input
+              type="file"
+              multiple
+              accept="image/png,image/jpeg,image/webp"
+              className={inputBase}
+              onChange={async (e) => {
+                const files = e.target.files;
+                if (!files || files.length === 0) return;
+
+                setUploading(true);
+                try {
+                  const form = new FormData();
+                  Array.from(files).forEach((file) => {
+                    form.append('files', file);
+                  });
+
+                  const res = await fetch('/api/admin/upload/partner-image', {
+                    method: 'POST',
+                    body: form,
+                  });
+
+                  const data = await res.json().catch(() => ({}));
+
+                  if (!res.ok || !Array.isArray(data?.urls)) {
+                    alert(data?.error ? String(data.error) : 'Erro ao subir imagens');
+                    return;
+                  }
+
+                  setImages((prev) => {
+                    const next = [...prev];
+                    for (const u of data.urls as string[]) {
+                      if (!next.includes(u)) next.push(u);
+                    }
+                    return next;
+                  });
+
+                  e.currentTarget.value = '';
+                } finally {
+                  setUploading(false);
+                }
+              }}
+            />
+
+            {uploading && <p className="mt-2 text-xs text-zinc-500">Enviando imagens...</p>}
+
+            {images.length > 0 && (
+              <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
+                {images.map((u) => (
+                  // eslint-disable-next-line react/jsx-key
+                  <button
+                    key={u}
+                    type="button"
+                    className={[
+                      'group relative overflow-hidden rounded-lg border',
+                      'border-zinc-200 bg-white',
+                      'dark:border-zinc-900 dark:bg-zinc-950',
+                    ].join(' ')}
+                    title="Clique para remover"
+                    onClick={() => {
+                      setImages((prev) => prev.filter((x) => x !== u));
+                    }}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={u} alt="Preview" className="h-20 w-full object-cover" />
+                    <div
+                      className={[
+                        'pointer-events-none absolute inset-0 opacity-0 transition',
+                        'bg-black/35 group-hover:opacity-100',
+                      ].join(' ')}
+                      aria-hidden="true"
+                    />
+                    <div
+                      className={[
+                        'pointer-events-none absolute bottom-1 right-1 rounded-md px-1.5 py-0.5 text-[10px] opacity-0 transition',
+                        'bg-black/60 text-white group-hover:opacity-100',
+                      ].join(' ')}
+                      aria-hidden="true"
+                    >
+                      Remover
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <p className={help}>
+              PNG/JPEG são convertidas para WebP. WebP é mantido. Clique na miniatura para remover.
+            </p>
+          </div>
+
           <div className={card}>
             <label className={label}>Notas internas</label>
             <textarea
@@ -159,11 +269,7 @@ export default function AdminNovoParceiroPage() {
         <div className="space-y-4">
           <div className={card}>
             <label className={label}>Categoria</label>
-            <select
-              value={categoria}
-              onChange={(e) => setCategoria(e.target.value)}
-              className={inputBase}
-            >
+            <select value={categoria} onChange={(e) => setCategoria(e.target.value)} className={inputBase}>
               {categories.map((c) => (
                 <option key={c} value={c}>
                   {c}
@@ -185,11 +291,7 @@ export default function AdminNovoParceiroPage() {
 
           <div className={card}>
             <label className={label}>Status</label>
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value as PartnerStatus)}
-              className={inputBase}
-            >
+            <select value={status} onChange={(e) => setStatus(e.target.value as PartnerStatus)} className={inputBase}>
               <option value="rascunho">Rascunho</option>
               <option value="publicado">Publicado</option>
               <option value="pausado">Pausado</option>
@@ -206,7 +308,7 @@ export default function AdminNovoParceiroPage() {
               'dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-500',
             ].join(' ')}
           >
-            Próximo: logo, imagens, endereço, termos e contatos.
+            Próximo: endereço, termos e contatos.
           </div>
         </div>
       </section>

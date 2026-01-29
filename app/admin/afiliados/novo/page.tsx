@@ -3,15 +3,35 @@
 // app/admin/afiliados/novo/page.tsx
 import Link from 'next/link';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { ArrowLeft, Save } from 'lucide-react';
 
 type AffiliateStatus = 'rascunho' | 'publicado' | 'pausado' | 'arquivado';
 
+const LS_AFFILIATES_KEY = 'pd_admin_affiliates_v1';
+
+function safeParseArray(raw: string | null) {
+  if (!raw) return [];
+  try {
+    const v = JSON.parse(raw);
+    return Array.isArray(v) ? v : [];
+  } catch {
+    return [];
+  }
+}
+
+function makeId(prefix: string) {
+  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+}
+
 export default function AdminNovoAfiliadoPage() {
+  const router = useRouter();
+
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
   const [cupom, setCupom] = useState('');
+  const [imageUrl, setImageUrl] = useState(''); // ✅ NOVO
   const [status, setStatus] = useState<AffiliateStatus>('rascunho');
   const [notas, setNotas] = useState('');
   const [saving, setSaving] = useState(false);
@@ -26,22 +46,33 @@ export default function AdminNovoAfiliadoPage() {
     if (!canSave) return;
     setSaving(true);
 
-    // MVP: mock
-    await new Promise((r) => setTimeout(r, 450));
+    try {
+      const id = makeId('affiliate');
+      const now = new Date().toISOString();
 
-    alert(
-      [
-        'Salvar afiliado (mock):',
-        `Nome: ${nome}`,
-        `Email: ${email}`,
-        `WhatsApp: ${whatsapp}`,
-        `Cupom: ${cupom.toUpperCase()}`,
-        `Status: ${status}`,
-        `Notas: ${notas || '-'}`,
-      ].join('\n')
-    );
+      const payload = {
+        id,
+        nome: nome.trim(),
+        email: email.trim(),
+        whatsapp: whatsapp.trim(),
+        cupom: cupom.trim().toUpperCase(),
+        imageUrl: imageUrl.trim() || null, // ✅
+        status,
+        notas: notas.trim() || null,
+        createdAt: now,
+        updatedAt: now,
+      };
 
-    setSaving(false);
+      const raw = window.localStorage.getItem(LS_AFFILIATES_KEY);
+      const arr = safeParseArray(raw);
+
+      window.localStorage.setItem(LS_AFFILIATES_KEY, JSON.stringify([payload, ...arr]));
+
+      router.push('/admin/afiliados');
+      router.refresh();
+    } finally {
+      setSaving(false);
+    }
   };
 
   const card = [
@@ -80,7 +111,7 @@ export default function AdminNovoAfiliadoPage() {
 
           <h1 className="text-2xl font-semibold tracking-tight">Novo afiliado</h1>
           <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-            MVP: cadastro básico. Comissões e subafiliados entram depois.
+            Cadastro rápido (local). Comissões e subafiliados entram depois.
           </p>
         </div>
 
@@ -108,34 +139,30 @@ export default function AdminNovoAfiliadoPage() {
         <div className="md:col-span-2 space-y-4">
           <div className={card}>
             <label className={label}>Nome</label>
-            <input
-              value={nome}
-              onChange={(e) => setNome(e.target.value)}
-              placeholder="Ex: Ana Ribeiro"
-              className={inputBase}
-            />
+            <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex: Ana Ribeiro" className={inputBase} />
             <p className={help}>Mínimo: 3 caracteres.</p>
           </div>
 
           <div className={card}>
             <label className={label}>Email</label>
-            <input
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Ex: ana@email.com"
-              className={inputBase}
-            />
+            <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Ex: ana@email.com" className={inputBase} />
           </div>
 
           <div className={card}>
             <label className={label}>WhatsApp</label>
+            <input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="Ex: (54) 99999-0000" className={inputBase} />
+            <p className={help}>Obrigatório.</p>
+          </div>
+
+          <div className={card}>
+            <label className={label}>Foto (URL) (opcional)</label>
             <input
-              value={whatsapp}
-              onChange={(e) => setWhatsapp(e.target.value)}
-              placeholder="Ex: (54) 99999-0000"
+              value={imageUrl}
+              onChange={(e) => setImageUrl(e.target.value)}
+              placeholder="Ex: https://.../foto.jpg"
               className={inputBase}
             />
-            <p className={help}>Obrigatório.</p>
+            <p className={help}>Se você preencher, a foto aparece na listagem.</p>
           </div>
 
           <div className={card}>
@@ -154,22 +181,13 @@ export default function AdminNovoAfiliadoPage() {
         <div className="space-y-4">
           <div className={card}>
             <label className={label}>Cupom</label>
-            <input
-              value={cupom}
-              onChange={(e) => setCupom(e.target.value.toUpperCase())}
-              placeholder="Ex: ANA10"
-              className={inputBase}
-            />
+            <input value={cupom} onChange={(e) => setCupom(e.target.value.toUpperCase())} placeholder="Ex: ANA10" className={inputBase} />
             <p className={help}>Mínimo: 3 caracteres.</p>
           </div>
 
           <div className={card}>
             <label className={label}>Status</label>
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value as AffiliateStatus)}
-              className={inputBase}
-            >
+            <select value={status} onChange={(e) => setStatus(e.target.value as AffiliateStatus)} className={inputBase}>
               <option value="rascunho">Rascunho</option>
               <option value="publicado">Publicado</option>
               <option value="pausado">Pausado</option>

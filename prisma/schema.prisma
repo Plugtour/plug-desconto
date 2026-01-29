@@ -12,26 +12,29 @@ enum OfferStatus {
   publicado
   pausado
   arquivado
+  lixeira
 }
 
 model Offer {
-  id          String      @id @default(cuid())
-  slug        String      @unique
+  id   String @id @default(cuid())
+  slug String @unique
 
   title       String
   partnerName String
 
-  city        String
-  categoryId  String
-  status      OfferStatus @default(rascunho)
+  city       String
+  categoryId String
+  status     OfferStatus @default(rascunho)
 
   // Campos opcionais (para crescer sem dor)
   description String?
   imageUrl    String?
-  priceText   String?
 
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  imageUrls String[] @default([])
+  priceText String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([city])
   @@index([categoryId])
@@ -40,15 +43,15 @@ model Offer {
 }
 
 model AdminAuditLog {
-  id         String   @id @default(cuid())
-  createdAt  DateTime @default(now())
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
 
-  // Multi-tenant (já preparado)
-  tenantId   String?
+  // Multi-tenant (jÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ preparado)
+  tenantId String?
 
   // Quem fez
-  actorRole  String
-  actorName  String?
+  actorRole String
+  actorName String?
 
   // O que aconteceu
   action     String
@@ -56,8 +59,8 @@ model AdminAuditLog {
   entityId   String?
 
   // Antes/depois
-  before     Json?
-  after      Json?
+  before Json?
+  after  Json?
 
   @@index([createdAt])
   @@index([tenantId])

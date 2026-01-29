@@ -1,28 +1,14 @@
 // app/api/offers/route.ts
 import { NextResponse } from 'next/server';
-import { Prisma } from '@prisma/client';
+import { Prisma, OfferStatus } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 
 function normalizeCity(value: string) {
-  return (value || '')
-    .trim()
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/(^-|-$)+/g, '');
+  return (value || '').trim();
 }
 
 function normalizeCat(value: string) {
-  return (value || '')
-    .trim()
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/(^-|-$)+/g, '');
+  return (value || '').trim();
 }
 
 type ApiOffer = {
@@ -110,7 +96,10 @@ export async function GET(request: Request) {
     const cityParamRaw = searchParams.get('city');
     const categoryParam = searchParams.get('categoryId');
 
-    const where: Prisma.OfferWhereInput = {};
+    const where: Prisma.OfferWhereInput = {
+      // ✅ site/app só mostra publicado
+      status: OfferStatus.publicado,
+    };
 
     if (cityParamRaw) where.city = normalizeCity(cityParamRaw);
     if (categoryParam) where.categoryId = normalizeCat(categoryParam);
@@ -139,9 +128,6 @@ export async function GET(request: Request) {
     return NextResponse.json({ items, total: items.length }, { status: 200 });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : String(e);
-    return NextResponse.json(
-      { error: 'Falha ao buscar ofertas', detail: message },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Falha ao buscar ofertas', detail: message }, { status: 500 });
   }
 }

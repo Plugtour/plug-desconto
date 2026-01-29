@@ -4,7 +4,7 @@
 import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 
 import AdminStatusPill from '../_components/AdminStatusPill';
 import AdminFiltersBar from '../_components/AdminFiltersBar';
@@ -25,6 +25,7 @@ type OfferItem = {
   categoria: string;
   status: OfferStatus;
   atualizadoEm: string;
+  imageUrl?: string | null;
 };
 
 const parseAnyDateTime = (s: string) => {
@@ -66,6 +67,7 @@ const statusWeight: Record<OfferStatus, number> = {
   rascunho: 2,
   pausado: 3,
   arquivado: 4,
+  lixeira: 5,
 };
 
 function SortIcon({
@@ -125,11 +127,28 @@ function ThSort({
   );
 }
 
+function RowThumb({ src, alt }: { src?: string | null; alt: string }) {
+  return (
+    <div
+      className={['h-[44px] w-[44px] flex-none overflow-hidden rounded-md', 'bg-blue-600/90 dark:bg-blue-500/80'].join(
+        ' '
+      )}
+      aria-hidden={!src}
+    >
+      {src ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={src} alt={alt} className="h-full w-full object-cover" loading="lazy" />
+      ) : null}
+    </div>
+  );
+}
+
 export default function AdminOfertasClient() {
   const { showToast } = useAdminToast();
-  const { offers, setOfferStatus } = useAdminData();
+  const { offers, setOfferStatus, emptyOffersTrash, deleteOfferForever } = useAdminData();
 
-  const [status, setStatus] = useState<OfferStatus | 'todos'>('todos');
+  // ✅ padrão agora é "publicado"
+  const [status, setStatus] = useState<OfferStatus | 'todos'>('publicado');
   const [q, setQ] = useState('');
 
   const [sortKey, setSortKey] = useState<SortKey>('atualizadoEm');
@@ -146,7 +165,6 @@ export default function AdminOfertasClient() {
     });
   };
 
-  // ✅ deslocar SOMENTE o conteúdo interno (sem criar “buraco” na linha)
   const shiftInner = '-ml-10';
 
   const getTitleById = (id: string) => (offers as OfferItem[]).find((o) => o.id === id)?.titulo || id;
@@ -166,9 +184,24 @@ export default function AdminOfertasClient() {
     showToast(`Oferta arquivada: ${getTitleById(id)}`, 'error');
   };
 
+  const handleTrash = (id: string) => {
+    setOfferStatus(id, 'lixeira');
+    showToast(`Enviado para lixeira: ${getTitleById(id)}`, 'warning');
+  };
+
   const handleRestore = (id: string) => {
     setOfferStatus(id, 'rascunho');
     showToast(`Oferta restaurada: ${getTitleById(id)}`, 'success');
+  };
+
+  const handleDeleteForever = (id: string) => {
+    deleteOfferForever(id);
+    showToast(`Excluída definitivamente: ${getTitleById(id)}`, 'error');
+  };
+
+  const handleEmptyTrash = () => {
+    emptyOffersTrash();
+    showToast('Lixeira esvaziada', 'success');
   };
 
   const filtered = useMemo(() => {
@@ -229,26 +262,29 @@ export default function AdminOfertasClient() {
       publicado: 0,
       pausado: 0,
       arquivado: 0,
+      lixeira: 0,
     };
     for (const o of offers as OfferItem[]) base[o.status] += 1;
     return base;
   }, [offers]);
 
+  // ✅ ordem: Publicado, Rascunho, Pausado, Arquivado, Todos, Lixeira
   const filterItems = useMemo(
     () => [
-      { key: 'todos' as const, label: 'Todos', count: counts.todos },
       { key: 'publicado' as const, label: 'Publicado', count: counts.publicado },
       { key: 'rascunho' as const, label: 'Rascunho', count: counts.rascunho },
       { key: 'pausado' as const, label: 'Pausado', count: counts.pausado },
       { key: 'arquivado' as const, label: 'Arquivado', count: counts.arquivado },
+      { key: 'todos' as const, label: 'Todos', count: counts.todos },
+      { key: 'lixeira' as const, label: 'Lixeira', count: counts.lixeira },
     ],
     [counts]
   );
 
-  const hasFilters = q.trim().length > 0 || status !== 'todos';
+  const hasFilters = q.trim().length > 0 || status !== 'publicado';
 
   const clearFilters = () => {
-    setStatus('todos');
+    setStatus('publicado');
     setQ('');
   };
 
@@ -258,7 +294,7 @@ export default function AdminOfertasClient() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Ofertas</h1>
           <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-            MVP: listar, buscar e filtrar por status. Nada é apagado — tudo é arquivado.
+            Listar, buscar e filtrar por status. Itens podem ir para arquivado ou lixeira.
           </p>
         </div>
 
@@ -283,6 +319,26 @@ export default function AdminOfertasClient() {
         placeholder="Buscar por título, parceiro, categoria..."
       />
 
+      {status === 'lixeira' && (
+        <div className="flex items-center justify-between rounded-xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-900 dark:bg-zinc-950">
+          <div className="text-xs text-zinc-600 dark:text-zinc-400">Itens na lixeira podem ser restaurados ou excluídos definitivamente.</div>
+
+          <button
+            type="button"
+            onClick={handleEmptyTrash}
+            className={[
+              'inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition',
+              'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50',
+              'dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900/60',
+            ].join(' ')}
+            title="Remove definitivamente os itens que estão na lixeira"
+          >
+            <Trash2 className="h-4 w-4" />
+            Esvaziar lixeira
+          </button>
+        </div>
+      )}
+
       {hasFilters && (
         <div
           className={[
@@ -294,7 +350,7 @@ export default function AdminOfertasClient() {
           <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400">
             <span className="text-zinc-500 dark:text-zinc-500">Filtrado por:</span>
 
-            {status !== 'todos' && (
+            {status !== 'publicado' && (
               <span
                 className={[
                   'rounded-full border px-2 py-1',
@@ -338,7 +394,7 @@ export default function AdminOfertasClient() {
         footer={
           <>
             Mostrando <span className="text-zinc-900 dark:text-zinc-300">{sorted.length}</span> de{' '}
-            <span className="text-zinc-900 dark:text-zinc-300">{(offers as OfferItem[]).length}</span> ofertas (mock).
+            <span className="text-zinc-900 dark:text-zinc-300">{(offers as OfferItem[]).length}</span> ofertas.
           </>
         }
       >
@@ -358,13 +414,7 @@ export default function AdminOfertasClient() {
                 Título
               </ThSort>
 
-              <ThSort
-                k="parceiro"
-                innerClassName={shiftInner}
-                sortKey={sortKey}
-                sortDir={sortDir}
-                onToggle={toggleSort}
-              >
+              <ThSort k="parceiro" innerClassName={shiftInner} sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>
                 Parceiro
               </ThSort>
               <ThSort
@@ -376,13 +426,7 @@ export default function AdminOfertasClient() {
               >
                 Categoria
               </ThSort>
-              <ThSort
-                k="status"
-                innerClassName={shiftInner}
-                sortKey={sortKey}
-                sortDir={sortDir}
-                onToggle={toggleSort}
-              >
+              <ThSort k="status" innerClassName={shiftInner} sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>
                 Status
               </ThSort>
               <ThSort
@@ -410,12 +454,15 @@ export default function AdminOfertasClient() {
               sorted.map((o) => (
                 <tr key={o.id} className="h-[54px] text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900/30">
                   <td className="px-3 py-2 align-middle">
-                    <div className="flex h-[54px] flex-col justify-center leading-[1.05]">
-                      <div className="truncate font-medium text-zinc-900 dark:text-zinc-100" title={o.titulo}>
-                        {o.titulo}
-                      </div>
-                      <div className="mt-1 truncate text-xs text-zinc-500" title={o.id}>
-                        {o.id}
+                    <div className="flex items-center gap-3">
+                      <RowThumb src={o.imageUrl} alt={o.titulo} />
+                      <div className="flex h-[54px] min-w-0 flex-col justify-center leading-[1.05]">
+                        <div className="truncate font-medium text-zinc-900 dark:text-zinc-100" title={o.titulo}>
+                          {o.titulo}
+                        </div>
+                        <div className="mt-1 truncate text-xs text-zinc-500" title={o.id}>
+                          {o.id}
+                        </div>
                       </div>
                     </div>
                   </td>
@@ -450,13 +497,16 @@ export default function AdminOfertasClient() {
                     <div className="flex justify-end whitespace-nowrap">
                       <AdminRowActions
                         id={o.id}
+                        editBaseHref="/admin/ofertas/editar"
                         status={o.status}
                         onView={(id) => showToast(`Visualizar: ${getTitleById(id)}`, 'success')}
                         onEdit={(id) => showToast(`Editar: ${getTitleById(id)}`, 'success')}
                         onPublish={handlePublish}
                         onPause={handlePause}
                         onArchive={handleArchive}
+                        onTrash={handleTrash}
                         onRestore={handleRestore}
+                        onDeleteForever={handleDeleteForever}
                       />
                     </div>
                   </td>
@@ -469,3 +519,4 @@ export default function AdminOfertasClient() {
     </main>
   );
 }
+ 

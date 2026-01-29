@@ -1,10 +1,10 @@
-'use client';
+﻿'use client';
 
 // app/admin/afiliados/AdminAfiliadosClient.tsx
 import Link from 'next/link';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 
 import AdminStatusPill from '../_components/AdminStatusPill';
 import AdminFiltersBar from '../_components/AdminFiltersBar';
@@ -42,7 +42,7 @@ const formatBRPhone = (raw: string) => {
 };
 
 const isAffiliateStatus = (v: string | null): v is AffiliateStatus =>
-  v === 'rascunho' || v === 'publicado' || v === 'pausado' || v === 'arquivado';
+  v === 'rascunho' || v === 'publicado' || v === 'pausado' || v === 'arquivado' || v === 'lixeira';
 
 const parseAnyDate = (s: string) => {
   const raw = (s || '').trim();
@@ -73,6 +73,7 @@ const statusWeight: Record<AffiliateStatus, number> = {
   rascunho: 2,
   pausado: 3,
   arquivado: 4,
+  lixeira: 5,
 };
 
 type SortKey = 'nome' | 'email' | 'whatsapp' | 'cupom' | 'status' | 'atualizadoEm';
@@ -146,14 +147,42 @@ function ThSort({
   );
 }
 
+function RowThumb({ src, alt }: { src?: string | null; alt: string }) {
+  const [err, setErr] = useState(false);
+  const showImg = !!src && !err;
+
+  return (
+    <div
+      className={[
+        'h-[42px] w-[56px] overflow-hidden rounded-md border',
+        'border-zinc-200 bg-zinc-100',
+        'dark:border-zinc-800 dark:bg-zinc-900',
+      ].join(' ')}
+    >
+      {showImg ? (
+        <img
+          src={src!}
+          alt={alt}
+          loading="lazy"
+          className="h-full w-full object-cover"
+          onError={() => setErr(true)}
+        />
+      ) : (
+        <div className="h-full w-full bg-blue-600/90 dark:bg-blue-500/70" aria-hidden="true" />
+      )}
+    </div>
+  );
+}
+
 export default function AdminAfiliadosClient() {
   const { showToast } = useAdminToast();
-  const { affiliates, setAffiliateStatus } = useAdminData();
+  const { affiliates, setAffiliateStatus, emptyAffiliatesTrash } = useAdminData();
 
   const router = useRouter();
   const pathname = usePathname();
 
-  const [status, setStatus] = useState<AffiliateStatus | 'todos'>('todos');
+  // ✅ padrão agora é "publicado"
+  const [status, setStatus] = useState<AffiliateStatus | 'todos'>('publicado');
   const [q, setQ] = useState('');
 
   const [sortKey, setSortKey] = useState<SortKey>('atualizadoEm');
@@ -204,7 +233,7 @@ export default function AdminAfiliadosClient() {
   }, [q, status, pathname, router]);
 
   const clearFilters = () => {
-    setStatus('todos');
+    setStatus('publicado');
     setQ('');
   };
 
@@ -225,9 +254,19 @@ export default function AdminAfiliadosClient() {
     showToast(`Afiliado arquivado: ${getNameById(id)}`, 'error');
   };
 
+  const handleTrash = (id: string) => {
+    setAffiliateStatus(id, 'lixeira');
+    showToast(`Enviado para lixeira: ${getNameById(id)}`, 'warning');
+  };
+
   const handleRestore = (id: string) => {
     setAffiliateStatus(id, 'rascunho');
     showToast(`Afiliado restaurado: ${getNameById(id)}`, 'success');
+  };
+
+  const handleEmptyTrash = () => {
+    emptyAffiliatesTrash();
+    showToast('Lixeira esvaziada', 'success');
   };
 
   const filtered = useMemo(() => {
@@ -292,6 +331,7 @@ export default function AdminAfiliadosClient() {
       publicado: 0,
       pausado: 0,
       arquivado: 0,
+      lixeira: 0,
     };
     for (const a of rows) base[a.status] += 1;
     return base;
@@ -299,18 +339,18 @@ export default function AdminAfiliadosClient() {
 
   const filterItems = useMemo(
     () => [
-      { key: 'todos' as const, label: 'Todos', count: counts.todos },
       { key: 'publicado' as const, label: 'Publicado', count: counts.publicado },
       { key: 'rascunho' as const, label: 'Rascunho', count: counts.rascunho },
       { key: 'pausado' as const, label: 'Pausado', count: counts.pausado },
       { key: 'arquivado' as const, label: 'Arquivado', count: counts.arquivado },
+      { key: 'todos' as const, label: 'Todos', count: counts.todos },
+      { key: 'lixeira' as const, label: 'Lixeira', count: counts.lixeira },
     ],
     [counts]
   );
 
-  const hasFilters = q.trim().length > 0 || status !== 'todos';
+  const hasFilters = q.trim().length > 0 || status !== 'publicado';
 
-  // ✅ deslocar SOMENTE o conteúdo interno (sem “buraco” na linha)
   const shiftInner = '-ml-10';
 
   const copyText = async (text: string, okMsg: string) => {
@@ -322,13 +362,25 @@ export default function AdminAfiliadosClient() {
     }
   };
 
+  const getAffiliateThumb = (a: AffiliateItem) => {
+    const any = a as AffiliateItem & {
+      avatarUrl?: string | null;
+      imagemUrl?: string | null;
+      imageUrl?: string | null;
+      thumbnailUrl?: string | null;
+      thumbUrl?: string | null;
+      fotoUrl?: string | null;
+    };
+    return any.avatarUrl ?? any.imagemUrl ?? any.imageUrl ?? any.thumbnailUrl ?? any.thumbUrl ?? any.fotoUrl ?? null;
+  };
+
   return (
     <main className="space-y-4">
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Afiliados</h1>
           <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-            MVP: listar, buscar e filtrar por status. Comissões entram depois.
+            Listar, buscar e filtrar por status. Itens podem ir para arquivado ou lixeira.
           </p>
         </div>
 
@@ -355,6 +407,26 @@ export default function AdminAfiliadosClient() {
         placeholder="Buscar por nome, email, cupom..."
       />
 
+      {status === 'lixeira' && (
+        <div className="flex items-center justify-between rounded-xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-900 dark:bg-zinc-950">
+          <div className="text-xs text-zinc-600 dark:text-zinc-400">Itens na lixeira podem ser restaurados.</div>
+
+          <button
+            type="button"
+            onClick={handleEmptyTrash}
+            className={[
+              'inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition',
+              'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50',
+              'dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900/60',
+            ].join(' ')}
+            title="Remove definitivamente os itens que estão na lixeira"
+          >
+            <Trash2 className="h-4 w-4" />
+            Esvaziar lixeira
+          </button>
+        </div>
+      )}
+
       {hasFilters && (
         <div
           className={[
@@ -366,7 +438,7 @@ export default function AdminAfiliadosClient() {
           <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400">
             <span className="text-zinc-500 dark:text-zinc-500">Filtrado por:</span>
 
-            {status !== 'todos' && (
+            {status !== 'publicado' && (
               <span
                 className={[
                   'rounded-full border px-2 py-1',
@@ -387,9 +459,7 @@ export default function AdminAfiliadosClient() {
                 ].join(' ')}
               >
                 busca:{' '}
-                <span className="font-medium text-zinc-900 dark:text-zinc-100">
-                  &quot;{q.trim()}&quot;
-                </span>
+                <span className="font-medium text-zinc-900 dark:text-zinc-100">&quot;{q.trim()}&quot;</span>
               </span>
             )}
           </div>
@@ -413,12 +483,13 @@ export default function AdminAfiliadosClient() {
           <>
             Mostrando <span className="text-zinc-900 dark:text-zinc-300">{sorted.length}</span> de{' '}
             <span className="text-zinc-900 dark:text-zinc-300">{(affiliates as AffiliateItem[]).length}</span>{' '}
-            afiliados (mock).
+            afiliados.
           </>
         }
       >
-        <table className="w-full min-w-[1120px] table-fixed text-left">
+        <table className="w-full min-w-[1180px] table-fixed text-left">
           <colgroup>
+            <col style={{ width: '76px' }} />
             <col />
             <col />
             <col style={{ width: '170px' }} />
@@ -430,37 +501,23 @@ export default function AdminAfiliadosClient() {
 
           <thead className="border-b border-zinc-200 bg-white dark:border-zinc-900 dark:bg-zinc-950">
             <tr className="text-xs text-zinc-600 dark:text-zinc-400">
+              <th className="pl-3 pr-0 py-3 font-medium">
+                <span className="sr-only">Imagem</span>
+              </th>
+
               <ThSort k="nome" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>
                 Nome
               </ThSort>
               <ThSort k="email" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>
                 Email
               </ThSort>
-              <ThSort
-                k="whatsapp"
-                innerClassName={shiftInner}
-                sortKey={sortKey}
-                sortDir={sortDir}
-                onToggle={toggleSort}
-              >
+              <ThSort k="whatsapp" innerClassName={shiftInner} sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>
                 WhatsApp
               </ThSort>
-              <ThSort
-                k="cupom"
-                innerClassName={shiftInner}
-                sortKey={sortKey}
-                sortDir={sortDir}
-                onToggle={toggleSort}
-              >
+              <ThSort k="cupom" innerClassName={shiftInner} sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>
                 Cupom
               </ThSort>
-              <ThSort
-                k="status"
-                innerClassName={shiftInner}
-                sortKey={sortKey}
-                sortDir={sortDir}
-                onToggle={toggleSort}
-              >
+              <ThSort k="status" innerClassName={shiftInner} sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>
                 Status
               </ThSort>
               <ThSort
@@ -480,7 +537,7 @@ export default function AdminAfiliadosClient() {
           <tbody className="divide-y divide-zinc-200 dark:divide-zinc-900">
             {sorted.length === 0 ? (
               <tr className="h-[64px]">
-                <td className="px-3 py-6 text-sm text-zinc-600 dark:text-zinc-500" colSpan={7}>
+                <td className="px-3 py-6 text-sm text-zinc-600 dark:text-zinc-500" colSpan={8}>
                   Nenhum afiliado encontrado com os filtros atuais.
                 </td>
               </tr>
@@ -488,9 +545,16 @@ export default function AdminAfiliadosClient() {
               sorted.map((a) => {
                 const whatsappHref = a.whatsappHref || buildWhatsappHref(a.whatsapp);
                 const whatsappLabel = formatBRPhone(a.whatsapp) || a.whatsapp;
+                const thumb = getAffiliateThumb(a);
 
                 return (
                   <tr key={a.id} className="h-[54px] text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900/30">
+                    <td className="pl-3 pr-0 py-2 align-middle">
+                      <div className="flex h-[54px] items-center">
+                        <RowThumb src={thumb} alt={a.nome} />
+                      </div>
+                    </td>
+
                     <td className="px-3 py-2 align-middle">
                       <div className="flex h-[54px] flex-col justify-center leading-[1.05]">
                         <div className="truncate font-medium text-zinc-900 dark:text-zinc-100" title={a.nome}>
@@ -570,6 +634,7 @@ export default function AdminAfiliadosClient() {
                           onPublish={handlePublish}
                           onPause={handlePause}
                           onArchive={handleArchive}
+                          onTrash={handleTrash}
                           onRestore={handleRestore}
                           viewBaseHref="/admin/afiliados"
                           editBaseHref="/admin/afiliados/editar"
@@ -586,3 +651,4 @@ export default function AdminAfiliadosClient() {
     </main>
   );
 }
+

@@ -8,6 +8,7 @@ type Status =
   | 'publicado'
   | 'pausado'
   | 'arquivado'
+  | 'lixeira'
   | 'ativo'
   | 'inativo'
   | 'pendente'
@@ -23,10 +24,10 @@ function getLabel(status: Status) {
   if (s === 'pausado') return 'Pausado';
   if (s === 'arquivado') return 'Arquivado';
   if (s === 'rascunho') return 'Rascunho';
+  if (s === 'lixeira') return 'Lixeira';
   if (s === 'inativo') return 'Inativo';
   if (s === 'pendente') return 'Pendente';
 
-  // fallback: capitaliza
   if (!s) return '—';
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
@@ -34,13 +35,9 @@ function getLabel(status: Status) {
 function getClasses(status: Status) {
   const s = normalize(status);
 
-  // Base visível em qualquer tema
   const base =
     'inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium leading-none border shadow-sm';
 
-  // Paleta:
-  // - Claro: fundo bem leve + texto escuro + borda suave
-  // - Escuro: fundo translúcido + texto claro + borda escura
   switch (s) {
     case 'publicado':
     case 'ativo':
@@ -69,6 +66,13 @@ function getClasses(status: Status) {
         base,
         'bg-sky-50 text-sky-800 border-sky-200',
         'dark:bg-sky-500/15 dark:text-sky-200 dark:border-sky-500/25',
+      ].join(' ');
+
+    case 'lixeira':
+      return [
+        base,
+        'bg-zinc-100 text-zinc-700 border-zinc-200',
+        'dark:bg-zinc-400/10 dark:text-zinc-200 dark:border-zinc-500/25',
       ].join(' ');
 
     case 'inativo':

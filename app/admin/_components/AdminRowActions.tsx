@@ -1,20 +1,16 @@
 'use client';
 
 import React from 'react';
-import { Eye, Pencil, Archive, PauseCircle, PlayCircle, RotateCcw } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Eye, Pencil, Archive, PauseCircle, PlayCircle, RotateCcw, Trash2 } from 'lucide-react';
 
-type AdminStatus = 'rascunho' | 'publicado' | 'pausado' | 'arquivado';
+type AdminStatus = 'rascunho' | 'publicado' | 'pausado' | 'arquivado' | 'lixeira';
 
 type ClickEvent = React.MouseEvent<HTMLButtonElement>;
 
 function safeStop(e: ClickEvent) {
   e.preventDefault();
   e.stopPropagation();
-}
-
-function openInNewTab(url: string) {
-  if (typeof window === 'undefined') return;
-  window.open(url, '_blank', 'noopener,noreferrer');
 }
 
 function RowAction({
@@ -37,7 +33,6 @@ function RowAction({
       disabled={disabled}
       className={[
         'group grid h-9 w-9 place-items-center rounded-lg transition',
-        // ✅ cores seguras no claro/escuro (sem "quadrado preto" agressivo)
         disabled
           ? 'cursor-not-allowed opacity-40'
           : [
@@ -48,10 +43,7 @@ function RowAction({
             ].join(' '),
       ].join(' ')}
     >
-      {/* garante que o SVG herde cor corretamente */}
-      <span className="grid place-items-center [&_svg]:transition [&_svg]:text-current">
-        {children}
-      </span>
+      <span className="grid place-items-center [&_svg]:transition [&_svg]:text-current">{children}</span>
     </button>
   );
 }
@@ -65,6 +57,8 @@ export default function AdminRowActions({
   onPause,
   onArchive,
   onRestore,
+  onTrash,
+  onDeleteForever,
   viewBaseHref,
   editBaseHref,
 }: {
@@ -76,18 +70,27 @@ export default function AdminRowActions({
   onPause: (id: string) => void;
   onArchive: (id: string) => void;
   onRestore: (id: string) => void;
+  onTrash: (id: string) => void;
+  onDeleteForever?: (id: string) => void;
   viewBaseHref?: string;
   editBaseHref?: string;
 }) {
+  const router = useRouter();
+
   const canPublish = status === 'rascunho' || status === 'pausado';
   const canPause = status === 'publicado';
   const isArchived = status === 'arquivado';
+  const isTrashed = status === 'lixeira';
+
+  const go = (url: string) => {
+    router.push(url);
+  };
 
   const handleView = (e: ClickEvent) => {
     safeStop(e);
     if (viewBaseHref) {
       const url = `${viewBaseHref}?id=${encodeURIComponent(id)}`;
-      openInNewTab(url);
+      go(url);
       return;
     }
     onView(id);
@@ -97,7 +100,7 @@ export default function AdminRowActions({
     safeStop(e);
     if (editBaseHref) {
       const url = `${editBaseHref}?id=${encodeURIComponent(id)}`;
-      openInNewTab(url);
+      go(url);
       return;
     }
     onEdit(id);
@@ -123,29 +126,56 @@ export default function AdminRowActions({
     onRestore(id);
   };
 
+  const handleTrash = (e: ClickEvent) => {
+    safeStop(e);
+    onTrash(id);
+  };
+
+  const handleDeleteForever = (e: ClickEvent) => {
+    safeStop(e);
+    if (!onDeleteForever) return;
+    onDeleteForever(id);
+  };
+
   return (
     <div className="flex items-center justify-end gap-1">
-      <RowAction title="Visualizar" onClick={handleView}>
+      <RowAction title="Visualizar" onClick={handleView} disabled={isTrashed}>
         <Eye className="h-4 w-4" />
       </RowAction>
 
-      <RowAction title="Editar" onClick={handleEdit}>
+      <RowAction title="Editar" onClick={handleEdit} disabled={isTrashed}>
         <Pencil className="h-4 w-4" />
       </RowAction>
 
-      {canPublish && (
+      {!isTrashed && (
+        <RowAction title="Enviar para lixeira" onClick={handleTrash}>
+          <Trash2 className="h-4 w-4" />
+        </RowAction>
+      )}
+
+      {!isTrashed && canPublish && (
         <RowAction title="Publicar" onClick={handlePublish}>
           <PlayCircle className="h-4 w-4" />
         </RowAction>
       )}
 
-      {canPause && (
+      {!isTrashed && canPause && (
         <RowAction title="Pausar" onClick={handlePause}>
           <PauseCircle className="h-4 w-4" />
         </RowAction>
       )}
 
-      {isArchived ? (
+      {isTrashed ? (
+        <>
+          <RowAction title="Restaurar" onClick={handleRestore}>
+            <RotateCcw className="h-4 w-4" />
+          </RowAction>
+
+          <RowAction title="Excluir definitivamente" onClick={handleDeleteForever} disabled={!onDeleteForever}>
+            <Trash2 className="h-4 w-4" />
+          </RowAction>
+        </>
+      ) : isArchived ? (
         <RowAction title="Restaurar" onClick={handleRestore}>
           <RotateCcw className="h-4 w-4" />
         </RowAction>

@@ -1,11 +1,11 @@
-'use client';
+﻿'use client';
 
 // app/admin/parceiros/AdminParceirosClient.tsx
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 
 import AdminStatusPill from '../_components/AdminStatusPill';
 import AdminFiltersBar from '../_components/AdminFiltersBar';
@@ -18,7 +18,7 @@ import { useAdminData } from '../_components/AdminDataProvider';
 import type { PartnerStatus, AdminPartnerRow } from '../_data/adminMappers';
 
 const isPartnerStatus = (v: string | null): v is PartnerStatus =>
-  v === 'rascunho' || v === 'publicado' || v === 'pausado' || v === 'arquivado';
+  v === 'rascunho' || v === 'publicado' || v === 'pausado' || v === 'arquivado' || v === 'lixeira';
 
 const onlyDigits = (v: string) => (v || '').replace(/\D/g, '');
 
@@ -74,6 +74,7 @@ const statusWeight: Record<PartnerStatus, number> = {
   rascunho: 2,
   pausado: 3,
   arquivado: 4,
+  lixeira: 5,
 };
 
 type SortKey = 'nome' | 'cidade' | 'telefone' | 'categoria' | 'status' | 'atualizadoEm';
@@ -135,14 +136,44 @@ function ThSort({
   );
 }
 
+/** ✅ MODELO DA FOTO (IGUAL AO DE OFERTAS) */
+function RowThumb({ src, alt }: { src?: string | null; alt: string }) {
+  const [err, setErr] = useState(false);
+  const showImg = !!src && !err;
+
+  return (
+    <div
+      className={[
+        'h-[42px] w-[56px] overflow-hidden rounded-md border',
+        'border-zinc-200 bg-zinc-100',
+        'dark:border-zinc-800 dark:bg-zinc-900',
+      ].join(' ')}
+    >
+      {showImg ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={src!}
+          alt={alt}
+          loading="lazy"
+          className="h-full w-full object-cover"
+          onError={() => setErr(true)}
+        />
+      ) : (
+        <div className="h-full w-full bg-blue-600/90 dark:bg-blue-500/70" aria-hidden="true" />
+      )}
+    </div>
+  );
+}
+
 export default function AdminParceirosClient() {
   const { showToast } = useAdminToast();
-  const { partners, setPartnerStatus } = useAdminData();
+  const { partners, setPartnerStatus, emptyPartnersTrash, deletePartnerForever } = useAdminData();
 
   const router = useRouter();
   const pathname = usePathname();
 
-  const [status, setStatus] = useState<PartnerStatus | 'todos'>('todos');
+  // ✅ padrão agora é "publicado"
+  const [status, setStatus] = useState<PartnerStatus | 'todos'>('publicado');
   const [q, setQ] = useState('');
 
   const [sortKey, setSortKey] = useState<SortKey>('atualizadoEm');
@@ -193,7 +224,7 @@ export default function AdminParceirosClient() {
   }, [q, status, pathname, router]);
 
   const clearFilters = () => {
-    setStatus('todos');
+    setStatus('publicado');
     setQ('');
   };
 
@@ -214,9 +245,24 @@ export default function AdminParceirosClient() {
     showToast(`Parceiro arquivado: ${getNameById(id)}`, 'error');
   };
 
+  const handleTrash = (id: string) => {
+    setPartnerStatus(id, 'lixeira');
+    showToast(`Enviado para lixeira: ${getNameById(id)}`, 'warning');
+  };
+
   const handleRestore = (id: string) => {
     setPartnerStatus(id, 'rascunho');
     showToast(`Parceiro restaurado: ${getNameById(id)}`, 'success');
+  };
+
+  const handleEmptyTrash = () => {
+    emptyPartnersTrash();
+    showToast('Lixeira esvaziada', 'success');
+  };
+
+  const handleDeleteForever = (id: string) => {
+    deletePartnerForever(id);
+    showToast(`Excluído definitivamente: ${getNameById(id)}`, 'success');
   };
 
   const filtered = useMemo(() => {
@@ -281,6 +327,7 @@ export default function AdminParceirosClient() {
       publicado: 0,
       pausado: 0,
       arquivado: 0,
+      lixeira: 0,
     };
     for (const p of rows) base[p.status] += 1;
     return base;
@@ -288,19 +335,31 @@ export default function AdminParceirosClient() {
 
   const filterItems = useMemo(
     () => [
-      { key: 'todos' as const, label: 'Todos', count: counts.todos },
       { key: 'publicado' as const, label: 'Publicado', count: counts.publicado },
       { key: 'rascunho' as const, label: 'Rascunho', count: counts.rascunho },
       { key: 'pausado' as const, label: 'Pausado', count: counts.pausado },
       { key: 'arquivado' as const, label: 'Arquivado', count: counts.arquivado },
+      { key: 'todos' as const, label: 'Todos', count: counts.todos },
+      { key: 'lixeira' as const, label: 'Lixeira', count: counts.lixeira },
     ],
     [counts]
   );
 
-  const hasFilters = q.trim().length > 0 || status !== 'todos';
+  const hasFilters = q.trim().length > 0 || status !== 'publicado';
 
-  // ✅ deslocar SOMENTE o conteúdo interno
   const shiftInner = '-ml-10';
+
+  const getPartnerThumb = (p: AdminPartnerRow) => {
+    const any = p as AdminPartnerRow & {
+      logoUrl?: string | null;
+      imagemUrl?: string | null;
+      imageUrl?: string | null;
+      thumbnailUrl?: string | null;
+      thumbUrl?: string | null;
+      fotoUrl?: string | null;
+    };
+    return any.logoUrl ?? any.imagemUrl ?? any.imageUrl ?? any.thumbnailUrl ?? any.thumbUrl ?? any.fotoUrl ?? null;
+  };
 
   return (
     <main className="space-y-4">
@@ -308,7 +367,7 @@ export default function AdminParceirosClient() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Parceiros</h1>
           <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-            MVP: listar, buscar e filtrar por status. Nada é apagado — tudo é arquivado.
+            Listar, buscar e filtrar por status. Itens podem ir para arquivado ou lixeira.
           </p>
         </div>
 
@@ -335,6 +394,26 @@ export default function AdminParceirosClient() {
         placeholder="Buscar por nome, cidade, categoria..."
       />
 
+      {status === 'lixeira' && (
+        <div className="flex items-center justify-between rounded-xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-900 dark:bg-zinc-950">
+          <div className="text-xs text-zinc-600 dark:text-zinc-400">Itens na lixeira podem ser restaurados.</div>
+
+          <button
+            type="button"
+            onClick={handleEmptyTrash}
+            className={[
+              'inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition',
+              'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50',
+              'dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900/60',
+            ].join(' ')}
+            title="Remove definitivamente os itens que estão na lixeira"
+          >
+            <Trash2 className="h-4 w-4" />
+            Esvaziar lixeira
+          </button>
+        </div>
+      )}
+
       {hasFilters && (
         <div
           className={[
@@ -346,7 +425,7 @@ export default function AdminParceirosClient() {
           <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400">
             <span className="text-zinc-500 dark:text-zinc-500">Filtrado por:</span>
 
-            {status !== 'todos' && (
+            {status !== 'publicado' && (
               <span
                 className={[
                   'rounded-full border px-2 py-1',
@@ -354,8 +433,7 @@ export default function AdminParceirosClient() {
                   'dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200',
                 ].join(' ')}
               >
-                status:{' '}
-                <span className="font-medium text-zinc-900 dark:text-zinc-100">{status}</span>
+                status: <span className="font-medium text-zinc-900 dark:text-zinc-100">{status}</span>
               </span>
             )}
 
@@ -367,8 +445,7 @@ export default function AdminParceirosClient() {
                   'dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200',
                 ].join(' ')}
               >
-                busca:{' '}
-                <span className="font-medium text-zinc-900 dark:text-zinc-100">&quot;{q.trim()}&quot;</span>
+                busca: <span className="font-medium text-zinc-900 dark:text-zinc-100">&quot;{q.trim()}&quot;</span>
               </span>
             )}
           </div>
@@ -392,12 +469,13 @@ export default function AdminParceirosClient() {
           <>
             Mostrando <span className="text-zinc-900 dark:text-zinc-300">{sorted.length}</span> de{' '}
             <span className="text-zinc-900 dark:text-zinc-300">{(partners as AdminPartnerRow[]).length}</span>{' '}
-            parceiros (mock).
+            parceiros.
           </>
         }
       >
-        <table className="w-full min-w-[1120px] table-fixed text-left">
+        <table className="w-full min-w-[1180px] table-fixed text-left">
           <colgroup>
+            <col style={{ width: '76px' }} />
             <col />
             <col />
             <col style={{ width: '170px' }} />
@@ -409,6 +487,10 @@ export default function AdminParceirosClient() {
 
           <thead className="border-b border-zinc-200 bg-white dark:border-zinc-900 dark:bg-zinc-950">
             <tr className="text-xs text-zinc-600 dark:text-zinc-400">
+              <th className="pl-3 pr-0 py-3 font-medium">
+                <span className="sr-only">Imagem</span>
+              </th>
+
               <ThSort k="nome" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>
                 Nome
               </ThSort>
@@ -416,13 +498,7 @@ export default function AdminParceirosClient() {
                 Cidade
               </ThSort>
 
-              <ThSort
-                k="telefone"
-                innerClassName={shiftInner}
-                sortKey={sortKey}
-                sortDir={sortDir}
-                onToggle={toggleSort}
-              >
+              <ThSort k="telefone" innerClassName={shiftInner} sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>
                 Telefone
               </ThSort>
               <ThSort
@@ -434,13 +510,7 @@ export default function AdminParceirosClient() {
               >
                 Categoria
               </ThSort>
-              <ThSort
-                k="status"
-                innerClassName={shiftInner}
-                sortKey={sortKey}
-                sortDir={sortDir}
-                onToggle={toggleSort}
-              >
+              <ThSort k="status" innerClassName={shiftInner} sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>
                 Status
               </ThSort>
               <ThSort
@@ -460,7 +530,7 @@ export default function AdminParceirosClient() {
           <tbody className="divide-y divide-zinc-200 dark:divide-zinc-900">
             {sorted.length === 0 ? (
               <tr className="h-[64px]">
-                <td className="px-3 py-6 text-sm text-zinc-600 dark:text-zinc-500" colSpan={7}>
+                <td className="px-3 py-6 text-sm text-zinc-600 dark:text-zinc-500" colSpan={8}>
                   Nenhum parceiro encontrado com os filtros atuais.
                 </td>
               </tr>
@@ -469,9 +539,16 @@ export default function AdminParceirosClient() {
                 const whatsappHref =
                   (p as AdminPartnerRow & { whatsappHref?: string }).whatsappHref || buildWhatsappHref(p.whatsapp);
                 const phoneLabel = formatBRPhone(p.whatsapp) || p.whatsapp;
+                const thumb = getPartnerThumb(p);
 
                 return (
                   <tr key={p.id} className="h-[54px] text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900/30">
+                    <td className="pl-3 pr-0 py-2 align-middle">
+                      <div className="flex h-[54px] items-center">
+                        <RowThumb src={thumb} alt={p.nome} />
+                      </div>
+                    </td>
+
                     <td className="px-3 py-2 align-middle">
                       <div className="flex h-[54px] flex-col justify-center leading-[1.05]">
                         <div className="truncate font-medium text-zinc-900 dark:text-zinc-100" title={p.nome}>
@@ -537,7 +614,9 @@ export default function AdminParceirosClient() {
                           onPublish={handlePublish}
                           onPause={handlePause}
                           onArchive={handleArchive}
+                          onTrash={handleTrash}
                           onRestore={handleRestore}
+                          onDeleteForever={handleDeleteForever}
                           viewBaseHref="/admin/parceiros"
                           editBaseHref="/admin/parceiros/editar"
                         />

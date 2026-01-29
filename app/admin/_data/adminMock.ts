@@ -1,5 +1,5 @@
 // app/admin/_data/adminMock.ts
-export type AdminStatus = 'rascunho' | 'publicado' | 'pausado' | 'arquivado';
+export type AdminStatus = 'rascunho' | 'publicado' | 'pausado' | 'arquivado' | 'lixeira';
 
 export type AdminOffer = {
   id: string;
@@ -178,6 +178,7 @@ export function countByStatus<T extends { status: AdminStatus }>(items: T[]) {
       publicado: 0,
       pausado: 0,
       arquivado: 0,
+      lixeira: 0,
     } as Record<AdminStatus, number>
   );
 }

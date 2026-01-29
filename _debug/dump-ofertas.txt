@@ -1,0 +1,2718 @@
+﻿===== TREE (app/admin/ofertas + api/admin/offers) =====
+Listagem de caminhos de pasta O número de série do volume é 0000002F A03C:0D6D C:\USERS\ACER\SITES\PLUGDESCONTO\APP\ADMIN\OFERTAS │   AdminOfertasClient.tsx │   page.tsx │    ├───editar │       page.tsx │        └───nova         page.tsx         
+Listagem de caminhos de pasta O número de série do volume é A03C-0D6D C:\USERS\ACER\SITES\PLUGDESCONTO\APP\API\ADMIN\OFFERS │   route.ts │    ├───empty-trash │       route.ts │        └───[id]         route.ts         
+
+===== RELEVANTES =====
+
+===== FILE: app\admin\ofertas\AdminOfertasClient.tsx =====
+'use client';
+
+// app/admin/ofertas/AdminOfertasClient.tsx
+import { useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
+import Link from 'next/link';
+import { ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
+
+import AdminStatusPill from '../_components/AdminStatusPill';
+import AdminFiltersBar from '../_components/AdminFiltersBar';
+import AdminTableShell from '../_components/AdminTableShell';
+import AdminRowActions from '../_components/AdminRowActions';
+import { useAdminToast } from '../_components/AdminToastProvider';
+import { useAdminData } from '../_components/AdminDataProvider';
+
+import type { OfferStatus } from '../_data/adminMappers';
+
+type SortKey = 'titulo' | 'parceiro' | 'categoria' | 'status' | 'atualizadoEm';
+type SortDir = 'asc' | 'desc';
+
+type OfferItem = {
+  id: string;
+  titulo: string;
+  parceiro: string;
+  categoria: string;
+  status: OfferStatus;
+  atualizadoEm: string;
+  imageUrl?: string | null;
+};
+
+const parseAnyDateTime = (s: string) => {
+  const raw = (s || '').trim();
+  if (!raw) return 0;
+
+  const t1 = new Date(raw).getTime();
+  if (!Number.isNaN(t1)) return t1;
+
+  const m = raw.match(/^(\d{2})\/(\d{2})\/(\d{4}),\s*(\d{2}):(\d{2})$/);
+  if (m) {
+    const dd = parseInt(m[1], 10);
+    const mm = parseInt(m[2], 10);
+    const yyyy = parseInt(m[3], 10);
+    const hh = parseInt(m[4], 10);
+    const mi = parseInt(m[5], 10);
+    const t = new Date(yyyy, mm - 1, dd, hh, mi).getTime();
+    return Number.isNaN(t) ? 0 : t;
+  }
+
+  const clean = raw.replace(/-/g, '/');
+  const parts = clean.split('/');
+  if (parts.length >= 3) {
+    const dd = parseInt(parts[0], 10);
+    const mm = parseInt(parts[1], 10);
+    const yy = parseInt(parts[2], 10);
+    if (dd && mm && !Number.isNaN(yy)) {
+      const yyyy = yy < 100 ? 2000 + yy : yy;
+      const t = new Date(yyyy, mm - 1, dd).getTime();
+      return Number.isNaN(t) ? 0 : t;
+    }
+  }
+
+  return 0;
+};
+
+const statusWeight: Record<OfferStatus, number> = {
+  publicado: 1,
+  rascunho: 2,
+  pausado: 3,
+  arquivado: 4,
+  lixeira: 5,
+};
+
+function SortIcon({
+  colKey,
+  activeKey,
+  dir,
+}: {
+  colKey: SortKey;
+  activeKey: SortKey;
+  dir: SortDir;
+}) {
+  if (activeKey !== colKey) return null;
+  return dir === 'asc' ? (
+    <ChevronUp className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-300" />
+  ) : (
+    <ChevronDown className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-300" />
+  );
+}
+
+function ThSort({
+  k,
+  children,
+  align = 'left',
+  className = '',
+  innerClassName = '',
+  sortKey,
+  sortDir,
+  onToggle,
+}: {
+  k: SortKey;
+  children: ReactNode;
+  align?: 'left' | 'right';
+  className?: string;
+  innerClassName?: string;
+  sortKey: SortKey;
+  sortDir: SortDir;
+  onToggle: (key: SortKey) => void;
+}) {
+  return (
+    <th className={`px-3 py-3 font-medium ${align === 'right' ? 'text-right' : ''} ${className}`}>
+      <div className={innerClassName}>
+        <button
+          type="button"
+          onClick={() => onToggle(k)}
+          className={[
+            'inline-flex items-center gap-1 rounded-md px-1 py-0.5 transition',
+            'text-xs text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900',
+            'dark:text-zinc-400 dark:hover:bg-zinc-900/60 dark:hover:text-zinc-100',
+          ].join(' ')}
+          title="Ordenar"
+        >
+          <span className="text-xs">{children}</span>
+          <SortIcon colKey={k} activeKey={sortKey} dir={sortDir} />
+        </button>
+      </div>
+    </th>
+  );
+}
+
+function RowThumb({ src, alt }: { src?: string | null; alt: string }) {
+  return (
+    <div
+      className={['h-[44px] w-[44px] flex-none overflow-hidden rounded-md', 'bg-blue-600/90 dark:bg-blue-500/80'].join(
+        ' '
+      )}
+      aria-hidden={!src}
+    >
+      {src ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={src} alt={alt} className="h-full w-full object-cover" loading="lazy" />
+      ) : null}
+    </div>
+  );
+}
+
+export default function AdminOfertasClient() {
+  const { showToast } = useAdminToast();
+  const { offers, setOfferStatus, emptyOffersTrash, deleteOfferForever } = useAdminData();
+
+  // âœ… padrÃ£o agora Ã© "publicado"
+  const [status, setStatus] = useState<OfferStatus | 'todos'>('publicado');
+  const [q, setQ] = useState('');
+
+  const [sortKey, setSortKey] = useState<SortKey>('atualizadoEm');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
+
+  const toggleSort = (key: SortKey) => {
+    setSortKey((prevKey) => {
+      if (prevKey !== key) {
+        setSortDir('asc');
+        return key;
+      }
+      setSortDir((prevDir) => (prevDir === 'asc' ? 'desc' : 'asc'));
+      return prevKey;
+    });
+  };
+
+  const shiftInner = '-ml-10';
+
+  const getTitleById = (id: string) => (offers as OfferItem[]).find((o) => o.id === id)?.titulo || id;
+
+  const handlePublish = (id: string) => {
+    setOfferStatus(id, 'publicado');
+    showToast(`Oferta publicada: ${getTitleById(id)}`, 'success');
+  };
+
+  const handlePause = (id: string) => {
+    setOfferStatus(id, 'pausado');
+    showToast(`Oferta pausada: ${getTitleById(id)}`, 'warning');
+  };
+
+  const handleArchive = (id: string) => {
+    setOfferStatus(id, 'arquivado');
+    showToast(`Oferta arquivada: ${getTitleById(id)}`, 'error');
+  };
+
+  const handleTrash = (id: string) => {
+    setOfferStatus(id, 'lixeira');
+    showToast(`Enviado para lixeira: ${getTitleById(id)}`, 'warning');
+  };
+
+  const handleRestore = (id: string) => {
+    setOfferStatus(id, 'rascunho');
+    showToast(`Oferta restaurada: ${getTitleById(id)}`, 'success');
+  };
+
+  const handleDeleteForever = (id: string) => {
+    deleteOfferForever(id);
+    showToast(`ExcluÃ­da definitivamente: ${getTitleById(id)}`, 'error');
+  };
+
+  const handleEmptyTrash = () => {
+    emptyOffersTrash();
+    showToast('Lixeira esvaziada', 'success');
+  };
+
+  const filtered = useMemo(() => {
+    const term = q.trim().toLowerCase();
+
+    return (offers as OfferItem[])
+      .filter((o) => (status === 'todos' ? true : o.status === status))
+      .filter((o) => {
+        if (!term) return true;
+        return (
+          o.titulo.toLowerCase().includes(term) ||
+          o.parceiro.toLowerCase().includes(term) ||
+          o.categoria.toLowerCase().includes(term) ||
+          o.id.toLowerCase().includes(term)
+        );
+      });
+  }, [offers, status, q]);
+
+  const sorted = useMemo(() => {
+    const dir = sortDir === 'asc' ? 1 : -1;
+
+    const getValue = (o: OfferItem, key: SortKey) => {
+      switch (key) {
+        case 'titulo':
+          return (o.titulo || '').toLowerCase();
+        case 'parceiro':
+          return (o.parceiro || '').toLowerCase();
+        case 'categoria':
+          return (o.categoria || '').toLowerCase();
+        case 'status':
+          return statusWeight[o.status] ?? 999;
+        case 'atualizadoEm':
+          return parseAnyDateTime(o.atualizadoEm);
+        default:
+          return '';
+      }
+    };
+
+    return [...filtered].sort((a, b) => {
+      const va = getValue(a, sortKey);
+      const vb = getValue(b, sortKey);
+
+      if (va < vb) return -1 * dir;
+      if (va > vb) return 1 * dir;
+
+      const ta = (a.titulo || '').toLowerCase();
+      const tb = (b.titulo || '').toLowerCase();
+      if (ta < tb) return -1;
+      if (ta > tb) return 1;
+      return 0;
+    });
+  }, [filtered, sortKey, sortDir]);
+
+  const counts = useMemo(() => {
+    const base: Record<'todos' | OfferStatus, number> = {
+      todos: (offers as OfferItem[]).length,
+      rascunho: 0,
+      publicado: 0,
+      pausado: 0,
+      arquivado: 0,
+      lixeira: 0,
+    };
+    for (const o of offers as OfferItem[]) base[o.status] += 1;
+    return base;
+  }, [offers]);
+
+  // âœ… ordem: Publicado, Rascunho, Pausado, Arquivado, Todos, Lixeira
+  const filterItems = useMemo(
+    () => [
+      { key: 'publicado' as const, label: 'Publicado', count: counts.publicado },
+      { key: 'rascunho' as const, label: 'Rascunho', count: counts.rascunho },
+      { key: 'pausado' as const, label: 'Pausado', count: counts.pausado },
+      { key: 'arquivado' as const, label: 'Arquivado', count: counts.arquivado },
+      { key: 'todos' as const, label: 'Todos', count: counts.todos },
+      { key: 'lixeira' as const, label: 'Lixeira', count: counts.lixeira },
+    ],
+    [counts]
+  );
+
+  const hasFilters = q.trim().length > 0 || status !== 'publicado';
+
+  const clearFilters = () => {
+    setStatus('publicado');
+    setQ('');
+  };
+
+  return (
+    <main className="space-y-4">
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Ofertas</h1>
+          <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+            Listar, buscar e filtrar por status. Itens podem ir para arquivado ou lixeira.
+          </p>
+        </div>
+
+        <Link
+          href="/admin/ofertas/nova"
+          className={[
+            'rounded-lg px-3 py-2 text-sm font-medium transition',
+            'border border-zinc-200 bg-zinc-100 text-zinc-900 hover:bg-zinc-200',
+            'dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800',
+          ].join(' ')}
+        >
+          Nova oferta
+        </Link>
+      </div>
+
+      <AdminFiltersBar<OfferStatus>
+        value={status}
+        onChange={setStatus}
+        items={filterItems}
+        search={q}
+        onSearch={setQ}
+        placeholder="Buscar por tÃ­tulo, parceiro, categoria..."
+      />
+
+      {status === 'lixeira' && (
+        <div className="flex items-center justify-between rounded-xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-900 dark:bg-zinc-950">
+          <div className="text-xs text-zinc-600 dark:text-zinc-400">Itens na lixeira podem ser restaurados ou excluÃ­dos definitivamente.</div>
+
+          <button
+            type="button"
+            onClick={handleEmptyTrash}
+            className={[
+              'inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition',
+              'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50',
+              'dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900/60',
+            ].join(' ')}
+            title="Remove definitivamente os itens que estÃ£o na lixeira"
+          >
+            <Trash2 className="h-4 w-4" />
+            Esvaziar lixeira
+          </button>
+        </div>
+      )}
+
+      {hasFilters && (
+        <div
+          className={[
+            'flex flex-wrap items-center justify-between gap-2 rounded-xl border px-4 py-3',
+            'border-zinc-200 bg-white',
+            'dark:border-zinc-900 dark:bg-zinc-950',
+          ].join(' ')}
+        >
+          <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400">
+            <span className="text-zinc-500 dark:text-zinc-500">Filtrado por:</span>
+
+            {status !== 'publicado' && (
+              <span
+                className={[
+                  'rounded-full border px-2 py-1',
+                  'border-zinc-200 bg-zinc-100 text-zinc-700',
+                  'dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200',
+                ].join(' ')}
+              >
+                status: <span className="font-medium text-zinc-900 dark:text-zinc-100">{status}</span>
+              </span>
+            )}
+
+            {q.trim() && (
+              <span
+                className={[
+                  'rounded-full border px-2 py-1',
+                  'border-zinc-200 bg-zinc-100 text-zinc-700',
+                  'dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200',
+                ].join(' ')}
+              >
+                busca:{' '}
+                <span className="font-medium text-zinc-900 dark:text-zinc-100">&quot;{q.trim()}&quot;</span>
+              </span>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={clearFilters}
+            className={[
+              'rounded-lg border px-3 py-1.5 text-xs transition',
+              'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50',
+              'dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900/60',
+            ].join(' ')}
+          >
+            Limpar filtros
+          </button>
+        </div>
+      )}
+
+      <AdminTableShell
+        footer={
+          <>
+            Mostrando <span className="text-zinc-900 dark:text-zinc-300">{sorted.length}</span> de{' '}
+            <span className="text-zinc-900 dark:text-zinc-300">{(offers as OfferItem[]).length}</span> ofertas.
+          </>
+        }
+      >
+        <table className="w-full min-w-[1120px] table-fixed text-left">
+          <colgroup>
+            <col />
+            <col style={{ width: '170px' }} />
+            <col style={{ width: '150px' }} />
+            <col style={{ width: '140px' }} />
+            <col style={{ width: '170px' }} />
+            <col style={{ width: '190px' }} />
+          </colgroup>
+
+          <thead className="border-b border-zinc-200 bg-white dark:border-zinc-900 dark:bg-zinc-950">
+            <tr className="text-xs text-zinc-600 dark:text-zinc-400">
+              <ThSort k="titulo" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>
+                TÃ­tulo
+              </ThSort>
+
+              <ThSort k="parceiro" innerClassName={shiftInner} sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>
+                Parceiro
+              </ThSort>
+              <ThSort
+                k="categoria"
+                innerClassName={shiftInner}
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onToggle={toggleSort}
+              >
+                Categoria
+              </ThSort>
+              <ThSort k="status" innerClassName={shiftInner} sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>
+                Status
+              </ThSort>
+              <ThSort
+                k="atualizadoEm"
+                innerClassName={shiftInner}
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onToggle={toggleSort}
+              >
+                Atualizado
+              </ThSort>
+
+              <th className="px-3 py-3 font-medium text-right">AÃ§Ãµes</th>
+            </tr>
+          </thead>
+
+          <tbody className="divide-y divide-zinc-200 dark:divide-zinc-900">
+            {sorted.length === 0 ? (
+              <tr className="h-[64px]">
+                <td className="px-3 py-6 text-sm text-zinc-500" colSpan={6}>
+                  Nenhuma oferta encontrada com os filtros atuais.
+                </td>
+              </tr>
+            ) : (
+              sorted.map((o) => (
+                <tr key={o.id} className="h-[54px] text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900/30">
+                  <td className="px-3 py-2 align-middle">
+                    <div className="flex items-center gap-3">
+                      <RowThumb src={o.imageUrl} alt={o.titulo} />
+                      <div className="flex h-[54px] min-w-0 flex-col justify-center leading-[1.05]">
+                        <div className="truncate font-medium text-zinc-900 dark:text-zinc-100" title={o.titulo}>
+                          {o.titulo}
+                        </div>
+                        <div className="mt-1 truncate text-xs text-zinc-500" title={o.id}>
+                          {o.id}
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+
+                  <td className="px-3 py-2 align-middle text-zinc-700 dark:text-zinc-200">
+                    <div className={shiftInner}>
+                      <span className="block truncate" title={o.parceiro}>
+                        {o.parceiro}
+                      </span>
+                    </div>
+                  </td>
+
+                  <td className="px-3 py-2 align-middle text-zinc-700 dark:text-zinc-200">
+                    <div className={shiftInner}>
+                      <span className="block whitespace-normal break-words">{o.categoria}</span>
+                    </div>
+                  </td>
+
+                  <td className="px-3 py-2 align-middle">
+                    <div className={shiftInner}>
+                      <AdminStatusPill status={o.status} />
+                    </div>
+                  </td>
+
+                  <td className="px-3 py-2 align-middle text-zinc-600 dark:text-zinc-300">
+                    <div className={shiftInner}>
+                      <span className="whitespace-nowrap">{o.atualizadoEm}</span>
+                    </div>
+                  </td>
+
+                  <td className="px-3 py-2 align-middle">
+                    <div className="flex justify-end whitespace-nowrap">
+                      <AdminRowActions
+                        id={o.id}
+                        editBaseHref="/admin/ofertas/editar"
+                        status={o.status}
+                        onView={(id) => showToast(`Visualizar: ${getTitleById(id)}`, 'success')}
+                        onEdit={(id) => showToast(`Editar: ${getTitleById(id)}`, 'success')}
+                        onPublish={handlePublish}
+                        onPause={handlePause}
+                        onArchive={handleArchive}
+                        onTrash={handleTrash}
+                        onRestore={handleRestore}
+                        onDeleteForever={handleDeleteForever}
+                      />
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </AdminTableShell>
+    </main>
+  );
+}
+ 
+
+===== FILE: app\admin\ofertas\page.tsx =====
+// app/admin/ofertas/page.tsx
+import { Suspense } from 'react';
+import AdminOfertasClient from './AdminOfertasClient';
+
+export const dynamic = 'force-dynamic';
+
+export default function AdminOfertasPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-sm text-zinc-400">Carregando...</div>}>
+      <AdminOfertasClient />
+    </Suspense>
+  );
+}
+
+
+===== FILE: app\admin\ofertas\editar\page.tsx =====
+'use client';
+
+// app/admin/ofertas/editar/page.tsx
+import Link from 'next/link';
+import { useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { ArrowLeft, Save, X } from 'lucide-react';
+
+import { useAdminData } from '../../_components/AdminDataProvider';
+
+type OfferStatus = 'rascunho' | 'publicado' | 'pausado' | 'arquivado' | 'lixeira';
+
+function normalizeCity(value: string) {
+  return (value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/(^-|-$)+/g, '');
+}
+
+function normalizeCategoryId(value: string) {
+  return (value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, '-');
+}
+
+type OfferApi = {
+  id: string;
+  title: string;
+  partnerName: string;
+  city: string;
+  categoryId: string;
+  status: OfferStatus;
+  description?: string | null;
+  imageUrl?: string | null;
+  imageUrls?: string[] | null;
+  priceText?: string | null;
+};
+
+function move<T>(arr: T[], from: number, to: number) {
+  const copy = arr.slice();
+  const [item] = copy.splice(from, 1);
+  copy.splice(to, 0, item);
+  return copy;
+}
+
+export default function AdminEditarOfertaPage() {
+  const router = useRouter();
+  const params = useSearchParams();
+  const id = params.get('id') || '';
+
+  const { refreshOffers } = useAdminData();
+
+  const categories = useMemo(
+    () => [
+      { label: 'Gastronomia', id: 'gastronomia' },
+      { label: 'AtraÃ§Ãµes', id: 'atracoes' },
+      { label: 'Passeios', id: 'passeios' },
+      { label: 'Hospedagem', id: 'hospedagem' },
+      { label: 'Transporte', id: 'transporte' },
+      { label: 'Compras', id: 'compras' },
+      { label: 'ServiÃ§os', id: 'servicos' },
+    ],
+    []
+  );
+
+  const partners = useMemo(
+    () => ['Cantina Bella', 'Dreamland', 'Gramado Tour', 'BistrÃ´ do Centro', 'Serra Trips', 'CafÃ© da Colina'],
+    []
+  );
+
+  const [loading, setLoading] = useState(true);
+
+  const [titulo, setTitulo] = useState('');
+  const [parceiro, setParceiro] = useState(partners[0] ?? '');
+  const [categoriaLabel, setCategoriaLabel] = useState(categories[0]?.label ?? '');
+  const [status, setStatus] = useState<OfferStatus>('rascunho');
+  const [descricao, setDescricao] = useState('');
+  const [regiao, setRegiao] = useState('Serra GaÃºcha');
+
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+
+  const [priceText, setPriceText] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+
+    async function run() {
+      if (!id) {
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      try {
+        const res = await fetch(`/api/admin/offers/${encodeURIComponent(id)}`, { method: 'GET' });
+        const data = await res.json().catch(() => ({}));
+
+        if (!alive) return;
+
+        if (!res.ok || !data?.offer) {
+          alert(data?.error ? `${data.error}${data?.detail ? `\n${data.detail}` : ''}` : 'Falha ao carregar oferta.');
+          setLoading(false);
+          return;
+        }
+
+        const o: OfferApi = data.offer;
+
+        setTitulo(o.title ?? '');
+        setParceiro(o.partnerName ?? (partners[0] ?? ''));
+        setStatus((o.status as OfferStatus) ?? 'rascunho');
+
+        const catFound = categories.find((c) => normalizeCategoryId(c.id) === normalizeCategoryId(o.categoryId ?? ''));
+        setCategoriaLabel(catFound?.label ?? (categories[0]?.label ?? ''));
+
+        setDescricao((o.description ?? '') as string);
+        setRegiao(o.city ? o.city : 'Serra GaÃºcha');
+
+        const fromList = Array.isArray(o.imageUrls) ? o.imageUrls.filter(Boolean) : [];
+        const fromSingle = o.imageUrl ? [String(o.imageUrl)] : [];
+        const merged = (fromList.length ? fromList : fromSingle).map((x) => String(x)).filter(Boolean);
+
+        setImageUrls(merged);
+        setPriceText((o.priceText ?? '') as string);
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        alert(`Falha ao carregar.\n${msg}`);
+      } finally {
+        if (alive) setLoading(false);
+      }
+    }
+
+    run();
+    return () => {
+      alive = false;
+    };
+  }, [id, categories, partners]);
+
+  const canSave = titulo.trim().length >= 4;
+
+  const onSave = async () => {
+    if (!id || !canSave || saving) return;
+
+    setSaving(true);
+    try {
+      const selectedCategory = categories.find((c) => c.label === categoriaLabel) ?? categories[0];
+
+      const cleanImageUrls = imageUrls.map((u) => String(u).trim()).filter(Boolean);
+
+      const payload = {
+        title: titulo.trim(),
+        partnerName: parceiro.trim(),
+        city: normalizeCity(regiao),
+        categoryId: normalizeCategoryId(selectedCategory?.id ?? ''),
+        status,
+        description: descricao.trim() ? descricao.trim() : null,
+        priceText: priceText.trim() ? priceText.trim() : null,
+
+        // novas
+        imageUrls: cleanImageUrls,
+
+        // compat (principal)
+        imageUrl: cleanImageUrls[0] ? cleanImageUrls[0] : null,
+      };
+
+      const res = await fetch(`/api/admin/offers/${encodeURIComponent(id)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        alert(data?.error ? `${data.error}${data?.detail ? `\n${data.detail}` : ''}` : 'Falha ao salvar.');
+        return;
+      }
+
+      await refreshOffers();
+      router.push('/admin/ofertas');
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      alert(`Falha ao salvar.\n${msg}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const card = [
+    'rounded-xl border p-4',
+    'border-zinc-200 bg-white',
+    'dark:border-zinc-900 dark:bg-zinc-950',
+  ].join(' ');
+
+  const label = 'block text-sm text-zinc-700 dark:text-zinc-300';
+
+  const inputBase = [
+    'mt-2 w-full rounded-lg border px-3 py-2 text-sm outline-none',
+    'border-zinc-200 bg-white text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-400',
+    'dark:border-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 dark:placeholder:text-zinc-600 dark:focus:border-zinc-700',
+  ].join(' ');
+
+  const help = 'mt-2 text-xs text-zinc-500';
+
+  return (
+    <main className="space-y-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="mb-2">
+            <Link
+              href="/admin/ofertas"
+              className={[
+                'inline-flex items-center gap-2 rounded-lg px-2 py-1 text-sm transition',
+                'text-zinc-700 hover:bg-zinc-100',
+                'dark:text-zinc-300 dark:hover:bg-zinc-900',
+              ].join(' ')}
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Voltar
+            </Link>
+          </div>
+
+          <h1 className="text-2xl font-semibold tracking-tight">Editar oferta</h1>
+          <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{id ? `ID: ${id}` : 'Nenhum ID informado.'}</p>
+        </div>
+
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={!id || !canSave || saving || loading}
+          className={[
+            'inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition',
+            !loading && id && canSave && !saving
+              ? [
+                  'bg-zinc-900 text-white hover:bg-zinc-800',
+                  'dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-white',
+                ].join(' ')
+              : 'bg-zinc-200 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400',
+          ].join(' ')}
+        >
+          <Save className="h-4 w-4" />
+          {saving ? 'Salvando...' : 'Salvar'}
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="rounded-xl border border-zinc-200 bg-white p-6 text-sm text-zinc-500 dark:border-zinc-900 dark:bg-zinc-950">
+          Carregando...
+        </div>
+      ) : !id ? (
+        <div className="rounded-xl border border-zinc-200 bg-white p-6 text-sm text-zinc-500 dark:border-zinc-900 dark:bg-zinc-950">
+          Abra a pÃ¡gina com <span className="font-medium">?id=SEU_ID</span>.
+        </div>
+      ) : (
+        <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="md:col-span-2 space-y-4">
+            <div className={card}>
+              <label className={label}>TÃ­tulo</label>
+              <input value={titulo} onChange={(e) => setTitulo(e.target.value)} className={inputBase} />
+              <p className={help}>MÃ­nimo: 4 caracteres.</p>
+            </div>
+
+            <div className={card}>
+              <label className={label}>DescriÃ§Ã£o</label>
+              <textarea
+                value={descricao}
+                onChange={(e) => setDescricao(e.target.value)}
+                rows={6}
+                className={[inputBase, 'resize-none'].join(' ')}
+              />
+              <p className={help}>Opcional.</p>
+            </div>
+
+            <div className={card}>
+              <label className={label}>Imagens da oferta</label>
+
+              <input
+                type="file"
+                multiple
+                accept="image/png,image/jpeg,image/webp"
+                className={inputBase}
+                onChange={async (e) => {
+                  const files = e.target.files;
+                  if (!files || files.length === 0) return;
+
+                  const form = new FormData();
+                  Array.from(files).forEach((file) => form.append('files', file));
+
+                  const res = await fetch('/api/admin/upload/offer-image', {
+                    method: 'POST',
+                    body: form,
+                  });
+
+                  const data = await res.json().catch(() => ({}));
+
+                  if (!res.ok || !Array.isArray(data?.urls)) {
+                    alert(data?.error ? String(data.error) : 'Erro ao subir imagens');
+                    return;
+                  }
+
+                  const newOnes = data.urls.map((u: any) => String(u)).filter(Boolean);
+                  if (!newOnes.length) return;
+
+                  setImageUrls((prev) => {
+                    const set = new Set<string>([...prev, ...newOnes]);
+                    return Array.from(set);
+                  });
+
+                  e.currentTarget.value = '';
+                }}
+              />
+
+              {imageUrls.length ? (
+                <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {imageUrls.map((url, idx) => {
+                    const isMain = idx === 0;
+                    return (
+                      <div
+                        key={url}
+                        className={[
+                          'relative overflow-hidden rounded-lg border',
+                          'border-zinc-200 bg-zinc-50',
+                          'dark:border-zinc-900 dark:bg-zinc-900/30',
+                        ].join(' ')}
+                        draggable
+                        onDragStart={() => setDragIndex(idx)}
+                        onDragOver={(ev) => ev.preventDefault()}
+                        onDrop={() => {
+                          if (dragIndex === null || dragIndex === idx) return;
+                          setImageUrls((prev) => move(prev, dragIndex, idx));
+                          setDragIndex(null);
+                        }}
+                        title="Arraste para reordenar"
+                      >
+                        {isMain ? (
+                          <div className="absolute left-2 top-2 z-10 rounded-md bg-black/70 px-2 py-1 text-xs font-medium text-white">
+                            Principal
+                          </div>
+                        ) : (
+                          <div className="absolute left-2 top-2 z-10 rounded-md bg-black/50 px-2 py-1 text-xs text-white">
+                            #{idx + 1}
+                          </div>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => setImageUrls((prev) => prev.filter((_, i) => i !== idx))}
+                          className="absolute right-2 top-2 z-10 inline-flex h-7 w-7 items-center justify-center rounded-md bg-black/70 text-white hover:bg-black/80"
+                          title="Remover"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={url} alt={`Imagem ${idx + 1}`} className="block h-28 w-full object-cover" />
+
+                        {!isMain ? (
+                          <button
+                            type="button"
+                            onClick={() => setImageUrls((prev) => move(prev, idx, 0))}
+                            className="w-full border-t border-zinc-200 bg-white px-2 py-2 text-xs font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-900 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900"
+                            title="Definir como principal"
+                          >
+                            Definir como principal
+                          </button>
+                        ) : (
+                          <div className="w-full border-t border-zinc-200 bg-white px-2 py-2 text-xs text-zinc-500 dark:border-zinc-900 dark:bg-zinc-950 dark:text-zinc-400">
+                            Arraste para reordenar
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : null}
+
+              <p className={help}>PNG/JPEG sÃ£o convertidas para WebP. WebP Ã© mantido.</p>
+            </div>
+
+            <div className={card}>
+              <label className={label}>PreÃ§o (texto)</label>
+              <input value={priceText} onChange={(e) => setPriceText(e.target.value)} className={inputBase} />
+              <p className={help}>Opcional.</p>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className={card}>
+              <label className={label}>Parceiro</label>
+              <select value={parceiro} onChange={(e) => setParceiro(e.target.value)} className={inputBase}>
+                {partners.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className={card}>
+              <label className={label}>Categoria</label>
+              <select value={categoriaLabel} onChange={(e) => setCategoriaLabel(e.target.value)} className={inputBase}>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.label}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+
+              <p className={help}>
+                SerÃ¡ salvo como:{' '}
+                <span className="font-medium text-zinc-900 dark:text-zinc-200">
+                  {normalizeCategoryId(categories.find((c) => c.label === categoriaLabel)?.id ?? '')}
+                </span>
+              </p>
+            </div>
+
+            <div className={card}>
+              <label className={label}>Status</label>
+              <select value={status} onChange={(e) => setStatus(e.target.value as OfferStatus)} className={inputBase}>
+                <option value="rascunho">Rascunho</option>
+                <option value="publicado">Publicado</option>
+                <option value="pausado">Pausado</option>
+                <option value="arquivado">Arquivado</option>
+              </select>
+
+              <p className={help}>Para remover do ar, use â€œPausadoâ€ ou â€œArquivadoâ€.</p>
+            </div>
+
+            <div className={card}>
+              <label className={label}>RegiÃ£o (cidade no banco)</label>
+              <input value={regiao} onChange={(e) => setRegiao(e.target.value)} className={inputBase} />
+              <p className={help}>
+                SerÃ¡ salvo como:{' '}
+                <span className="font-medium text-zinc-900 dark:text-zinc-200">{normalizeCity(regiao)}</span>
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
+    </main>
+  );
+}
+
+===== FILE: app\admin\ofertas\nova\page.tsx =====
+'use client';
+
+// app/admin/ofertas/nova/page.tsx
+import Link from 'next/link';
+import { useMemo, useState } from 'react';
+import { ArrowLeft, Save, X, GripVertical } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+
+import { useAdminData } from '../../_components/AdminDataProvider';
+
+type OfferStatus = 'rascunho' | 'publicado' | 'pausado' | 'arquivado';
+
+function normalizeCity(value: string) {
+  return (value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/(^-|-$)+/g, '');
+}
+
+function normalizeCategoryId(value: string) {
+  return (value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, '-');
+}
+
+function StatusModal({
+  open,
+  value,
+  onChange,
+  onCancel,
+  onConfirm,
+  busy,
+}: {
+  open: boolean;
+  value: OfferStatus;
+  onChange: (v: OfferStatus) => void;
+  onCancel: () => void;
+  onConfirm: () => void;
+  busy?: boolean;
+}) {
+  if (!open) return null;
+
+  const overlay = [
+    'fixed inset-0 z-[80] bg-black/40 backdrop-blur-[1px]',
+    'flex items-center justify-center p-4',
+  ].join(' ');
+
+  const card = [
+    'w-full max-w-[520px] rounded-2xl border p-4 shadow-xl',
+    'border-zinc-200 bg-white text-zinc-900',
+    'dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100',
+  ].join(' ');
+
+  const radioWrap = [
+    'mt-3 space-y-2 rounded-xl border p-3',
+    'border-zinc-200 bg-zinc-50',
+    'dark:border-zinc-800 dark:bg-zinc-900/30',
+  ].join(' ');
+
+  const radioRow = [
+    'flex items-center gap-3 rounded-lg px-2 py-2 transition',
+    'hover:bg-white/60 dark:hover:bg-zinc-900/60',
+  ].join(' ');
+
+  const pill = (s: OfferStatus) =>
+    [
+      'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium',
+      s === 'publicado'
+        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200'
+        : s === 'rascunho'
+        ? 'bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200'
+        : s === 'pausado'
+        ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200'
+        : 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-200',
+    ].join(' ');
+
+  return (
+    <div className={overlay} role="dialog" aria-modal="true">
+      <div className={card}>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-base font-semibold">Escolha o status para salvar</h2>
+            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+              VocÃª escolhe agora, confirma e salvamos no status selecionado.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onCancel}
+            className={[
+              'grid h-9 w-9 place-items-center rounded-lg border transition',
+              'border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50',
+              'dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-900/60',
+            ].join(' ')}
+            title="Fechar"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className={radioWrap}>
+          {([
+            { key: 'rascunho', label: 'Rascunho', hint: 'NÃ£o aparece no site.' },
+            { key: 'publicado', label: 'Publicado', hint: 'Aparece no site.' },
+            { key: 'pausado', label: 'Pausado', hint: 'Sai do ar temporariamente.' },
+            { key: 'arquivado', label: 'Arquivado', hint: 'Arquivado/encerrado.' },
+          ] as const).map((it) => (
+            <label key={it.key} className={radioRow}>
+              <input
+                type="radio"
+                name="statusToSave"
+                checked={value === it.key}
+                onChange={() => onChange(it.key)}
+              />
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium">{it.label}</span>
+                  <span className={pill(it.key)}>{it.key}</span>
+                </div>
+                <div className="mt-0.5 text-xs text-zinc-600 dark:text-zinc-400">{it.hint}</div>
+              </div>
+            </label>
+          ))}
+        </div>
+
+        <div className="mt-4 flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={!!busy}
+            className={[
+              'rounded-lg border px-3 py-2 text-sm transition',
+              'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50',
+              'dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900/60',
+              busy ? 'opacity-60' : '',
+            ].join(' ')}
+          >
+            Cancelar
+          </button>
+
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={!!busy}
+            className={[
+              'inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition',
+              'bg-zinc-900 text-white hover:bg-zinc-800',
+              'dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-white',
+              busy ? 'opacity-60' : '',
+            ].join(' ')}
+          >
+            <Save className="h-4 w-4" />
+            {busy ? 'Salvando...' : 'Confirmar e salvar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function AdminNovaOfertaPage() {
+  const router = useRouter();
+  const { refreshOffers } = useAdminData();
+
+  const categories = useMemo(
+    () => [
+      { label: 'Gastronomia', id: 'gastronomia' },
+      { label: 'AtraÃ§Ãµes', id: 'atracoes' },
+      { label: 'Passeios', id: 'passeios' },
+      { label: 'Hospedagem', id: 'hospedagem' },
+      { label: 'Transporte', id: 'transporte' },
+      { label: 'Compras', id: 'compras' },
+      { label: 'ServiÃ§os', id: 'servicos' },
+    ],
+    []
+  );
+
+  const partners = useMemo(
+    () => ['Cantina Bella', 'Dreamland', 'Gramado Tour', 'BistrÃ´ do Centro', 'Serra Trips', 'CafÃ© da Colina'],
+    []
+  );
+
+  const [titulo, setTitulo] = useState('');
+  const [parceiro, setParceiro] = useState(partners[0] ?? '');
+  const [categoriaLabel, setCategoriaLabel] = useState(categories[0]?.label ?? '');
+  const [descricao, setDescricao] = useState('');
+  const [regiao, setRegiao] = useState('Serra GaÃºcha');
+
+  // âœ… mÃºltiplas imagens + ordem
+  const [images, setImages] = useState<string[]>([]);
+  const [dragFrom, setDragFrom] = useState<number | null>(null);
+
+  const [priceText, setPriceText] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  // âœ… status escolhido somente ao salvar (modal)
+  const [statusModalOpen, setStatusModalOpen] = useState(false);
+  const [statusToSave, setStatusToSave] = useState<OfferStatus>('rascunho');
+
+  const canSave = titulo.trim().length >= 4 && descricao.trim().length >= 10;
+
+  const removeImageAt = (idx: number) => {
+    setImages((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const moveImage = (from: number, to: number) => {
+    if (from === to) return;
+    setImages((prev) => {
+      const copy = [...prev];
+      const item = copy[from];
+      copy.splice(from, 1);
+      copy.splice(to, 0, item);
+      return copy;
+    });
+  };
+
+  const doSave = async (status: OfferStatus) => {
+    if (!canSave || saving) return;
+
+    setSaving(true);
+    try {
+      const selectedCategory = categories.find((c) => c.label === categoriaLabel) ?? categories[0];
+
+      const payload: any = {
+        title: titulo.trim(),
+        partnerName: parceiro.trim(),
+        city: normalizeCity(regiao),
+        categoryId: normalizeCategoryId(selectedCategory?.id ?? ''),
+        status,
+        description: descricao.trim(),
+        // âœ… compat: continua enviando imageUrl com a primeira
+        imageUrl: images[0] ? images[0] : null,
+        // âœ… jÃ¡ deixo pronto pro backend aceitar depois
+        images: images.length ? images : null,
+        priceText: priceText.trim() ? priceText.trim() : null,
+      };
+
+      const res = await fetch('/api/admin/offers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        alert(data?.error ? `${data.error}${data?.detail ? `\n${data.detail}` : ''}` : 'Falha ao salvar.');
+        return;
+      }
+
+      await refreshOffers();
+      router.push('/admin/ofertas');
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e);
+      alert(`Falha ao salvar.\n${message}`);
+    } finally {
+      setSaving(false);
+      setStatusModalOpen(false);
+    }
+  };
+
+  const onClickSave = () => {
+    if (!canSave || saving) return;
+    setStatusModalOpen(true);
+  };
+
+  const card = ['rounded-xl border p-4', 'border-zinc-200 bg-white', 'dark:border-zinc-900 dark:bg-zinc-950'].join(
+    ' '
+  );
+
+  const label = 'block text-sm text-zinc-700 dark:text-zinc-300';
+
+  const inputBase = [
+    'mt-2 w-full rounded-lg border px-3 py-2 text-sm outline-none',
+    'border-zinc-200 bg-white text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-400',
+    'dark:border-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 dark:placeholder:text-zinc-600 dark:focus:border-zinc-700',
+  ].join(' ');
+
+  const help = 'mt-2 text-xs text-zinc-500';
+
+  const thumbsWrap = [
+    'mt-3 flex items-stretch gap-3 overflow-x-auto pb-2',
+    '[&::-webkit-scrollbar]:h-2',
+    '[&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-zinc-300/70',
+    'dark:[&::-webkit-scrollbar-thumb]:bg-zinc-700/60',
+  ].join(' ');
+
+  const thumbCard = (isPrimary: boolean, isDragging: boolean) =>
+    [
+      'relative flex-none overflow-hidden rounded-xl border',
+      'h-[96px] w-[160px]',
+      'border-zinc-200 bg-zinc-100',
+      'dark:border-zinc-800 dark:bg-zinc-900/50',
+      isPrimary ? 'ring-2 ring-zinc-900 dark:ring-zinc-100' : '',
+      isDragging ? 'opacity-70' : '',
+    ].join(' ');
+
+  return (
+    <main className="space-y-4">
+      <StatusModal
+        open={statusModalOpen}
+        value={statusToSave}
+        onChange={setStatusToSave}
+        onCancel={() => setStatusModalOpen(false)}
+        onConfirm={() => doSave(statusToSave)}
+        busy={saving}
+      />
+
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="mb-2">
+            <Link
+              href="/admin/ofertas"
+              className={[
+                'inline-flex items-center gap-2 rounded-lg px-2 py-1 text-sm transition',
+                'text-zinc-700 hover:bg-zinc-100',
+                'dark:text-zinc-300 dark:hover:bg-zinc-900',
+              ].join(' ')}
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Voltar
+            </Link>
+          </div>
+
+          <h1 className="text-2xl font-semibold tracking-tight">Nova oferta</h1>
+          <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Cadastro real no Supabase via Prisma.</p>
+        </div>
+
+        <button
+          type="button"
+          onClick={onClickSave}
+          disabled={!canSave || saving}
+          className={[
+            'inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition',
+            canSave && !saving
+              ? [
+                  'bg-zinc-900 text-white hover:bg-zinc-800',
+                  'dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-white',
+                ].join(' ')
+              : 'bg-zinc-200 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400',
+          ].join(' ')}
+        >
+          <Save className="h-4 w-4" />
+          {saving ? 'Salvando...' : 'Salvar'}
+        </button>
+      </div>
+
+      <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div className="md:col-span-2 space-y-4">
+          <div className={card}>
+            <label className={label}>TÃ­tulo</label>
+            <input
+              value={titulo}
+              onChange={(e) => setTitulo(e.target.value)}
+              placeholder="Ex: 10% off em fondue na Serra"
+              className={inputBase}
+            />
+            <p className={help}>MÃ­nimo: 4 caracteres.</p>
+          </div>
+
+          <div className={card}>
+            <label className={label}>DescriÃ§Ã£o</label>
+            <textarea
+              value={descricao}
+              onChange={(e) => setDescricao(e.target.value)}
+              placeholder="Escreva uma descriÃ§Ã£o clara do benefÃ­cio..."
+              rows={6}
+              className={[inputBase, 'resize-none'].join(' ')}
+            />
+            <p className={help}>MÃ­nimo: 10 caracteres.</p>
+          </div>
+
+          <div className={card}>
+            <label className={label}>Imagens da oferta</label>
+
+            <input
+              type="file"
+              multiple
+              accept="image/png,image/jpeg,image/webp"
+              className={inputBase}
+              onChange={async (e) => {
+                const files = e.target.files;
+                if (!files || files.length === 0) return;
+
+                const form = new FormData();
+                Array.from(files).forEach((file) => form.append('files', file));
+
+                const res = await fetch('/api/admin/upload/offer-image', { method: 'POST', body: form });
+                const data = await res.json().catch(() => ({}));
+
+                if (!res.ok || !data?.urls || !Array.isArray(data.urls)) {
+                  alert('Erro ao subir imagens');
+                  return;
+                }
+
+                const urls = data.urls.filter((u: any) => typeof u === 'string' && u.trim().length > 0);
+                if (!urls.length) return;
+
+                setImages((prev) => {
+                  const set = new Set(prev);
+                  for (const u of urls) set.add(u);
+                  return Array.from(set);
+                });
+
+                // limpa o input pra permitir subir o mesmo arquivo de novo se quiser
+                e.currentTarget.value = '';
+              }}
+            />
+
+            {images.length > 0 ? (
+              <>
+                <div className={thumbsWrap}>
+                  {images.map((src, idx) => {
+                    const isPrimary = idx === 0;
+                    const isDragging = dragFrom === idx;
+
+                    return (
+                      <div
+                        key={`${src}-${idx}`}
+                        className={thumbCard(isPrimary, isDragging)}
+                        draggable
+                        onDragStart={() => setDragFrom(idx)}
+                        onDragEnd={() => setDragFrom(null)}
+                        onDragOver={(ev) => ev.preventDefault()}
+                        onDrop={() => {
+                          if (dragFrom === null) return;
+                          moveImage(dragFrom, idx);
+                          setDragFrom(null);
+                        }}
+                        title={isPrimary ? 'Imagem principal (1Âª)' : 'Arraste para ordenar'}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={src} alt={`Imagem ${idx + 1}`} className="h-full w-full object-cover" />
+
+                        <div className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-md bg-black/55 px-2 py-1 text-[11px] text-white">
+                          <GripVertical className="h-3.5 w-3.5" />
+                          {isPrimary ? 'Principal' : `#${idx + 1}`}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => removeImageAt(idx)}
+                          className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-md bg-black/55 text-white hover:bg-black/70"
+                          title="Remover"
+                          aria-label="Remover"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <p className={help}>
+                  Arraste e solte para ordenar. A <span className="font-medium">1Âª imagem</span> serÃ¡ a principal.
+                </p>
+              </>
+            ) : (
+              <p className={help}>Envie 1 ou mais imagens. Depois vocÃª pode ordenar arrastando.</p>
+            )}
+
+            <p className={help}>PNG/JPEG sÃ£o convertidas para WebP. WebP Ã© mantido.</p>
+          </div>
+
+          <div className={card}>
+            <label className={label}>PreÃ§o (texto)</label>
+            <input
+              value={priceText}
+              onChange={(e) => setPriceText(e.target.value)}
+              placeholder='Ex: "R$ 125,00" ou "10% off"'
+              className={inputBase}
+            />
+            <p className={help}>Opcional.</p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div className={card}>
+            <label className={label}>Parceiro</label>
+            <select value={parceiro} onChange={(e) => setParceiro(e.target.value)} className={inputBase}>
+              {partners.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className={card}>
+            <label className={label}>Categoria</label>
+            <select value={categoriaLabel} onChange={(e) => setCategoriaLabel(e.target.value)} className={inputBase}>
+              {categories.map((c) => (
+                <option key={c.id} value={c.label}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+
+            <p className={help}>
+              SerÃ¡ salvo como:{' '}
+              <span className="font-medium text-zinc-900 dark:text-zinc-200">
+                {normalizeCategoryId(categories.find((c) => c.label === categoriaLabel)?.id ?? '')}
+              </span>
+            </p>
+          </div>
+
+          {/* âœ… Status removido daqui (agora Ã© escolhido ao salvar) */}
+          <div className={card}>
+            <label className={label}>Status</label>
+            <div className="mt-2 rounded-lg border border-dashed border-zinc-300 bg-zinc-50 px-3 py-2 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900/30 dark:text-zinc-300">
+              Agora o status Ã© escolhido ao clicar em <span className="font-medium">Salvar</span>.
+            </div>
+            <p className={help}>VocÃª confirma o status no modal antes de salvar.</p>
+          </div>
+
+          <div className={card}>
+            <label className={label}>RegiÃ£o (cidade no banco)</label>
+            <input value={regiao} onChange={(e) => setRegiao(e.target.value)} placeholder="Ex: Serra GaÃºcha" className={inputBase} />
+            <p className={help}>
+              SerÃ¡ salvo como:{' '}
+              <span className="font-medium text-zinc-900 dark:text-zinc-200">{normalizeCity(regiao)}</span>
+            </p>
+          </div>
+
+          <div
+            className={[
+              'rounded-xl border border-dashed p-4 text-xs',
+              'border-zinc-300 bg-white text-zinc-500',
+              'dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-500',
+            ].join(' ')}
+          >
+            PrÃ³ximo: persistir o array de imagens no banco (images[]) e usar no produto no site.
+          </div>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+===== FILE: app\admin\_components\AdminRowActions.tsx =====
+'use client';
+
+import React from 'react';
+import { useRouter } from 'next/navigation';
+import { Eye, Pencil, Archive, PauseCircle, PlayCircle, RotateCcw, Trash2 } from 'lucide-react';
+
+type AdminStatus = 'rascunho' | 'publicado' | 'pausado' | 'arquivado' | 'lixeira';
+
+type ClickEvent = React.MouseEvent<HTMLButtonElement>;
+
+function safeStop(e: ClickEvent) {
+  e.preventDefault();
+  e.stopPropagation();
+}
+
+function RowAction({
+  title,
+  onClick,
+  children,
+  disabled,
+}: {
+  title: string;
+  onClick: (e: ClickEvent) => void;
+  children: React.ReactNode;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      title={title}
+      aria-label={title}
+      onClick={onClick}
+      disabled={disabled}
+      className={[
+        'group grid h-9 w-9 place-items-center rounded-lg transition',
+        disabled
+          ? 'cursor-not-allowed opacity-40'
+          : [
+              'text-zinc-500 hover:text-zinc-900 active:text-zinc-900',
+              'hover:bg-zinc-100 active:bg-zinc-200',
+              'dark:text-zinc-400 dark:hover:text-zinc-100 dark:active:text-zinc-100',
+              'dark:hover:bg-zinc-900/60 dark:active:bg-zinc-900/80',
+            ].join(' '),
+      ].join(' ')}
+    >
+      <span className="grid place-items-center [&_svg]:transition [&_svg]:text-current">{children}</span>
+    </button>
+  );
+}
+
+export default function AdminRowActions({
+  id,
+  status,
+  onView,
+  onEdit,
+  onPublish,
+  onPause,
+  onArchive,
+  onRestore,
+  onTrash,
+  onDeleteForever,
+  viewBaseHref,
+  editBaseHref,
+}: {
+  id: string;
+  status: AdminStatus;
+  onView: (id: string) => void;
+  onEdit: (id: string) => void;
+  onPublish: (id: string) => void;
+  onPause: (id: string) => void;
+  onArchive: (id: string) => void;
+  onRestore: (id: string) => void;
+  onTrash: (id: string) => void;
+  onDeleteForever?: (id: string) => void;
+  viewBaseHref?: string;
+  editBaseHref?: string;
+}) {
+  const router = useRouter();
+
+  const canPublish = status === 'rascunho' || status === 'pausado';
+  const canPause = status === 'publicado';
+  const isArchived = status === 'arquivado';
+  const isTrashed = status === 'lixeira';
+
+  const go = (url: string) => {
+    router.push(url);
+  };
+
+  const handleView = (e: ClickEvent) => {
+    safeStop(e);
+    if (viewBaseHref) {
+      const url = `${viewBaseHref}?id=${encodeURIComponent(id)}`;
+      go(url);
+      return;
+    }
+    onView(id);
+  };
+
+  const handleEdit = (e: ClickEvent) => {
+    safeStop(e);
+    if (editBaseHref) {
+      const url = `${editBaseHref}?id=${encodeURIComponent(id)}`;
+      go(url);
+      return;
+    }
+    onEdit(id);
+  };
+
+  const handlePublish = (e: ClickEvent) => {
+    safeStop(e);
+    onPublish(id);
+  };
+
+  const handlePause = (e: ClickEvent) => {
+    safeStop(e);
+    onPause(id);
+  };
+
+  const handleArchive = (e: ClickEvent) => {
+    safeStop(e);
+    onArchive(id);
+  };
+
+  const handleRestore = (e: ClickEvent) => {
+    safeStop(e);
+    onRestore(id);
+  };
+
+  const handleTrash = (e: ClickEvent) => {
+    safeStop(e);
+    onTrash(id);
+  };
+
+  const handleDeleteForever = (e: ClickEvent) => {
+    safeStop(e);
+    if (!onDeleteForever) return;
+    onDeleteForever(id);
+  };
+
+  return (
+    <div className="flex items-center justify-end gap-1">
+      <RowAction title="Visualizar" onClick={handleView} disabled={isTrashed}>
+        <Eye className="h-4 w-4" />
+      </RowAction>
+
+      <RowAction title="Editar" onClick={handleEdit} disabled={isTrashed}>
+        <Pencil className="h-4 w-4" />
+      </RowAction>
+
+      {!isTrashed && (
+        <RowAction title="Enviar para lixeira" onClick={handleTrash}>
+          <Trash2 className="h-4 w-4" />
+        </RowAction>
+      )}
+
+      {!isTrashed && canPublish && (
+        <RowAction title="Publicar" onClick={handlePublish}>
+          <PlayCircle className="h-4 w-4" />
+        </RowAction>
+      )}
+
+      {!isTrashed && canPause && (
+        <RowAction title="Pausar" onClick={handlePause}>
+          <PauseCircle className="h-4 w-4" />
+        </RowAction>
+      )}
+
+      {isTrashed ? (
+        <>
+          <RowAction title="Restaurar" onClick={handleRestore}>
+            <RotateCcw className="h-4 w-4" />
+          </RowAction>
+
+          <RowAction title="Excluir definitivamente" onClick={handleDeleteForever} disabled={!onDeleteForever}>
+            <Trash2 className="h-4 w-4" />
+          </RowAction>
+        </>
+      ) : isArchived ? (
+        <RowAction title="Restaurar" onClick={handleRestore}>
+          <RotateCcw className="h-4 w-4" />
+        </RowAction>
+      ) : (
+        <RowAction title="Arquivar" onClick={handleArchive}>
+          <Archive className="h-4 w-4" />
+        </RowAction>
+      )}
+    </div>
+  );
+}
+
+
+===== FILE: app\admin\_components\AdminDataProvider.tsx =====
+'use client';
+
+// app/admin/_components/AdminDataProvider.tsx
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import type {
+  OfferStatus,
+  AffiliateStatus,
+  PartnerStatus,
+  AdminPartnerRow as MappedPartnerRow,
+  AdminAffiliateRow as MappedAffiliateRow,
+} from '../_data/adminMappers';
+import { mapPartner, mapAffiliate, mapDbOfferToAdminRow } from '../_data/adminMappers';
+
+type AdminOfferRow = {
+  id: string;
+  titulo: string;
+  parceiro: string;
+  categoria: string;
+  status: OfferStatus;
+  atualizadoEm: string;
+  imageUrl?: string | null;
+};
+
+type AdminPartnerRow = MappedPartnerRow;
+type AdminAffiliateRow = MappedAffiliateRow;
+
+// ✅ sessão para o AdminShell mostrar "Logado como"
+type SessionRole = 'guest' | 'user' | 'affiliate' | 'partner' | 'master';
+type Session = {
+  role: SessionRole;
+  planActive: boolean;
+  userName?: string;
+};
+
+type CreatePartnerInput = {
+  nome: string;
+  categoria: string;
+  cidade: string;
+  whatsapp: string;
+  instagram?: string | null;
+  imageUrl?: string | null;
+  images?: string[] | null;
+  status: PartnerStatus;
+  observacoes?: string | null;
+};
+
+type UpdatePartnerInput = {
+  id: string;
+  nome: string;
+  categoria: string;
+  cidade: string;
+  whatsapp: string;
+  instagram?: string | null;
+  imageUrl?: string | null;
+  images?: string[] | null;
+  status: PartnerStatus;
+  observacoes?: string | null;
+};
+
+type AdminDataContextValue = {
+  session: Session | null;
+
+  offers: AdminOfferRow[];
+  partners: AdminPartnerRow[];
+  affiliates: AdminAffiliateRow[];
+
+  refreshOffers: () => Promise<void>;
+  refreshSession: () => Promise<void>;
+
+  setOfferStatus: (id: string, status: OfferStatus) => Promise<void>;
+  deleteOfferForever: (id: string) => Promise<void>;
+  emptyOffersTrash: () => Promise<void>;
+
+  setAffiliateStatus: (id: string, status: AffiliateStatus) => void;
+  setPartnerStatus: (id: string, status: PartnerStatus) => void;
+
+  emptyPartnersTrash: () => void;
+  emptyAffiliatesTrash: () => void;
+
+  /** Recarrega listas locais (sem mock) */
+  refreshMockLists: () => void;
+
+  createPartner: (input: CreatePartnerInput) => AdminPartnerRow;
+
+  /** ✅ editar parceiro (persistente) */
+  updatePartner: (input: UpdatePartnerInput) => AdminPartnerRow | null;
+
+  /** ✅ excluir definitivo (remove do localStorage) */
+  deletePartnerForever: (id: string) => void;
+};
+
+const AdminDataContext = createContext<AdminDataContextValue | null>(null);
+
+async function fetchJson(url: string, init?: RequestInit) {
+  const res = await fetch(url, { cache: 'no-store', ...init });
+  const data = await res.json().catch(() => null);
+  return { res, data };
+}
+
+const LS_PARTNERS_KEY = 'pd_admin_partners_v1';
+const LS_AFFILIATES_KEY = 'pd_admin_affiliates_v1';
+
+function safeParseArray(raw: string | null) {
+  if (!raw) return [];
+  try {
+    const v = JSON.parse(raw);
+    return Array.isArray(v) ? v : [];
+  } catch {
+    return [];
+  }
+}
+
+function makeId(prefix: string) {
+  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function writeLsArray(key: string, arr: any[]) {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(key, JSON.stringify(arr));
+}
+
+function updateLsRowStatus(key: string, id: string, status: string) {
+  if (typeof window === 'undefined') return;
+  const raw = window.localStorage.getItem(key);
+  const arr = safeParseArray(raw);
+
+  let changed = false;
+  const next = arr.map((p: any) => {
+    if (String(p?.id ?? '') !== id) return p;
+    changed = true;
+    return { ...p, status, updatedAt: new Date().toISOString() };
+  });
+
+  if (changed) window.localStorage.setItem(key, JSON.stringify(next));
+}
+
+function removeFromLsByStatus(key: string, status: string) {
+  if (typeof window === 'undefined') return;
+  const raw = window.localStorage.getItem(key);
+  const arr = safeParseArray(raw);
+  const next = arr.filter((x: any) => String(x?.status ?? '').toLowerCase() !== String(status).toLowerCase());
+  window.localStorage.setItem(key, JSON.stringify(next));
+}
+
+function removeFromLsById(key: string, id: string) {
+  if (typeof window === 'undefined') return;
+  const raw = window.localStorage.getItem(key);
+  const arr = safeParseArray(raw);
+  const next = arr.filter((x: any) => String(x?.id ?? '') !== id);
+  window.localStorage.setItem(key, JSON.stringify(next));
+}
+
+export function AdminDataProvider({ children }: { children: React.ReactNode }) {
+  const [session, setSession] = useState<Session | null>(null);
+
+  const [offers, setOffers] = useState<AdminOfferRow[]>([]);
+  const [partners, setPartners] = useState<AdminPartnerRow[]>([]);
+  const [affiliates, setAffiliates] = useState<AdminAffiliateRow[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  const refreshSession = async () => {
+    const { res, data } = await fetchJson('/api/auth/me');
+    if (!res.ok) {
+      setSession(null);
+      return;
+    }
+    setSession((data?.session ?? null) as Session | null);
+  };
+
+  const refreshOffers = async () => {
+    const { res, data } = await fetchJson('/api/admin/offers');
+
+    if (!res.ok) {
+      const msg = data?.error ? String(data.error) : 'Falha ao carregar ofertas';
+      throw new Error(msg);
+    }
+
+    const items = Array.isArray(data?.items) ? data.items : [];
+    setOffers(items.map(mapDbOfferToAdminRow));
+  };
+
+  /**
+   * ✅ IMPORTANTE:
+   * Parceiros e afiliados vêm SOMENTE do localStorage.
+   */
+  const refreshMockLists = () => {
+    let lsPartners: AdminPartnerRow[] = [];
+    let lsAffiliates: AdminAffiliateRow[] = [];
+
+    if (typeof window !== 'undefined') {
+      const rawP = window.localStorage.getItem(LS_PARTNERS_KEY);
+      const rawA = window.localStorage.getItem(LS_AFFILIATES_KEY);
+
+      lsPartners = safeParseArray(rawP).map((p) => mapPartner(p)) as AdminPartnerRow[];
+      lsAffiliates = safeParseArray(rawA).map((a) => mapAffiliate(a)) as AdminAffiliateRow[];
+    }
+
+    setPartners(lsPartners);
+    setAffiliates(lsAffiliates);
+  };
+
+  useEffect(() => {
+    if (loaded) return;
+    setLoaded(true);
+
+    refreshMockLists();
+    refreshSession().catch(() => {});
+    refreshOffers().catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded]);
+
+  // ✅ Soft delete / status update no banco
+  const setOfferStatus = async (id: string, status: OfferStatus) => {
+    setOffers((prev) => prev.map((o) => (o.id === id ? { ...o, status } : o)));
+
+    try {
+      const { res, data } = await fetchJson(`/api/admin/offers/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+
+      if (!res.ok) {
+        const msg = data?.error ? String(data.error) : 'Falha ao atualizar status';
+        throw new Error(msg);
+      }
+    } finally {
+      await refreshOffers().catch(() => {});
+    }
+  };
+
+  // ✅ Delete definitivo (só para status=lixeira)
+  const deleteOfferForever = async (id: string) => {
+    setOffers((prev) => prev.filter((o) => o.id !== id));
+
+    try {
+      const { res, data } = await fetchJson(`/api/admin/offers/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const msg = data?.error ? String(data.error) : 'Falha ao excluir definitivamente';
+        throw new Error(msg);
+      }
+    } finally {
+      await refreshOffers().catch(() => {});
+    }
+  };
+
+  // ✅ Esvaziar lixeira (deleteMany no backend)
+  const emptyOffersTrash = async () => {
+    try {
+      const { res, data } = await fetchJson('/api/admin/offers/empty-trash', { method: 'DELETE' });
+      if (!res.ok) {
+        const msg = data?.error ? String(data.error) : 'Falha ao esvaziar lixeira';
+        throw new Error(msg);
+      }
+    } finally {
+      await refreshOffers().catch(() => {});
+    }
+  };
+
+  const setAffiliateStatus = (id: string, status: AffiliateStatus) => {
+    setAffiliates((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)));
+    updateLsRowStatus(LS_AFFILIATES_KEY, id, status);
+  };
+
+  const setPartnerStatus = (id: string, status: PartnerStatus) => {
+    setPartners((prev) => prev.map((p) => (p.id === id ? { ...p, status } : p)));
+    updateLsRowStatus(LS_PARTNERS_KEY, id, status);
+  };
+
+  const emptyPartnersTrash = () => {
+    setPartners((prev) => prev.filter((p) => p.status !== 'lixeira'));
+    removeFromLsByStatus(LS_PARTNERS_KEY, 'lixeira');
+  };
+
+  const emptyAffiliatesTrash = () => {
+    setAffiliates((prev) => prev.filter((a) => a.status !== 'lixeira'));
+    removeFromLsByStatus(LS_AFFILIATES_KEY, 'lixeira');
+  };
+
+  const createPartner = (input: CreatePartnerInput) => {
+    const id = makeId('partner');
+    const now = new Date().toISOString();
+
+    const payload: any = {
+      id,
+      nome: String(input.nome ?? '').trim(),
+      categoria: String(input.categoria ?? '').trim(),
+      cidade: String(input.cidade ?? '').trim(),
+      whatsapp: String(input.whatsapp ?? '').trim(),
+      instagram: (input.instagram ?? '').toString().trim() || null,
+
+      imageUrl: (input.imageUrl ?? '').toString().trim() || null,
+      images: Array.isArray(input.images) && input.images.length ? input.images : null,
+
+      status: input.status ?? 'rascunho',
+      observacoes: (input.observacoes ?? '').toString().trim() || null,
+
+      ofertasAtivas: 0,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    if (typeof window !== 'undefined') {
+      const raw = window.localStorage.getItem(LS_PARTNERS_KEY);
+      const arr = safeParseArray(raw);
+      writeLsArray(LS_PARTNERS_KEY, [payload, ...arr]);
+    }
+
+    const mapped = mapPartner(payload) as AdminPartnerRow;
+    setPartners((prev) => [mapped, ...prev.filter((p) => p.id !== mapped.id)]);
+
+    return mapped;
+  };
+
+  const updatePartner = (input: UpdatePartnerInput) => {
+    const id = String(input.id ?? '').trim();
+    if (!id) return null;
+
+    const now = new Date().toISOString();
+
+    // atualiza LS (fonte de verdade)
+    if (typeof window !== 'undefined') {
+      const raw = window.localStorage.getItem(LS_PARTNERS_KEY);
+      const arr = safeParseArray(raw);
+
+      const next = arr.map((p: any) => {
+        if (String(p?.id ?? '') !== id) return p;
+
+        return {
+          ...p,
+          nome: String(input.nome ?? '').trim(),
+          categoria: String(input.categoria ?? '').trim(),
+          cidade: String(input.cidade ?? '').trim(),
+          whatsapp: String(input.whatsapp ?? '').trim(),
+          instagram: (input.instagram ?? '').toString().trim() || null,
+          imageUrl: (input.imageUrl ?? '').toString().trim() || null,
+          images: Array.isArray(input.images) && input.images.length ? input.images : null,
+          status: input.status ?? p?.status ?? 'rascunho',
+          observacoes: (input.observacoes ?? '').toString().trim() || null,
+          updatedAt: now,
+        };
+      });
+
+      writeLsArray(LS_PARTNERS_KEY, next);
+    }
+
+    // atualiza UI sem esperar reload
+    let mapped: AdminPartnerRow | null = null;
+    setPartners((prev) => {
+      const next = prev.map((p) => {
+        if (p.id !== id) return p;
+        const payload: any = {
+          ...p,
+          nome: String(input.nome ?? '').trim(),
+          categoria: String(input.categoria ?? '').trim(),
+          cidade: String(input.cidade ?? '').trim(),
+          whatsapp: String(input.whatsapp ?? '').trim(),
+          instagram: (input.instagram ?? '').toString().trim() || null,
+          imageUrl: (input.imageUrl ?? '').toString().trim() || null,
+          images: Array.isArray(input.images) && input.images.length ? input.images : null,
+          status: input.status ?? p.status,
+          observacoes: (input.observacoes ?? '').toString().trim() || null,
+          updatedAt: now,
+        };
+        const m = mapPartner(payload) as AdminPartnerRow;
+        mapped = m;
+        return m;
+      });
+      return next;
+    });
+
+    return mapped;
+  };
+
+  const deletePartnerForever = (id: string) => {
+    const rid = String(id ?? '').trim();
+    if (!rid) return;
+
+    setPartners((prev) => prev.filter((p) => p.id !== rid));
+    removeFromLsById(LS_PARTNERS_KEY, rid);
+  };
+
+  const value = useMemo(
+    () => ({
+      session,
+
+      offers,
+      partners,
+      affiliates,
+
+      refreshOffers,
+      refreshSession,
+
+      setOfferStatus,
+      deleteOfferForever,
+      emptyOffersTrash,
+
+      setAffiliateStatus,
+      setPartnerStatus,
+
+      emptyPartnersTrash,
+      emptyAffiliatesTrash,
+
+      refreshMockLists,
+
+      createPartner,
+      updatePartner,
+      deletePartnerForever,
+    }),
+    [session, offers, partners, affiliates]
+  );
+
+  return <AdminDataContext.Provider value={value}>{children}</AdminDataContext.Provider>;
+}
+
+export function useAdminData() {
+  const ctx = useContext(AdminDataContext);
+  if (!ctx) throw new Error('useAdminData deve ser usado dentro de AdminDataProvider');
+  return ctx;
+}
+
+
+===== FILE: app\admin\_components\AdminToastProvider.tsx =====
+'use client';
+
+import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+
+type ToastType = 'success' | 'warning' | 'error';
+
+export type AdminToast = {
+  id: string;
+  message: string;
+  type: ToastType;
+};
+
+type ToastContextType = {
+  toasts: AdminToast[];
+  showToast: (message: string, type?: ToastType) => void;
+  removeToast: (id: string) => void;
+};
+
+const ToastContext = createContext<ToastContextType | null>(null);
+
+export default function AdminToastProvider({ children }: { children: React.ReactNode }) {
+  const [toasts, setToasts] = useState<AdminToast[]>([]);
+
+  const removeToast = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
+  const showToast = useCallback(
+    (message: string, type: ToastType = 'success') => {
+      const id =
+        typeof crypto !== 'undefined' && 'randomUUID' in crypto
+          ? crypto.randomUUID()
+          : Math.random().toString(36).slice(2);
+
+      setToasts((prev) => [...prev, { id, message, type }]);
+
+      // auto-remove
+      setTimeout(() => removeToast(id), 2800);
+    },
+    [removeToast]
+  );
+
+  const value = useMemo(
+    () => ({ toasts, showToast, removeToast }),
+    [toasts, showToast, removeToast]
+  );
+
+  return <ToastContext.Provider value={value}>{children}</ToastContext.Provider>;
+}
+
+export function useAdminToast() {
+  const ctx = useContext(ToastContext);
+  if (!ctx) throw new Error('useAdminToast must be used within AdminToastProvider');
+  return ctx;
+}
+
+
+===== FILE: app\admin\_data\adminMappers.ts =====
+// app/admin/_data/adminMappers.ts
+
+export type OfferStatus = 'rascunho' | 'publicado' | 'pausado' | 'arquivado' | 'lixeira';
+export type PartnerStatus = OfferStatus;
+export type AffiliateStatus = OfferStatus;
+
+function formatDateBR(value: string | Date | null | undefined) {
+  if (!value) return '-';
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return '-';
+  return d.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+}
+
+const digitsOnly = (v: string) => (v || '').replace(/\D/g, '');
+
+export const buildWhatsappHref = (raw: string) => {
+  const digits = digitsOnly(raw);
+  if (!digits) return 'https://wa.me/55';
+  const withCountry = digits.startsWith('55') ? digits : `55${digits}`;
+  return `https://wa.me/${withCountry}`;
+};
+
+const slugify = (s: string) =>
+  (s || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '')
+    .toUpperCase()
+    .slice(0, 10);
+
+function pickFirstFromArray(v: any): string | null {
+  if (!Array.isArray(v)) return null;
+  const first = v.find((x) => typeof x === 'string' && x.trim().length > 0);
+  return first ? String(first).trim() : null;
+}
+
+function pickImageUrl(x: any): string | null {
+  // âœ… aceita tambÃ©m images[] como fallback
+  const raw =
+    x?.imageUrl ??
+    x?.imagemUrl ??
+    x?.logoUrl ??
+    x?.avatarUrl ??
+    x?.thumbnailUrl ??
+    x?.thumbUrl ??
+    x?.fotoUrl ??
+    x?.photoUrl ??
+    x?.coverUrl ??
+    x?.pictureUrl ??
+    x?.image_url ??
+    x?.imagem_url ??
+    pickFirstFromArray(x?.images) ??
+    pickFirstFromArray(x?.imagens) ??
+    null;
+
+  if (!raw) return null;
+  const s = String(raw).trim();
+  return s ? s : null;
+}
+
+export type AdminOfferRow = {
+  id: string;
+  titulo: string;
+  parceiro: string;
+  categoria: string;
+  status: OfferStatus;
+  atualizadoEm: string;
+  imageUrl?: string | null;
+};
+
+export type AdminPartnerRow = {
+  id: string;
+  nome: string;
+  categoria: string;
+  cidade: string;
+  whatsapp: string;
+  whatsappHref: string;
+  status: PartnerStatus;
+  ofertasAtivas: number;
+  atualizadoEm: string;
+  imageUrl?: string | null;
+
+  // âœ… opcional (para galeria no futuro)
+  images?: string[] | null;
+};
+
+export type AdminAffiliateRow = {
+  id: string;
+  nome: string;
+  email: string;
+  whatsapp: string;
+  whatsappHref: string;
+  cupom: string;
+  status: AffiliateStatus;
+  atualizadoEm: string;
+  imageUrl?: string | null;
+  canal?: string;
+  leadsMes?: number;
+  vendasMes?: number;
+};
+
+// =========================
+// OFFERS
+// =========================
+
+export function mapDbOfferToAdminRow(db: any): AdminOfferRow {
+  return {
+    id: String(db?.id ?? ''),
+    titulo: String(db?.title ?? db?.titulo ?? ''),
+    parceiro: String(db?.partnerName ?? db?.parceiro ?? ''),
+    categoria: String(db?.categoryId ?? db?.categoria ?? ''),
+    status: (db?.status ?? 'rascunho') as OfferStatus,
+    atualizadoEm: formatDateBR(db?.updatedAt ?? db?.createdAt),
+    imageUrl: pickImageUrl(db),
+  };
+}
+
+export function mapMockOfferToAdminRow(m: any): AdminOfferRow {
+  return {
+    id: String(m?.id ?? ''),
+    titulo: String(m?.titulo ?? m?.title ?? ''),
+    parceiro: String(m?.parceiro ?? m?.partnerName ?? ''),
+    categoria: String(m?.categoria ?? m?.categoryId ?? ''),
+    status: (m?.status ?? 'rascunho') as OfferStatus,
+    atualizadoEm: formatDateBR(m?.updatedAt ?? m?.createdAt),
+    imageUrl: pickImageUrl(m),
+  };
+}
+
+export const mapOffer = (x: any): AdminOfferRow => {
+  if (x && typeof x === 'object' && ('titulo' in x || 'parceiro' in x)) return mapMockOfferToAdminRow(x);
+  return mapDbOfferToAdminRow(x);
+};
+
+// =========================
+// PARTNERS
+// =========================
+
+export const mapPartner = (p: any): AdminPartnerRow => {
+  const id = String(p?.id ?? '');
+  const nome = String(p?.nome ?? p?.name ?? '');
+
+  const whatsapp = String(p?.whatsapp ?? '').trim() || '51999999999';
+  const whatsappHref = String(p?.whatsappHref ?? '').trim() || buildWhatsappHref(whatsapp);
+
+  const images =
+    Array.isArray(p?.images) && p.images.length
+      ? p.images.filter((x: any) => typeof x === 'string' && x.trim().length > 0)
+      : null;
+
+  return {
+    id,
+    nome,
+    categoria: String(p?.categoria ?? p?.category ?? ''),
+    cidade: String(p?.cidade ?? p?.city ?? ''),
+    whatsapp,
+    whatsappHref,
+    status: (p?.status ?? 'rascunho') as PartnerStatus,
+    ofertasAtivas: Number(p?.ofertasAtivas ?? p?.activeOffers ?? 0),
+    atualizadoEm: formatDateBR(p?.updatedAt ?? p?.createdAt),
+    imageUrl: pickImageUrl(p),
+    images,
+  };
+};
+
+// =========================
+// AFFILIATES
+// =========================
+
+export const mapAffiliate = (a: any): AdminAffiliateRow => {
+  const id = String(a?.id ?? '');
+  const nome = String(a?.nome ?? a?.name ?? '');
+
+  const email = String(a?.email ?? '').trim() || `${slugify(nome || id).toLowerCase()}@afiliado.local`;
+  const whatsapp = String(a?.whatsapp ?? '').trim() || '51999999999';
+  const cupom = String(a?.cupom ?? '').trim() || slugify(nome || id) || 'CUPOM';
+  const whatsappHref = String(a?.whatsappHref ?? '').trim() || buildWhatsappHref(whatsapp);
+
+  return {
+    id,
+    nome,
+    email,
+    whatsapp,
+    whatsappHref,
+    cupom,
+    status: (a?.status ?? 'rascunho') as AffiliateStatus,
+    atualizadoEm: formatDateBR(a?.updatedAt ?? a?.createdAt),
+    imageUrl: pickImageUrl(a),
+    canal: a?.canal,
+    leadsMes: a?.leadsMes,
+    vendasMes: a?.vendasMes,
+  };
+};
+
+
+===== FILE: app\admin\_data\adminSelectors.ts =====
+// app/admin/_data/adminSelectors.ts
+import { adminMock, countByStatus } from './adminMock';
+import { mapOffer, mapPartner, mapAffiliate } from './adminMappers';
+
+export function getAdminUiData() {
+  const offers = adminMock.offers.map(mapOffer);
+  const partners = adminMock.partners.map(mapPartner);
+  const affiliates = adminMock.affiliates.map(mapAffiliate);
+
+  return { offers, partners, affiliates };
+}
+
+export function getDashboardData() {
+  const { offers, partners } = getAdminUiData();
+
+  const offersByStatus = countByStatus(adminMock.offers);
+  const partnersByStatus = countByStatus(adminMock.partners);
+
+  const chart = {
+    yearLabel: '2026',
+    isMock: true,
+    months: adminMock.dashboard.months,
+    bars: adminMock.dashboard.months.map((m) => m.value),
+  };
+
+  const stats = [
+    {
+      label: 'Ofertas publicadas',
+      value: String(offersByStatus.publicado),
+      hint: 'Base atual (mock central)',
+    },
+    {
+      label: 'Parceiros ativos',
+      value: String(partnersByStatus.publicado),
+      hint: 'Publicados e visÃ­veis (mock)',
+    },
+    {
+      label: 'Cupons utilizados',
+      value: '912',
+      hint: 'Total acumulado (mock)',
+    },
+    {
+      label: 'Receita estimada',
+      value: 'R$ 18.420',
+      hint: 'SimulaÃ§Ã£o (MVP)',
+    },
+  ];
+
+  return { stats, chart, offers, partners };
+}
+
+
+===== FILE: app\api\admin\offers\route.ts =====
+// app/api/admin/offers/route.ts
+import { NextResponse } from 'next/server';
+import { Prisma, OfferStatus } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
+import { decodeSession, getSessionCookieName } from '@/lib/session';
+import { cookies, headers } from 'next/headers';
+
+export const dynamic = 'force-dynamic';
+
+const allowedCreate = new Set<OfferStatus>([
+  OfferStatus.rascunho,
+  OfferStatus.publicado,
+  OfferStatus.pausado,
+  OfferStatus.arquivado,
+]);
+
+async function requireMaster() {
+  const c = await cookies();
+  const raw = c.get(getSessionCookieName())?.value ?? null;
+  const session = decodeSession(raw);
+  if (!session || session.role !== 'master') return null;
+  return session;
+}
+
+async function getTenantId() {
+  const h = await headers();
+  return h.get('x-tenant-id') ?? undefined;
+}
+
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
+function slugify(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)+/g, '');
+}
+
+async function ensureUniqueSlug(base: string) {
+  const cleanBase = slugify(base || 'oferta') || 'oferta';
+  let slug = cleanBase;
+  let i = 2;
+
+  while (true) {
+    const exists = await prisma.offer.findUnique({ where: { slug } });
+    if (!exists) return slug;
+    slug = `${cleanBase}-${i}`;
+    i += 1;
+  }
+}
+
+function pickStatus(raw: unknown): OfferStatus {
+  const s = String(raw ?? OfferStatus.rascunho);
+  return (Object.values(OfferStatus).includes(s as OfferStatus) ? (s as OfferStatus) : OfferStatus.rascunho) as OfferStatus;
+}
+
+function toStringArray(v: unknown): string[] | null {
+  if (!Array.isArray(v)) return null;
+  const out = v.map((x) => String(x).trim()).filter(Boolean);
+  return out;
+}
+
+function toStringOrNull(v: unknown) {
+  const s = typeof v === 'string' ? v : v == null ? '' : String(v);
+  const out = s.trim();
+  return out ? out : null;
+}
+
+// ========================
+// ADMIN: LISTA OFERTAS
+// ========================
+export async function GET() {
+  const session = await requireMaster();
+  if (!session) {
+    return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
+  }
+
+  try {
+    const items = await prisma.offer.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return NextResponse.json({ ok: true, items, total: items.length }, { status: 200 });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : String(e);
+    return NextResponse.json(
+      { ok: false, error: 'Falha ao buscar ofertas', detail: message },
+      { status: 500 }
+    );
+  }
+}
+
+// ========================
+// ADMIN: CRIA OFERTA
+// ========================
+export async function POST(request: Request) {
+  const session = await requireMaster();
+  if (!session) {
+    return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
+  }
+
+  try {
+    const bodyRaw: unknown = await request.json().catch(() => null);
+    const body = isPlainObject(bodyRaw) ? bodyRaw : {};
+
+    const title = String(body.title ?? '').trim();
+    const partnerName = String(body.partnerName ?? '').trim();
+    const city = String(body.city ?? '').trim();
+    const categoryId = String(body.categoryId ?? '').trim();
+
+    const status = pickStatus(body.status ?? OfferStatus.rascunho);
+
+    const description = body.hasOwnProperty('description') ? toStringOrNull(body.description) : null;
+
+    const imageUrls = body.hasOwnProperty('imageUrls') ? (toStringArray(body.imageUrls) ?? []) : [];
+    const imageUrlFallback = body.hasOwnProperty('imageUrl') ? toStringOrNull(body.imageUrl) : null;
+    const imageUrl = (imageUrls.length ? imageUrls[0] : null) ?? imageUrlFallback ?? null;
+
+    const priceText = body.hasOwnProperty('priceText') ? toStringOrNull(body.priceText) : null;
+
+    if (title.length < 4) {
+      return NextResponse.json({ ok: false, error: 'TÃ­tulo invÃ¡lido' }, { status: 400 });
+    }
+    if (!partnerName) {
+      return NextResponse.json({ ok: false, error: 'Parceiro Ã© obrigatÃ³rio' }, { status: 400 });
+    }
+    if (!city) {
+      return NextResponse.json({ ok: false, error: 'Cidade Ã© obrigatÃ³ria' }, { status: 400 });
+    }
+    if (!categoryId) {
+      return NextResponse.json({ ok: false, error: 'Categoria Ã© obrigatÃ³ria' }, { status: 400 });
+    }
+
+    // evita criar direto como lixeira
+    if (!allowedCreate.has(status)) {
+      return NextResponse.json({ ok: false, error: 'Status invÃ¡lido para criaÃ§Ã£o' }, { status: 400 });
+    }
+
+    const tenantId = await getTenantId();
+    const slug = await ensureUniqueSlug(title);
+
+    const created = await prisma.offer.create({
+      data: {
+        slug,
+        title,
+        partnerName,
+        city,
+        categoryId,
+        status,
+        description,
+        imageUrl,
+        imageUrls,
+        priceText,
+      },
+    });
+
+    await prisma.adminAuditLog.create({
+      data: {
+        tenantId,
+        actorRole: session.role,
+        actorName: session.userName ?? null,
+        action: 'OFFER_CREATED',
+        entityType: 'offer',
+        entityId: created.id,
+        before: Prisma.JsonNull,
+        after: created as unknown as Prisma.InputJsonValue,
+      },
+    });
+
+    return NextResponse.json({ ok: true, offer: created }, { status: 201 });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : String(e);
+    return NextResponse.json(
+      { ok: false, error: 'Falha ao criar oferta', detail: message },
+      { status: 500 }
+    );
+  }
+}
+
+// ========================
+// ADMIN: ATUALIZA (COMPAT) via /api/admin/offers?id=...
+// Usado normalmente pelos Ã­cones (pausar/arquivar/lixeira)
+// ========================
+export async function PUT(request: Request) {
+  const session = await requireMaster();
+  if (!session) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
+
+  const url = new URL(request.url);
+  const id = url.searchParams.get('id') ?? '';
+
+  if (!id) return NextResponse.json({ ok: false, error: 'missing_id' }, { status: 400 });
+
+  try {
+    const before = await prisma.offer.findUnique({ where: { id } });
+    if (!before) return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 });
+
+    const bodyRaw: unknown = await request.json().catch(() => null);
+    const body = isPlainObject(bodyRaw) ? bodyRaw : {};
+
+    // campos que os Ã­cones normalmente mandam:
+    const status = body.hasOwnProperty('status') ? pickStatus(body.status) : before.status;
+
+    // opcional: imagem / imagens tambÃ©m podem passar por aqui
+    const imageUrls = body.hasOwnProperty('imageUrls')
+      ? (toStringArray(body.imageUrls) ?? [])
+      : (Array.isArray(before.imageUrls) ? before.imageUrls : []);
+
+    const imageUrlFallback = body.hasOwnProperty('imageUrl') ? toStringOrNull(body.imageUrl) : (before.imageUrl ?? null);
+    const imageUrl = (imageUrls.length ? imageUrls[0] : null) ?? imageUrlFallback ?? null;
+
+    const updated = await prisma.offer.update({
+      where: { id },
+      data: {
+        status,
+        imageUrl,
+        imageUrls: { set: imageUrls },
+      },
+    });
+
+    const tenantId = await getTenantId();
+
+    await prisma.adminAuditLog.create({
+      data: {
+        tenantId,
+        actorRole: session.role,
+        actorName: session.userName ?? null,
+        action: 'OFFER_UPDATED',
+        entityType: 'offer',
+        entityId: updated.id,
+        before: before as unknown as Prisma.InputJsonValue,
+        after: updated as unknown as Prisma.InputJsonValue,
+      },
+    });
+
+    return NextResponse.json({ ok: true, offer: updated }, { status: 200 });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ ok: false, error: 'Falha ao atualizar oferta', detail: message }, { status: 500 });
+  }
+}
+
+===== FILE: app\api\admin\offers\[id]\route.ts =====
+!! NÃO ENCONTRADO
+

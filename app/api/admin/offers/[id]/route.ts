@@ -1,116 +1,307 @@
 // app/api/admin/offers/[id]/route.ts
 import { NextResponse } from 'next/server';
-import { Prisma } from '@prisma/client';
+import type { NextRequest } from 'next/server';
+import { Prisma, OfferStatus } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { decodeSession, getSessionCookieName } from '@/lib/session';
 import { cookies, headers } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
 
-type OfferStatus = 'rascunho' | 'publicado' | 'pausado' | 'arquivado';
-const allowed = new Set<OfferStatus>(['rascunho', 'publicado', 'pausado', 'arquivado']);
-
-async function requireMaster() {
-  const c = await cookies();
-  const raw = c.get(getSessionCookieName())?.value ?? null;
-  const session = decodeSession(raw);
-  if (!session || session.role !== 'master') return null;
-  return session;
-}
-
-async function getTenantId() {
-  const h = await headers();
-  return h.get('x-tenant-id') ?? undefined;
-}
-
-type RouteCtx = { params: Promise<{ id: string }> };
+type Ctx = { params: Promise<{ id: string }> };
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
-export async function PATCH(req: Request, context: RouteCtx) {
-  const session = await requireMaster();
-  if (!session) {
-    return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
+function requireMaster() {
+  // ✅ Next atual: cookies() pode ser async (no seu erro ele virou Promise)
+  // então usamos await via "any" safe aqui mantendo compat sem quebrar runtime.
+  // (o TS do seu projeto está acusando Promise, então tratamos como Promise)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const c: any = cookies();
+  const getCookieValue = (obj: any) => obj?.get?.(getSessionCookieName())?.value ?? null;
+
+  const raw =
+    typeof c?.then === 'function'
+      ? // cookies() retornou Promise
+        null
+      : getCookieValue(c);
+
+  // Se cookies() veio como Promise, vamos resolver do jeito correto no runtime:
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const resolve = async () => {
+    if (typeof c?.then === 'function') {
+      const cc = await c;
+      return getCookieValue(cc);
+    }
+    return raw;
+  };
+
+  return resolve().then((cookieRaw) => {
+    const session = decodeSession(cookieRaw);
+    if (!session || session.role !== 'master') return null;
+    return session;
+  });
+}
+
+async function getTenantId() {
+  // ✅ Next atual: headers() pode ser async (no seu erro ele virou Promise)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const h: any = headers();
+  const readHeader = (obj: any) => obj?.get?.('x-tenant-id') ?? undefined;
+
+  if (typeof h?.then === 'function') {
+    const hh = await h;
+    return readHeader(hh);
   }
+  return readHeader(h);
+}
+
+function pickStatus(raw: unknown): OfferStatus {
+  const s = String(raw ?? OfferStatus.rascunho);
+  return (Object.values(OfferStatus).includes(s as OfferStatus)
+    ? (s as OfferStatus)
+    : OfferStatus.rascunho) as OfferStatus;
+}
+
+function toStringOrNull(v: unknown) {
+  const s = typeof v === 'string' ? v : v == null ? '' : String(v);
+  const out = s.trim();
+  return out ? out : null;
+}
+
+function toStringArrayOrNull(v: unknown): string[] | null {
+  if (!Array.isArray(v)) return null;
+  const arr = v.map((x) => String(x).trim()).filter(Boolean);
+  return arr;
+}
+
+function pickFirstFromArray(v: unknown): string | null {
+  if (!Array.isArray(v)) return null;
+  const first = v.find((x) => typeof x === 'string' && x.trim().length > 0);
+  return first ? String(first).trim() : null;
+}
+
+export async function GET(_req: NextRequest, context: Ctx) {
+  const session = await requireMaster();
+  if (!session) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
+
+  const { id } = await context.params;
+  const cleanId = String(id ?? '').trim();
+  if (!cleanId) return NextResponse.json({ ok: false, error: 'missing_id' }, { status: 400 });
 
   try {
-    const { id } = await context.params;
+    const offer = await prisma.offer.findUnique({ where: { id: cleanId } });
+    if (!offer) return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 });
 
-    if (!id || typeof id !== 'string') {
-      return NextResponse.json({ ok: false, error: 'ID inválido' }, { status: 400 });
-    }
+    return NextResponse.json({ ok: true, offer }, { status: 200 });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ ok: false, error: 'Falha ao carregar oferta', detail: message }, { status: 500 });
+  }
+}
+
+/**
+ * PATCH = atualização rápida (usado pelos ícones)
+ */
+export async function PATCH(req: NextRequest, context: Ctx) {
+  const session = await requireMaster();
+  if (!session) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
+
+  const { id } = await context.params;
+  const cleanId = String(id ?? '').trim();
+  if (!cleanId) return NextResponse.json({ ok: false, error: 'missing_id' }, { status: 400 });
+
+  try {
+    const before = await prisma.offer.findUnique({ where: { id: cleanId } });
+    if (!before) return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 });
 
     const bodyRaw: unknown = await req.json().catch(() => null);
     const body = isPlainObject(bodyRaw) ? bodyRaw : {};
 
-    const data: Prisma.OfferUpdateInput = {};
+    const status = Object.prototype.hasOwnProperty.call(body, 'status') ? pickStatus(body.status) : before.status;
 
-    if (typeof body.status === 'string') {
-      const status = body.status as OfferStatus;
-      if (!allowed.has(status)) {
-        return NextResponse.json({ ok: false, error: 'Status inválido' }, { status: 400 });
-      }
-      data.status = status;
-    }
+    const imageUrlsFromBody = Object.prototype.hasOwnProperty.call(body, 'imageUrls')
+      ? toStringArrayOrNull(body.imageUrls)
+      : null;
 
-    if (typeof body.title === 'string') data.title = body.title.trim();
-    if (typeof body.partnerName === 'string') data.partnerName = body.partnerName.trim();
-    if (typeof body.city === 'string') data.city = body.city.trim();
-    if (typeof body.categoryId === 'string') data.categoryId = body.categoryId.trim();
-    if (typeof body.description === 'string' || body.description === null)
-      data.description = body.description;
-    if (typeof body.imageUrl === 'string' || body.imageUrl === null)
-      data.imageUrl = body.imageUrl;
-    if (typeof body.priceText === 'string' || body.priceText === null)
-      data.priceText = body.priceText;
+    const compatImageUrlFromBody = Object.prototype.hasOwnProperty.call(body, 'imageUrl')
+      ? toStringOrNull(body.imageUrl)
+      : null;
 
-    if (Object.keys(data).length === 0) {
-      return NextResponse.json({ ok: false, error: 'Nada para atualizar' }, { status: 400 });
-    }
+    const finalImageUrls =
+      imageUrlsFromBody !== null
+        ? imageUrlsFromBody
+        : Array.isArray(before.imageUrls)
+          ? before.imageUrls
+          : [];
+
+    const imageUrl =
+      (finalImageUrls.length ? finalImageUrls[0] : null) ??
+      compatImageUrlFromBody ??
+      before.imageUrl ??
+      pickFirstFromArray(before.imageUrls) ??
+      null;
+
+    const updated = await prisma.offer.update({
+      where: { id: cleanId },
+      data: {
+        status,
+        imageUrl,
+        imageUrls: { set: finalImageUrls },
+      },
+    });
 
     const tenantId = await getTenantId();
 
-    const result = await prisma.$transaction(async (tx) => {
-      const prev = await tx.offer.findUnique({
-        where: { id },
-        select: { id: true, status: true },
-      });
-
-      if (!prev) return { kind: 'not_found' as const };
-
-      const updated = await tx.offer.update({
-        where: { id },
-        data,
-      });
-
-      await tx.adminAuditLog.create({
-        data: {
-          tenantId,
-          actorRole: session.role,
-          actorName: session.userName ?? null,
-          action: 'OFFER_UPDATED',
-          entityType: 'offer',
-          entityId: id,
-          before: prev as Prisma.InputJsonValue,
-          after: updated as Prisma.InputJsonValue,
-        },
-      });
-
-      return { kind: 'ok' as const, updated };
+    await prisma.adminAuditLog.create({
+      data: {
+        tenantId,
+        actorRole: session.role,
+        actorName: session.userName ?? null,
+        action: 'OFFER_UPDATED',
+        entityType: 'offer',
+        entityId: updated.id,
+        before: before as unknown as Prisma.InputJsonValue,
+        after: updated as unknown as Prisma.InputJsonValue,
+      },
     });
 
-    if (result.kind === 'not_found') {
-      return NextResponse.json({ ok: false, error: 'Oferta não encontrada' }, { status: 404 });
-    }
-
-    return NextResponse.json({ ok: true, item: result.updated }, { status: 200 });
+    return NextResponse.json({ ok: true, offer: updated }, { status: 200 });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : String(e);
-    return NextResponse.json(
-      { ok: false, error: message || 'Erro ao atualizar oferta' },
-      { status: 500 }
-    );
+    return NextResponse.json({ ok: false, error: 'Falha ao atualizar oferta', detail: message }, { status: 500 });
+  }
+}
+
+export async function PUT(req: NextRequest, context: Ctx) {
+  const session = await requireMaster();
+  if (!session) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
+
+  const { id } = await context.params;
+  const cleanId = String(id ?? '').trim();
+  if (!cleanId) return NextResponse.json({ ok: false, error: 'missing_id' }, { status: 400 });
+
+  try {
+    const before = await prisma.offer.findUnique({ where: { id: cleanId } });
+    if (!before) return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 });
+
+    const bodyRaw: unknown = await req.json().catch(() => null);
+    const body = isPlainObject(bodyRaw) ? bodyRaw : {};
+
+    const title = String(body.title ?? before.title).trim();
+    const partnerName = String(body.partnerName ?? before.partnerName).trim();
+    const city = String(body.city ?? before.city).trim();
+    const categoryId = String(body.categoryId ?? before.categoryId).trim();
+    const status = Object.prototype.hasOwnProperty.call(body, 'status') ? pickStatus(body.status) : before.status;
+
+    const description = Object.prototype.hasOwnProperty.call(body, 'description')
+      ? toStringOrNull(body.description)
+      : before.description ?? null;
+
+    const priceText = Object.prototype.hasOwnProperty.call(body, 'priceText')
+      ? toStringOrNull(body.priceText)
+      : before.priceText ?? null;
+
+    const imageUrlsFromBody = Object.prototype.hasOwnProperty.call(body, 'imageUrls')
+      ? toStringArrayOrNull(body.imageUrls)
+      : null;
+
+    const imageUrlFallback = Object.prototype.hasOwnProperty.call(body, 'imageUrl')
+      ? toStringOrNull(body.imageUrl)
+      : null;
+
+    const finalImageUrls =
+      imageUrlsFromBody !== null
+        ? imageUrlsFromBody
+        : Array.isArray(before.imageUrls)
+          ? before.imageUrls
+          : [];
+
+    const imageUrl = (finalImageUrls.length ? finalImageUrls[0] : null) ?? imageUrlFallback ?? before.imageUrl ?? null;
+
+    if (title.length < 4) return NextResponse.json({ ok: false, error: 'Título inválido' }, { status: 400 });
+    if (!partnerName) return NextResponse.json({ ok: false, error: 'Parceiro é obrigatório' }, { status: 400 });
+    if (!city) return NextResponse.json({ ok: false, error: 'Cidade é obrigatória' }, { status: 400 });
+    if (!categoryId) return NextResponse.json({ ok: false, error: 'Categoria é obrigatória' }, { status: 400 });
+
+    const updated = await prisma.offer.update({
+      where: { id: cleanId },
+      data: {
+        title,
+        partnerName,
+        city,
+        categoryId,
+        status,
+        description,
+        priceText,
+        imageUrl,
+        imageUrls: { set: finalImageUrls },
+      },
+    });
+
+    const tenantId = await getTenantId();
+
+    await prisma.adminAuditLog.create({
+      data: {
+        tenantId,
+        actorRole: session.role,
+        actorName: session.userName ?? null,
+        action: 'OFFER_UPDATED',
+        entityType: 'offer',
+        entityId: updated.id,
+        before: before as unknown as Prisma.InputJsonValue,
+        after: updated as unknown as Prisma.InputJsonValue,
+      },
+    });
+
+    return NextResponse.json({ ok: true, offer: updated }, { status: 200 });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ ok: false, error: 'Falha ao salvar oferta', detail: message }, { status: 500 });
+  }
+}
+
+export async function DELETE(_req: NextRequest, context: Ctx) {
+  const session = await requireMaster();
+  if (!session) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
+
+  const { id } = await context.params;
+  const cleanId = String(id ?? '').trim();
+  if (!cleanId) return NextResponse.json({ ok: false, error: 'missing_id' }, { status: 400 });
+
+  try {
+    const before = await prisma.offer.findUnique({ where: { id: cleanId } });
+    if (!before) return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 });
+
+    if (before.status !== OfferStatus.lixeira) {
+      return NextResponse.json(
+        { ok: false, error: 'Só é permitido excluir definitivamente ofertas na lixeira.' },
+        { status: 400 }
+      );
+    }
+
+    await prisma.offer.delete({ where: { id: cleanId } });
+
+    const tenantId = await getTenantId();
+
+    await prisma.adminAuditLog.create({
+      data: {
+        tenantId,
+        actorRole: session.role,
+        actorName: session.userName ?? null,
+        action: 'OFFER_DELETED',
+        entityType: 'offer',
+        entityId: cleanId,
+        before: before as unknown as Prisma.InputJsonValue,
+        after: Prisma.JsonNull,
+      },
+    });
+
+    return NextResponse.json({ ok: true }, { status: 200 });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ ok: false, error: 'Falha ao excluir oferta', detail: message }, { status: 500 });
   }
 }
