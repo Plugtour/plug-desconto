@@ -17,6 +17,13 @@ import {
   User,
   ChevronDown,
   FileText,
+  ShoppingCart,
+  Settings,
+  BarChart3,
+  BadgePercent,
+  Store,
+  UserCircle2,
+  Users2,
 } from 'lucide-react';
 
 import ThemeToggle from '../../_components/ThemeToggle';
@@ -29,13 +36,9 @@ export default function AdminShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { session } = useAdminData();
 
-  // desktop: recolhido/expandido
   const [collapsed, setCollapsed] = useState(false);
-
-  // mobile: drawer aberto/fechado
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  // menu usuário (header)
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
 
@@ -43,20 +46,15 @@ export default function AdminShell({ children }: { children: ReactNode }) {
     try {
       const raw = localStorage.getItem(LS_KEY);
       if (raw === '1') setCollapsed(true);
-    } catch {
-      // ignore
-    }
+    } catch {}
   }, []);
 
   useEffect(() => {
     try {
       localStorage.setItem(LS_KEY, collapsed ? '1' : '0');
-    } catch {
-      // ignore
-    }
+    } catch {}
   }, [collapsed]);
 
-  // fecha dropdown ao clicar fora
   useEffect(() => {
     const onDown = (e: MouseEvent) => {
       if (!userMenuOpen) return;
@@ -69,7 +67,6 @@ export default function AdminShell({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('mousedown', onDown);
   }, [userMenuOpen]);
 
-  // fecha dropdown no ESC
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!userMenuOpen) return;
@@ -83,7 +80,7 @@ export default function AdminShell({ children }: { children: ReactNode }) {
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
     } catch {
-      // mesmo se falhar, tenta seguir
+      // ignore
     } finally {
       setUserMenuOpen(false);
       router.push('/entrar');
@@ -108,16 +105,13 @@ export default function AdminShell({ children }: { children: ReactNode }) {
     <div
       className={[
         'relative left-1/2 min-h-screen w-screen -translate-x-1/2',
-        // Light
         'bg-zinc-100 text-zinc-900',
-        // Dark
         'dark:bg-zinc-900 dark:text-zinc-100',
       ].join(' ')}
     >
       <div className="flex min-h-screen w-full gap-0">
-        {/* ===== DESKTOP SIDEBAR (colapsável) ===== */}
+        {/* ===== DESKTOP SIDEBAR ===== */}
         <div className="relative hidden md:flex min-h-screen">
-          {/* Linha alinhada com o fim do header (micro-ajuste fino) */}
           <div
             className={[
               'pointer-events-none absolute left-0 right-0 top-[63.25px] h-px',
@@ -131,17 +125,13 @@ export default function AdminShell({ children }: { children: ReactNode }) {
               'shrink-0 flex-col border-r',
               'transition-[width] duration-400 ease-in-out',
               sidebarW,
-              // Light
               'border-zinc-200 bg-white',
-              // Dark
               'dark:border-zinc-800 dark:bg-zinc-950',
             ].join(' ')}
           >
-            {/* removido border-b daqui para a linha não ficar duplicada */}
             <div className="px-6 py-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  {/* TÍTULO: anima o texto para evitar “pulo” ao abrir */}
                   <div className="text-sm font-semibold tracking-tight">
                     <span
                       className={[
@@ -166,7 +156,6 @@ export default function AdminShell({ children }: { children: ReactNode }) {
                     </span>
                   </div>
 
-                  {/* "Admin": mantém espaço e anima entrada para não “pular” */}
                   <div className="text-xs text-zinc-500">
                     <span
                       className={[
@@ -185,52 +174,128 @@ export default function AdminShell({ children }: { children: ReactNode }) {
               </div>
             </div>
 
-            <nav className="flex flex-1 flex-col gap-1 px-3 py-4 text-sm">
-              <NavItem
-                href="/admin"
-                icon={<LayoutDashboard className="h-4 w-4" />}
-                collapsed={collapsed}
-                active={isActive('/admin')}
-              >
-                Dashboard
-              </NavItem>
+            {/* ===== MENU (BLOCOS) ===== */}
+            <nav className="flex flex-1 flex-col px-3 py-4 text-sm">
+              {/* Bloco 1: Operação */}
+              <div className="flex flex-col gap-1">
+                <NavItem
+                  href="/admin"
+                  icon={<LayoutDashboard className="h-4 w-4" />}
+                  collapsed={collapsed}
+                  active={isActive('/admin')}
+                >
+                  Dashboard
+                </NavItem>
 
-              <NavItem
-                href="/admin/ofertas"
-                icon={<Tag className="h-4 w-4" />}
-                collapsed={collapsed}
-                active={isActive('/admin/ofertas')}
-              >
-                Ofertas
-              </NavItem>
+                <NavItem
+                  href="/admin/vendas"
+                  icon={<ShoppingCart className="h-4 w-4" />}
+                  collapsed={collapsed}
+                  active={isActive('/admin/vendas')}
+                >
+                  Vendas
+                </NavItem>
 
-              <NavItem
-                href="/admin/parceiros"
-                icon={<Users className="h-4 w-4" />}
-                collapsed={collapsed}
-                active={isActive('/admin/parceiros')}
-              >
-                Parceiros
-              </NavItem>
+                <NavItem
+                  href="/admin/ofertas"
+                  icon={<Tag className="h-4 w-4" />}
+                  collapsed={collapsed}
+                  active={isActive('/admin/ofertas')}
+                >
+                  Ofertas
+                </NavItem>
+              </div>
 
-              <NavItem
-                href="/admin/afiliados"
-                icon={<Users className="h-4 w-4" />}
-                collapsed={collapsed}
-                active={isActive('/admin/afiliados')}
-              >
-                Afiliados
-              </NavItem>
+              <MenuDivider collapsed={collapsed} />
 
-              {/* ✅ NOVO: LOGS */}
-              <NavItem
-                href="/admin/logs"
-                icon={<FileText className="h-4 w-4" />}
-                collapsed={collapsed}
-                active={isActive('/admin/logs')}
-              >
-                Logs
-              </NavItem>
+              {/* Bloco 2: Cadastros */}
+              <div className="flex flex-col gap-1">
+                <NavItem
+                  href="/admin/parceiros"
+                  icon={<Users className="h-4 w-4" />}
+                  collapsed={collapsed}
+                  active={isActive('/admin/parceiros')}
+                >
+                  Parceiros
+                </NavItem>
+
+                <NavItem
+                  href="/admin/afiliados"
+                  icon={<Users className="h-4 w-4" />}
+                  collapsed={collapsed}
+                  active={isActive('/admin/afiliados')}
+                >
+                  Afiliados
+                </NavItem>
+
+                <NavItem
+                  href="/admin/clientes"
+                  icon={<Users2 className="h-4 w-4" />}
+                  collapsed={collapsed}
+                  active={isActive('/admin/clientes')}
+                >
+                  Clientes
+                </NavItem>
+
+                <NavItem
+                  href="/admin/embaixadores"
+                  icon={<UserCircle2 className="h-4 w-4" />}
+                  collapsed={collapsed}
+                  active={isActive('/admin/embaixadores')}
+                >
+                  Embaixadores
+                </NavItem>
+
+                <NavItem
+                  href="/admin/franquiados"
+                  icon={<Store className="h-4 w-4" />}
+                  collapsed={collapsed}
+                  active={isActive('/admin/franquiados')}
+                >
+                  Franquiados
+                </NavItem>
+              </div>
+
+              <MenuDivider collapsed={collapsed} />
+
+              {/* Bloco 3: Gestão */}
+              <div className="flex flex-col gap-1">
+                <NavItem
+                  href="/admin/patrocinados"
+                  icon={<BadgePercent className="h-4 w-4" />}
+                  collapsed={collapsed}
+                  active={isActive('/admin/patrocinados')}
+                >
+                  Patrocinados
+                </NavItem>
+
+                <NavItem
+                  href="/admin/relatorios"
+                  icon={<BarChart3 className="h-4 w-4" />}
+                  collapsed={collapsed}
+                  active={isActive('/admin/relatorios')}
+                >
+                  Relatórios
+                </NavItem>
+
+                <NavItem
+                  href="/admin/logs"
+                  icon={<FileText className="h-4 w-4" />}
+                  collapsed={collapsed}
+                  active={isActive('/admin/logs')}
+                >
+                  Logs
+                </NavItem>
+
+                <NavItem
+                  href="/admin/configuracoes"
+                  icon={<Settings className="h-4 w-4" />}
+                  collapsed={collapsed}
+                  active={isActive('/admin/configuracoes')}
+                >
+                  Configurações
+                </NavItem>
+              </div>
             </nav>
 
             <div className="border-t border-zinc-200 px-3 py-3 dark:border-zinc-800">
@@ -240,9 +305,7 @@ export default function AdminShell({ children }: { children: ReactNode }) {
                 className={[
                   'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs transition',
                   collapsed ? 'justify-center' : '',
-                  // Light
                   'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900',
-                  // Dark
                   'dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-100',
                 ].join(' ')}
                 title="Sair"
@@ -254,7 +317,7 @@ export default function AdminShell({ children }: { children: ReactNode }) {
             </div>
           </aside>
 
-          {/* ===== BOTÃO EXTERNO (FORA DO MENU) ===== */}
+          {/* ===== BOTÃO EXTERNO ===== */}
           <button
             type="button"
             onClick={() => setCollapsed((v) => !v)}
@@ -264,9 +327,7 @@ export default function AdminShell({ children }: { children: ReactNode }) {
               'border bg-white shadow-md',
               'transition-all duration-300 ease-in-out',
               'hover:scale-105',
-              // Light
               'border-zinc-200 text-zinc-600 hover:bg-zinc-50',
-              // Dark
               'dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-900',
             ].join(' ')}
             aria-label={collapsed ? 'Expandir menu' : 'Recolher menu'}
@@ -285,7 +346,6 @@ export default function AdminShell({ children }: { children: ReactNode }) {
           ].join(' ')}
           aria-hidden={!mobileOpen}
         >
-          {/* overlay */}
           <div
             onClick={() => setMobileOpen(false)}
             className={[
@@ -294,16 +354,13 @@ export default function AdminShell({ children }: { children: ReactNode }) {
             ].join(' ')}
           />
 
-          {/* panel */}
           <aside
             className={[
               'absolute left-0 top-0 h-full w-80 max-w-[85vw]',
               'border-r',
               'transition-transform duration-400 ease-in-out',
               mobileOpen ? 'translate-x-0' : '-translate-x-full',
-              // Light
               'border-zinc-200 bg-white',
-              // Dark
               'dark:border-zinc-800 dark:bg-zinc-950',
             ].join(' ')}
           >
@@ -319,9 +376,7 @@ export default function AdminShell({ children }: { children: ReactNode }) {
                   onClick={() => setMobileOpen(false)}
                   className={[
                     'inline-flex h-8 w-8 items-center justify-center rounded-lg transition',
-                    // Light
                     'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900',
-                    // Dark
                     'dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-100',
                   ].join(' ')}
                   aria-label="Fechar menu"
@@ -337,39 +392,107 @@ export default function AdminShell({ children }: { children: ReactNode }) {
               </div>
             </div>
 
-            <nav className="flex flex-1 flex-col gap-1 px-4 py-4 text-sm">
-              <NavItemMobile href="/admin" icon={<LayoutDashboard className="h-4 w-4" />} active={isActive('/admin')}>
-                Dashboard
-              </NavItemMobile>
+            <nav className="flex flex-1 flex-col px-4 py-4 text-sm">
+              {/* Bloco 1 */}
+              <div className="flex flex-col gap-1">
+                <NavItemMobile href="/admin" icon={<LayoutDashboard className="h-4 w-4" />} active={isActive('/admin')}>
+                  Dashboard
+                </NavItemMobile>
 
-              <NavItemMobile
-                href="/admin/ofertas"
-                icon={<Tag className="h-4 w-4" />}
-                active={isActive('/admin/ofertas')}
-              >
-                Ofertas
-              </NavItemMobile>
+                <NavItemMobile
+                  href="/admin/vendas"
+                  icon={<ShoppingCart className="h-4 w-4" />}
+                  active={isActive('/admin/vendas')}
+                >
+                  Vendas
+                </NavItemMobile>
 
-              <NavItemMobile
-                href="/admin/parceiros"
-                icon={<Users className="h-4 w-4" />}
-                active={isActive('/admin/parceiros')}
-              >
-                Parceiros
-              </NavItemMobile>
+                <NavItemMobile
+                  href="/admin/ofertas"
+                  icon={<Tag className="h-4 w-4" />}
+                  active={isActive('/admin/ofertas')}
+                >
+                  Ofertas
+                </NavItemMobile>
+              </div>
 
-              <NavItemMobile
-                href="/admin/afiliados"
-                icon={<Users className="h-4 w-4" />}
-                active={isActive('/admin/afiliados')}
-              >
-                Afiliados
-              </NavItemMobile>
+              <MenuDividerMobile />
 
-              {/* ✅ NOVO: LOGS */}
-              <NavItemMobile href="/admin/logs" icon={<FileText className="h-4 w-4" />} active={isActive('/admin/logs')}>
-                Logs
-              </NavItemMobile>
+              {/* Bloco 2 */}
+              <div className="flex flex-col gap-1">
+                <NavItemMobile
+                  href="/admin/parceiros"
+                  icon={<Users className="h-4 w-4" />}
+                  active={isActive('/admin/parceiros')}
+                >
+                  Parceiros
+                </NavItemMobile>
+
+                <NavItemMobile
+                  href="/admin/afiliados"
+                  icon={<Users className="h-4 w-4" />}
+                  active={isActive('/admin/afiliados')}
+                >
+                  Afiliados
+                </NavItemMobile>
+
+                <NavItemMobile
+                  href="/admin/clientes"
+                  icon={<Users2 className="h-4 w-4" />}
+                  active={isActive('/admin/clientes')}
+                >
+                  Clientes
+                </NavItemMobile>
+
+                <NavItemMobile
+                  href="/admin/embaixadores"
+                  icon={<UserCircle2 className="h-4 w-4" />}
+                  active={isActive('/admin/embaixadores')}
+                >
+                  Embaixadores
+                </NavItemMobile>
+
+                <NavItemMobile
+                  href="/admin/franquiados"
+                  icon={<Store className="h-4 w-4" />}
+                  active={isActive('/admin/franquiados')}
+                >
+                  Franquiados
+                </NavItemMobile>
+              </div>
+
+              <MenuDividerMobile />
+
+              {/* Bloco 3 */}
+              <div className="flex flex-col gap-1">
+                <NavItemMobile
+                  href="/admin/patrocinados"
+                  icon={<BadgePercent className="h-4 w-4" />}
+                  active={isActive('/admin/patrocinados')}
+                >
+                  Patrocinados
+                </NavItemMobile>
+
+                <NavItemMobile
+                  href="/admin/relatorios"
+                  icon={<BarChart3 className="h-4 w-4" />}
+                  active={isActive('/admin/relatorios')}
+                >
+                  Relatórios
+                </NavItemMobile>
+
+                <NavItemMobile href="/admin/logs" icon={<FileText className="h-4 w-4" />} active={isActive('/admin/logs')}>
+                  Logs
+                </NavItemMobile>
+
+                <NavItemMobile
+                  href="/admin/configuracoes"
+                  icon={<Settings className="h-4 w-4" />}
+                  active={isActive('/admin/configuracoes')}
+                >
+                  Configurações
+                </NavItemMobile>
+              </div>
             </nav>
 
             <div className="border-t border-zinc-200 px-4 py-3 dark:border-zinc-800">
@@ -378,9 +501,7 @@ export default function AdminShell({ children }: { children: ReactNode }) {
                 onClick={onLogout}
                 className={[
                   'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs transition',
-                  // Light
                   'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900',
-                  // Dark
                   'dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-100',
                 ].join(' ')}
               >
@@ -393,7 +514,6 @@ export default function AdminShell({ children }: { children: ReactNode }) {
 
         {/* ===== CONTEÚDO ===== */}
         <div className="flex min-w-0 flex-1 flex-col">
-          {/* TOPO */}
           <header
             className={[
               'sticky top-0 z-10 backdrop-blur',
@@ -407,15 +527,12 @@ export default function AdminShell({ children }: { children: ReactNode }) {
           >
             <div className="flex h-full w-full items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                {/* mobile menu button */}
                 <button
                   type="button"
                   onClick={() => setMobileOpen(true)}
                   className={[
                     'md:hidden inline-flex h-9 w-9 items-center justify-center rounded-lg transition',
-                    // Light
                     'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900',
-                    // Dark
                     'dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-100',
                   ].join(' ')}
                   aria-label="Abrir menu"
@@ -427,16 +544,13 @@ export default function AdminShell({ children }: { children: ReactNode }) {
                 <div className="text-sm font-medium">Painel Administrativo</div>
               </div>
 
-              {/* ===== USER DROPDOWN ===== */}
               <div className="relative" ref={userMenuRef}>
                 <button
                   type="button"
                   onClick={() => setUserMenuOpen((v) => !v)}
                   className={[
                     'inline-flex items-center gap-2 rounded-lg p-1 transition',
-                    // Light
                     'text-zinc-700 hover:bg-zinc-100',
-                    // Dark
                     'dark:text-zinc-200 dark:hover:bg-zinc-900',
                   ].join(' ')}
                   aria-label="Abrir menu do usuário"
@@ -452,9 +566,7 @@ export default function AdminShell({ children }: { children: ReactNode }) {
                   <div
                     className={[
                       'absolute right-0 mt-2 w-64 overflow-hidden rounded-xl border shadow-lg',
-                      // Light
                       'border-zinc-200 bg-white',
-                      // Dark
                       'dark:border-zinc-800 dark:bg-zinc-950',
                     ].join(' ')}
                   >
@@ -480,9 +592,7 @@ export default function AdminShell({ children }: { children: ReactNode }) {
                         onClick={onLogout}
                         className={[
                           'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs transition',
-                          // Light
                           'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900',
-                          // Dark
                           'dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-100',
                         ].join(' ')}
                       >
@@ -496,7 +606,6 @@ export default function AdminShell({ children }: { children: ReactNode }) {
             </div>
           </header>
 
-          {/* MAIN */}
           <main className="flex-1 px-6 py-6">
             <div className="w-full">{children}</div>
           </main>
@@ -504,6 +613,18 @@ export default function AdminShell({ children }: { children: ReactNode }) {
       </div>
     </div>
   );
+}
+
+function MenuDivider({ collapsed }: { collapsed: boolean }) {
+  return (
+    <div className={collapsed ? 'px-4' : 'px-3'}>
+      <div className="my-4 h-px w-full bg-zinc-200/70 dark:bg-zinc-800/70" />
+    </div>
+  );
+}
+
+function MenuDividerMobile() {
+  return <div className="my-4 h-px w-full bg-zinc-200/70 dark:bg-zinc-800/70" />;
 }
 
 function NavItem({
@@ -526,8 +647,6 @@ function NavItem({
       className={[
         'flex items-center rounded-lg px-3 py-2 transition',
         collapsed ? 'justify-center' : 'gap-3',
-
-        // ACTIVE: mesmo estilo do hover, porém fixo
         active
           ? 'bg-zinc-100 text-zinc-900 dark:bg-zinc-900 dark:text-zinc-100'
           : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-100',
@@ -535,11 +654,7 @@ function NavItem({
       aria-current={active ? 'page' : undefined}
     >
       {icon}
-
-      {/* quando colapsado, mantém acessível */}
       {collapsed && <span className="sr-only">{children}</span>}
-
-      {/* texto animado (delay) para não “pular” ao abrir */}
       <span
         className={[
           'overflow-hidden whitespace-nowrap',
@@ -570,8 +685,6 @@ function NavItemMobile({
       href={href}
       className={[
         'flex items-center gap-3 rounded-lg px-3 py-2 transition',
-
-        // ACTIVE: mesmo estilo do hover, porém fixo
         active
           ? 'bg-zinc-100 text-zinc-900 dark:bg-zinc-900 dark:text-zinc-100'
           : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-100',
