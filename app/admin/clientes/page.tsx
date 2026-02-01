@@ -1,10 +1,9 @@
-import { Users2 } from 'lucide-react';
 import { Header, Kpi, Placeholder } from '../_components/AdminPageUI';
 
 export default function AdminClientesPage() {
   return (
     <div className="w-full space-y-6">
-      <Header  title="Clientes" description="Base de usuários e histórico de consumo." />
+      <Header title="Clientes" description="Base de usuários e histórico de consumo." />
 
       <div className="grid gap-4 md:grid-cols-4">
         <Kpi title="Clientes ativos" value="—" />

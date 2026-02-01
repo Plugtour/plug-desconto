@@ -6,10 +6,21 @@ import type {
   OfferStatus,
   AffiliateStatus,
   PartnerStatus,
+  AmbassadorStatus,
+  FranchiseeStatus,
   AdminPartnerRow as MappedPartnerRow,
   AdminAffiliateRow as MappedAffiliateRow,
+  AdminAmbassadorRow as MappedAmbassadorRow,
+  AdminFranchiseeRow as MappedFranchiseeRow,
 } from '../_data/adminMappers';
-import { mapPartner, mapAffiliate, mapDbOfferToAdminRow } from '../_data/adminMappers';
+
+import {
+  mapPartner,
+  mapAffiliate,
+  mapAmbassador,
+  mapFranchisee,
+  mapDbOfferToAdminRow,
+} from '../_data/adminMappers';
 
 type AdminOfferRow = {
   id: string;
@@ -23,8 +34,9 @@ type AdminOfferRow = {
 
 type AdminPartnerRow = MappedPartnerRow;
 type AdminAffiliateRow = MappedAffiliateRow;
+type AdminAmbassadorRow = MappedAmbassadorRow;
+type AdminFranchiseeRow = MappedFranchiseeRow;
 
-// ✅ sessão para o AdminShell mostrar "Logado como"
 type SessionRole = 'guest' | 'user' | 'affiliate' | 'partner' | 'master';
 type Session = {
   role: SessionRole;
@@ -57,12 +69,39 @@ type UpdatePartnerInput = {
   observacoes?: string | null;
 };
 
+// ✅ Embaixadores
+type CreateAmbassadorInput = {
+  nome: string;
+  email: string;
+  whatsapp: string;
+  codigo: string;
+  imageUrl?: string | null;
+  status: AmbassadorStatus;
+};
+
+type UpdateAmbassadorInput = CreateAmbassadorInput & { id: string };
+
+// ✅ Franquiados
+type CreateFranchiseeInput = {
+  nome: string;
+  cidade: string;
+  whatsapp: string;
+  imageUrl?: string | null;
+  status: FranchiseeStatus;
+};
+
+type UpdateFranchiseeInput = CreateFranchiseeInput & { id: string };
+
 type AdminDataContextValue = {
   session: Session | null;
 
   offers: AdminOfferRow[];
   partners: AdminPartnerRow[];
   affiliates: AdminAffiliateRow[];
+
+  // ✅ novos
+  ambassadors: AdminAmbassadorRow[];
+  franchisees: AdminFranchiseeRow[];
 
   refreshOffers: () => Promise<void>;
   refreshSession: () => Promise<void>;
@@ -77,16 +116,28 @@ type AdminDataContextValue = {
   emptyPartnersTrash: () => void;
   emptyAffiliatesTrash: () => void;
 
+  // ✅ novos (status + lixeira)
+  setAmbassadorStatus: (id: string, status: AmbassadorStatus) => void;
+  emptyAmbassadorsTrash: () => void;
+  deleteAmbassadorForever: (id: string) => void;
+
+  setFranchiseeStatus: (id: string, status: FranchiseeStatus) => void;
+  emptyFranchiseesTrash: () => void;
+  deleteFranchiseeForever: (id: string) => void;
+
   /** Recarrega listas locais (sem mock) */
   refreshMockLists: () => void;
 
   createPartner: (input: CreatePartnerInput) => AdminPartnerRow;
-
-  /** ✅ editar parceiro (persistente) */
   updatePartner: (input: UpdatePartnerInput) => AdminPartnerRow | null;
-
-  /** ✅ excluir definitivo (remove do localStorage) */
   deletePartnerForever: (id: string) => void;
+
+  // ✅ novos (CRUD)
+  createAmbassador: (input: CreateAmbassadorInput) => AdminAmbassadorRow;
+  updateAmbassador: (input: UpdateAmbassadorInput) => AdminAmbassadorRow | null;
+
+  createFranchisee: (input: CreateFranchiseeInput) => AdminFranchiseeRow;
+  updateFranchisee: (input: UpdateFranchiseeInput) => AdminFranchiseeRow | null;
 };
 
 const AdminDataContext = createContext<AdminDataContextValue | null>(null);
@@ -99,6 +150,10 @@ async function fetchJson(url: string, init?: RequestInit) {
 
 const LS_PARTNERS_KEY = 'pd_admin_partners_v1';
 const LS_AFFILIATES_KEY = 'pd_admin_affiliates_v1';
+
+// ✅ novos
+const LS_AMBASSADORS_KEY = 'pd_admin_ambassadors_v1';
+const LS_FRANCHISEES_KEY = 'pd_admin_franchisees_v1';
 
 function safeParseArray(raw: string | null) {
   if (!raw) return [];
@@ -156,6 +211,11 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
   const [offers, setOffers] = useState<AdminOfferRow[]>([]);
   const [partners, setPartners] = useState<AdminPartnerRow[]>([]);
   const [affiliates, setAffiliates] = useState<AdminAffiliateRow[]>([]);
+
+  // ✅ novos
+  const [ambassadors, setAmbassadors] = useState<AdminAmbassadorRow[]>([]);
+  const [franchisees, setFranchisees] = useState<AdminFranchiseeRow[]>([]);
+
   const [loaded, setLoaded] = useState(false);
 
   const refreshSession = async () => {
@@ -181,22 +241,30 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
 
   /**
    * ✅ IMPORTANTE:
-   * Parceiros e afiliados vêm SOMENTE do localStorage.
+   * Parceiros, afiliados, embaixadores e franquiados vêm SOMENTE do localStorage.
    */
   const refreshMockLists = () => {
     let lsPartners: AdminPartnerRow[] = [];
     let lsAffiliates: AdminAffiliateRow[] = [];
+    let lsAmbassadors: AdminAmbassadorRow[] = [];
+    let lsFranchisees: AdminFranchiseeRow[] = [];
 
     if (typeof window !== 'undefined') {
       const rawP = window.localStorage.getItem(LS_PARTNERS_KEY);
       const rawA = window.localStorage.getItem(LS_AFFILIATES_KEY);
+      const rawAm = window.localStorage.getItem(LS_AMBASSADORS_KEY);
+      const rawF = window.localStorage.getItem(LS_FRANCHISEES_KEY);
 
       lsPartners = safeParseArray(rawP).map((p) => mapPartner(p)) as AdminPartnerRow[];
       lsAffiliates = safeParseArray(rawA).map((a) => mapAffiliate(a)) as AdminAffiliateRow[];
+      lsAmbassadors = safeParseArray(rawAm).map((a) => mapAmbassador(a)) as AdminAmbassadorRow[];
+      lsFranchisees = safeParseArray(rawF).map((f) => mapFranchisee(f)) as AdminFranchiseeRow[];
     }
 
     setPartners(lsPartners);
     setAffiliates(lsAffiliates);
+    setAmbassadors(lsAmbassadors);
+    setFranchisees(lsFranchisees);
   };
 
   useEffect(() => {
@@ -277,6 +345,10 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
     removeFromLsByStatus(LS_AFFILIATES_KEY, 'lixeira');
   };
 
+  // =========================
+  // PARTNERS (CRUD)
+  // =========================
+
   const createPartner = (input: CreatePartnerInput) => {
     const id = makeId('partner');
     const now = new Date().toISOString();
@@ -318,7 +390,6 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
 
     const now = new Date().toISOString();
 
-    // atualiza LS (fonte de verdade)
     if (typeof window !== 'undefined') {
       const raw = window.localStorage.getItem(LS_PARTNERS_KEY);
       const arr = safeParseArray(raw);
@@ -344,7 +415,6 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
       writeLsArray(LS_PARTNERS_KEY, next);
     }
 
-    // atualiza UI sem esperar reload
     let mapped: AdminPartnerRow | null = null;
     setPartners((prev) => {
       const next = prev.map((p) => {
@@ -380,6 +450,203 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
     removeFromLsById(LS_PARTNERS_KEY, rid);
   };
 
+  // =========================
+  // AMBASSADORS (CRUD + status)
+  // =========================
+
+  const setAmbassadorStatus = (id: string, status: AmbassadorStatus) => {
+    setAmbassadors((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)));
+    updateLsRowStatus(LS_AMBASSADORS_KEY, id, status);
+  };
+
+  const emptyAmbassadorsTrash = () => {
+    setAmbassadors((prev) => prev.filter((a) => a.status !== 'lixeira'));
+    removeFromLsByStatus(LS_AMBASSADORS_KEY, 'lixeira');
+  };
+
+  const deleteAmbassadorForever = (id: string) => {
+    const rid = String(id ?? '').trim();
+    if (!rid) return;
+
+    setAmbassadors((prev) => prev.filter((a) => a.id !== rid));
+    removeFromLsById(LS_AMBASSADORS_KEY, rid);
+  };
+
+  const createAmbassador = (input: CreateAmbassadorInput) => {
+    const id = makeId('ambassador');
+    const now = new Date().toISOString();
+
+    const payload: any = {
+      id,
+      nome: String(input.nome ?? '').trim(),
+      email: String(input.email ?? '').trim(),
+      whatsapp: String(input.whatsapp ?? '').trim(),
+      codigo: String(input.codigo ?? '').trim(),
+      imageUrl: (input.imageUrl ?? '').toString().trim() || null,
+      status: input.status ?? 'rascunho',
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    if (typeof window !== 'undefined') {
+      const raw = window.localStorage.getItem(LS_AMBASSADORS_KEY);
+      const arr = safeParseArray(raw);
+      writeLsArray(LS_AMBASSADORS_KEY, [payload, ...arr]);
+    }
+
+    const mapped = mapAmbassador(payload) as AdminAmbassadorRow;
+    setAmbassadors((prev) => [mapped, ...prev.filter((a) => a.id !== mapped.id)]);
+    return mapped;
+  };
+
+  const updateAmbassador = (input: UpdateAmbassadorInput) => {
+    const id = String(input.id ?? '').trim();
+    if (!id) return null;
+
+    const now = new Date().toISOString();
+
+    if (typeof window !== 'undefined') {
+      const raw = window.localStorage.getItem(LS_AMBASSADORS_KEY);
+      const arr = safeParseArray(raw);
+
+      const next = arr.map((a: any) => {
+        if (String(a?.id ?? '') !== id) return a;
+        return {
+          ...a,
+          nome: String(input.nome ?? '').trim(),
+          email: String(input.email ?? '').trim(),
+          whatsapp: String(input.whatsapp ?? '').trim(),
+          codigo: String(input.codigo ?? '').trim(),
+          imageUrl: (input.imageUrl ?? '').toString().trim() || null,
+          status: input.status ?? a?.status ?? 'rascunho',
+          updatedAt: now,
+        };
+      });
+
+      writeLsArray(LS_AMBASSADORS_KEY, next);
+    }
+
+    let mapped: AdminAmbassadorRow | null = null;
+    setAmbassadors((prev) => {
+      const next = prev.map((a) => {
+        if (a.id !== id) return a;
+        const payload: any = {
+          ...a,
+          nome: String(input.nome ?? '').trim(),
+          email: String(input.email ?? '').trim(),
+          whatsapp: String(input.whatsapp ?? '').trim(),
+          codigo: String(input.codigo ?? '').trim(),
+          imageUrl: (input.imageUrl ?? '').toString().trim() || null,
+          status: input.status ?? a.status,
+          updatedAt: now,
+        };
+        const m = mapAmbassador(payload) as AdminAmbassadorRow;
+        mapped = m;
+        return m;
+      });
+      return next;
+    });
+
+    return mapped;
+  };
+
+  // =========================
+  // FRANCHISEES (CRUD + status)
+  // =========================
+
+  const setFranchiseeStatus = (id: string, status: FranchiseeStatus) => {
+    setFranchisees((prev) => prev.map((f) => (f.id === id ? { ...f, status } : f)));
+    updateLsRowStatus(LS_FRANCHISEES_KEY, id, status);
+  };
+
+  const emptyFranchiseesTrash = () => {
+    setFranchisees((prev) => prev.filter((f) => f.status !== 'lixeira'));
+    removeFromLsByStatus(LS_FRANCHISEES_KEY, 'lixeira');
+  };
+
+  const deleteFranchiseeForever = (id: string) => {
+    const rid = String(id ?? '').trim();
+    if (!rid) return;
+
+    setFranchisees((prev) => prev.filter((f) => f.id !== rid));
+    removeFromLsById(LS_FRANCHISEES_KEY, rid);
+  };
+
+  const createFranchisee = (input: CreateFranchiseeInput) => {
+    const id = makeId('franchisee');
+    const now = new Date().toISOString();
+
+    const payload: any = {
+      id,
+      nome: String(input.nome ?? '').trim(),
+      cidade: String(input.cidade ?? '').trim(),
+      whatsapp: String(input.whatsapp ?? '').trim(),
+      imageUrl: (input.imageUrl ?? '').toString().trim() || null,
+      status: input.status ?? 'rascunho',
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    if (typeof window !== 'undefined') {
+      const raw = window.localStorage.getItem(LS_FRANCHISEES_KEY);
+      const arr = safeParseArray(raw);
+      writeLsArray(LS_FRANCHISEES_KEY, [payload, ...arr]);
+    }
+
+    const mapped = mapFranchisee(payload) as AdminFranchiseeRow;
+    setFranchisees((prev) => [mapped, ...prev.filter((f) => f.id !== mapped.id)]);
+    return mapped;
+  };
+
+  const updateFranchisee = (input: UpdateFranchiseeInput) => {
+    const id = String(input.id ?? '').trim();
+    if (!id) return null;
+
+    const now = new Date().toISOString();
+
+    if (typeof window !== 'undefined') {
+      const raw = window.localStorage.getItem(LS_FRANCHISEES_KEY);
+      const arr = safeParseArray(raw);
+
+      const next = arr.map((f: any) => {
+        if (String(f?.id ?? '') !== id) return f;
+        return {
+          ...f,
+          nome: String(input.nome ?? '').trim(),
+          cidade: String(input.cidade ?? '').trim(),
+          whatsapp: String(input.whatsapp ?? '').trim(),
+          imageUrl: (input.imageUrl ?? '').toString().trim() || null,
+          status: input.status ?? f?.status ?? 'rascunho',
+          updatedAt: now,
+        };
+      });
+
+      writeLsArray(LS_FRANCHISEES_KEY, next);
+    }
+
+    let mapped: AdminFranchiseeRow | null = null;
+    setFranchisees((prev) => {
+      const next = prev.map((f) => {
+        if (f.id !== id) return f;
+        const payload: any = {
+          ...f,
+          nome: String(input.nome ?? '').trim(),
+          cidade: String(input.cidade ?? '').trim(),
+          whatsapp: String(input.whatsapp ?? '').trim(),
+          imageUrl: (input.imageUrl ?? '').toString().trim() || null,
+          status: input.status ?? f.status,
+          updatedAt: now,
+        };
+        const m = mapFranchisee(payload) as AdminFranchiseeRow;
+        mapped = m;
+        return m;
+      });
+      return next;
+    });
+
+    return mapped;
+  };
+
   const value = useMemo(
     () => ({
       session,
@@ -387,6 +654,9 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
       offers,
       partners,
       affiliates,
+
+      ambassadors,
+      franchisees,
 
       refreshOffers,
       refreshSession,
@@ -401,13 +671,27 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
       emptyPartnersTrash,
       emptyAffiliatesTrash,
 
+      setAmbassadorStatus,
+      emptyAmbassadorsTrash,
+      deleteAmbassadorForever,
+
+      setFranchiseeStatus,
+      emptyFranchiseesTrash,
+      deleteFranchiseeForever,
+
       refreshMockLists,
 
       createPartner,
       updatePartner,
       deletePartnerForever,
+
+      createAmbassador,
+      updateAmbassador,
+
+      createFranchisee,
+      updateFranchisee,
     }),
-    [session, offers, partners, affiliates]
+    [session, offers, partners, affiliates, ambassadors, franchisees]
   );
 
   return <AdminDataContext.Provider value={value}>{children}</AdminDataContext.Provider>;

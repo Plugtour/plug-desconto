@@ -32,6 +32,14 @@ function getLabel(status: Status) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+/**
+ * 🎨 Paleta unificada (igual ao Dashboard):
+ * - rascunho: sky
+ * - arquivado: rose
+ * - pausado: amber
+ * - publicado/ativo: emerald
+ * - lixeira: zinc
+ */
 function getClasses(status: Status) {
   const s = normalize(status);
 
@@ -55,6 +63,7 @@ function getClasses(status: Status) {
       ].join(' ');
 
     case 'arquivado':
+      // ✅ Arquivado = rose (igual ao Dashboard)
       return [
         base,
         'bg-rose-50 text-rose-800 border-rose-200',
@@ -69,10 +78,11 @@ function getClasses(status: Status) {
       ].join(' ');
 
     case 'lixeira':
+      // ✅ Lixeira = zinc (igual ao Dashboard)
       return [
         base,
         'bg-zinc-100 text-zinc-700 border-zinc-200',
-        'dark:bg-zinc-400/10 dark:text-zinc-200 dark:border-zinc-500/25',
+        'dark:bg-zinc-500/15 dark:text-zinc-200 dark:border-zinc-500/25',
       ].join(' ');
 
     case 'inativo':
@@ -85,8 +95,8 @@ function getClasses(status: Status) {
     case 'pendente':
       return [
         base,
-        'bg-violet-50 text-violet-800 border-violet-200',
-        'dark:bg-violet-500/15 dark:text-violet-200 dark:border-violet-500/25',
+        'bg-indigo-50 text-indigo-800 border-indigo-200',
+        'dark:bg-indigo-500/15 dark:text-indigo-200 dark:border-indigo-500/25',
       ].join(' ');
 
     default:

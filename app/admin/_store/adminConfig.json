@@ -1,0 +1,38 @@
+{
+  "destinos": [
+    {
+      "id": "dest_bymnf5gmkzmxbo7",
+      "nome": "Florianópolis",
+      "slug": "florianopolis",
+      "ativo": true,
+      "criadoEm": "2026-01-29T15:54:39.313Z",
+      "atualizadoEm": "2026-01-29T15:54:39.313Z"
+    },
+    {
+      "id": "dest_symabg4mkzn2n11",
+      "nome": "Gramado",
+      "slug": "gramado",
+      "ativo": true,
+      "criadoEm": "2026-01-29T15:58:47.317Z",
+      "atualizadoEm": "2026-01-29T15:58:47.317Z"
+    }
+  ],
+  "categorias": [
+    {
+      "id": "cat_kst8asbmkzn356l",
+      "nome": "Passeios",
+      "slug": "passeios",
+      "ativo": true,
+      "criadoEm": "2026-01-29T15:59:10.845Z",
+      "atualizadoEm": "2026-01-29T15:59:10.845Z"
+    },
+    {
+      "id": "cat_be2y8ndmkzn3bl6",
+      "nome": "Gastronomia",
+      "slug": "gastronomia",
+      "ativo": true,
+      "criadoEm": "2026-01-29T15:59:19.146Z",
+      "atualizadoEm": "2026-01-29T15:59:19.146Z"
+    }
+  ]
+}

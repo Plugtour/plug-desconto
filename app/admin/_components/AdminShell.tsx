@@ -24,6 +24,7 @@ import {
   Store,
   UserCircle2,
   Users2,
+  ExternalLink,
 } from 'lucide-react';
 
 import ThemeToggle from '../../_components/ThemeToggle';
@@ -93,6 +94,8 @@ export default function AdminShell({ children }: { children: ReactNode }) {
     return name ? name : 'Master';
   }, [session?.userName]);
 
+  // ✅ largura do sidebar (desktop)
+  // Antes: md:w-72 (288px). Agora: md:w-80 (320px) para ficar um pouco mais largo.
   const sidebarW = collapsed ? 'md:w-20' : 'md:w-80';
 
   const isActive = (href: string) => {
@@ -104,7 +107,7 @@ export default function AdminShell({ children }: { children: ReactNode }) {
   return (
     <div
       className={[
-        'relative left-1/2 min-h-screen w-screen -translate-x-1/2',
+        'min-h-screen w-full',
         'bg-zinc-100 text-zinc-900',
         'dark:bg-zinc-900 dark:text-zinc-100',
       ].join(' ')}
@@ -123,7 +126,7 @@ export default function AdminShell({ children }: { children: ReactNode }) {
             className={[
               'md:flex',
               'shrink-0 flex-col border-r',
-              'transition-[width] duration-400 ease-in-out',
+              'transition-[width] duration-300 ease-in-out',
               sidebarW,
               'border-zinc-200 bg-white',
               'dark:border-zinc-800 dark:bg-zinc-950',
@@ -149,7 +152,7 @@ export default function AdminShell({ children }: { children: ReactNode }) {
                         'transition-[max-width,opacity,transform] duration-300 ease-in-out',
                         collapsed
                           ? 'max-w-0 opacity-0 translate-x-1'
-                          : 'max-w-[220px] opacity-100 translate-x-0 delay-150',
+                          : 'max-w-[260px] opacity-100 translate-x-0 delay-150',
                       ].join(' ')}
                     >
                       Plug Desconto
@@ -161,9 +164,7 @@ export default function AdminShell({ children }: { children: ReactNode }) {
                       className={[
                         'inline-block overflow-hidden whitespace-nowrap',
                         'transition-[max-width,opacity,transform] duration-300 ease-in-out',
-                        collapsed
-                          ? 'max-w-0 opacity-0 translate-x-1'
-                          : 'max-w-[120px] opacity-100 translate-x-0 delay-150',
+                        collapsed ? 'max-w-0 opacity-0 translate-x-1' : 'max-w-[160px] opacity-100 translate-x-0 delay-150',
                       ].join(' ')}
                     >
                       Admin
@@ -358,7 +359,7 @@ export default function AdminShell({ children }: { children: ReactNode }) {
             className={[
               'absolute left-0 top-0 h-full w-80 max-w-[85vw]',
               'border-r',
-              'transition-transform duration-400 ease-in-out',
+              'transition-transform duration-300 ease-in-out',
               mobileOpen ? 'translate-x-0' : '-translate-x-full',
               'border-zinc-200 bg-white',
               'dark:border-zinc-800 dark:bg-zinc-950',
@@ -407,11 +408,7 @@ export default function AdminShell({ children }: { children: ReactNode }) {
                   Vendas
                 </NavItemMobile>
 
-                <NavItemMobile
-                  href="/admin/ofertas"
-                  icon={<Tag className="h-4 w-4" />}
-                  active={isActive('/admin/ofertas')}
-                >
+                <NavItemMobile href="/admin/ofertas" icon={<Tag className="h-4 w-4" />} active={isActive('/admin/ofertas')}>
                   Ofertas
                 </NavItemMobile>
               </div>
@@ -518,7 +515,7 @@ export default function AdminShell({ children }: { children: ReactNode }) {
             className={[
               'sticky top-0 z-10 backdrop-blur',
               'h-16',
-              'px-6',
+              'px-4 md:px-6',
               'bg-white/80',
               'shadow-[inset_0_-0.5px_0_0_rgb(228,228,231)]',
               'dark:bg-zinc-950/80',
@@ -544,7 +541,7 @@ export default function AdminShell({ children }: { children: ReactNode }) {
                 <div className="text-sm font-medium">Painel Administrativo</div>
               </div>
 
-              <div className="relative" ref={userMenuRef}>
+              <div className="relative flex items-center gap-2" ref={userMenuRef}>
                 <button
                   type="button"
                   onClick={() => setUserMenuOpen((v) => !v)}
@@ -561,6 +558,21 @@ export default function AdminShell({ children }: { children: ReactNode }) {
                   </span>
                   <ChevronDown className="h-4 w-4 text-zinc-400" />
                 </button>
+
+                <a
+                  href="/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={[
+                    'inline-flex h-9 w-9 items-center justify-center rounded-lg transition',
+                    'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900',
+                    'dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-100',
+                  ].join(' ')}
+                  aria-label="Abrir site principal"
+                  title="Abrir site principal"
+                >
+                  <ExternalLink className="h-5 w-5" />
+                </a>
 
                 {userMenuOpen && (
                   <div
@@ -606,8 +618,9 @@ export default function AdminShell({ children }: { children: ReactNode }) {
             </div>
           </header>
 
-          <main className="flex-1 px-6 py-6">
-            <div className="w-full">{children}</div>
+          {/* Conteúdo sem limite de largura */}
+          <main className="flex-1 px-4 py-6 md:px-6">
+            <div className="w-full max-w-none">{children}</div>
           </main>
         </div>
       </div>
@@ -659,7 +672,7 @@ function NavItem({
         className={[
           'overflow-hidden whitespace-nowrap',
           'transition-[max-width,opacity,transform] duration-300 ease-in-out',
-          collapsed ? 'max-w-0 opacity-0 translate-x-1' : 'max-w-[220px] opacity-100 translate-x-0 delay-150',
+          collapsed ? 'max-w-0 opacity-0 translate-x-1' : 'max-w-[260px] opacity-100 translate-x-0 delay-150',
         ].join(' ')}
         aria-hidden={collapsed}
       >

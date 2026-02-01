@@ -181,8 +181,8 @@ export default function AdminAfiliadosClient() {
   const router = useRouter();
   const pathname = usePathname();
 
-  // ✅ padrão agora é "publicado"
-  const [status, setStatus] = useState<AffiliateStatus | 'todos'>('publicado');
+  // ✅ padrão agora é "todos" (igual Ofertas)
+  const [status, setStatus] = useState<AffiliateStatus | 'todos'>('todos');
   const [q, setQ] = useState('');
 
   const [sortKey, setSortKey] = useState<SortKey>('atualizadoEm');
@@ -233,7 +233,7 @@ export default function AdminAfiliadosClient() {
   }, [q, status, pathname, router]);
 
   const clearFilters = () => {
-    setStatus('publicado');
+    setStatus('todos');
     setQ('');
   };
 
@@ -337,19 +337,20 @@ export default function AdminAfiliadosClient() {
     return base;
   }, [affiliates]);
 
+  // ✅ ordem igual Ofertas: Todos primeiro
   const filterItems = useMemo(
     () => [
-      { key: 'publicado' as const, label: 'Publicado', count: counts.publicado },
-      { key: 'rascunho' as const, label: 'Rascunho', count: counts.rascunho },
-      { key: 'pausado' as const, label: 'Pausado', count: counts.pausado },
-      { key: 'arquivado' as const, label: 'Arquivado', count: counts.arquivado },
       { key: 'todos' as const, label: 'Todos', count: counts.todos },
+      { key: 'publicado' as const, label: 'Publicado', count: counts.publicado },
+      { key: 'pausado' as const, label: 'Pausado', count: counts.pausado },
+      { key: 'rascunho' as const, label: 'Rascunho', count: counts.rascunho },
+      { key: 'arquivado' as const, label: 'Arquivado', count: counts.arquivado },
       { key: 'lixeira' as const, label: 'Lixeira', count: counts.lixeira },
     ],
     [counts]
   );
 
-  const hasFilters = q.trim().length > 0 || status !== 'publicado';
+  const hasFilters = q.trim().length > 0 || status !== 'todos';
 
   const shiftInner = '-ml-10';
 
@@ -398,7 +399,7 @@ export default function AdminAfiliadosClient() {
         </div>
       </div>
 
-      <AdminFiltersBar<AffiliateStatus>
+      <AdminFiltersBar<AffiliateStatus | 'todos'>
         value={status}
         onChange={setStatus}
         items={filterItems}
@@ -438,7 +439,7 @@ export default function AdminAfiliadosClient() {
           <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400">
             <span className="text-zinc-500 dark:text-zinc-500">Filtrado por:</span>
 
-            {status !== 'publicado' && (
+            {status !== 'todos' && (
               <span
                 className={[
                   'rounded-full border px-2 py-1',
@@ -651,4 +652,3 @@ export default function AdminAfiliadosClient() {
     </main>
   );
 }
-

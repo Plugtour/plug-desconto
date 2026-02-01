@@ -1,13 +1,9 @@
-import { ShoppingCart } from 'lucide-react';
 import { Header, Kpi, Placeholder } from '../_components/AdminPageUI';
 
 export default function AdminVendasPage() {
   return (
     <div className="w-full space-y-6">
-      <Header
-        title="Vendas"
-        description="Acompanhe pedidos, faturamento e conversão."
-      />
+      <Header title="Vendas" description="Acompanhe pedidos, faturamento e conversão." />
 
       <div className="grid gap-4 md:grid-cols-4">
         <Kpi title="Faturamento" value="R$ —" />

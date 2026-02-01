@@ -2,13 +2,32 @@
 
 // app/admin/ofertas/nova/page.tsx
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { ArrowLeft, Save, X, GripVertical } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import { useAdminData } from '../../_components/AdminDataProvider';
+import type { AdminPartnerRow } from '../../_data/adminMappers';
 
 type OfferStatus = 'rascunho' | 'publicado' | 'pausado' | 'arquivado';
+
+type AdminDestino = {
+  id: string;
+  nome: string;
+  slug: string;
+  ativo: boolean;
+  criadoEm: string;
+  atualizadoEm: string;
+};
+
+type AdminCategoria = {
+  id: string;
+  nome: string;
+  slug: string;
+  ativo: boolean;
+  criadoEm: string;
+  atualizadoEm: string;
+};
 
 function normalizeCity(value: string) {
   return (value || '')
@@ -28,6 +47,13 @@ function normalizeCategoryId(value: string) {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/\s+/g, '-');
+}
+
+async function safeGetJSON(url: string) {
+  const res = await fetch(url, { method: 'GET', cache: 'no-store' });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error ? String(data.error) : `GET ${url} falhou`);
+  return data;
 }
 
 function StatusModal({
@@ -114,12 +140,7 @@ function StatusModal({
             { key: 'arquivado', label: 'Arquivado', hint: 'Arquivado/encerrado.' },
           ] as const).map((it) => (
             <label key={it.key} className={radioRow}>
-              <input
-                type="radio"
-                name="statusToSave"
-                checked={value === it.key}
-                onChange={() => onChange(it.key)}
-              />
+              <input type="radio" name="statusToSave" checked={value === it.key} onChange={() => onChange(it.key)} />
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="font-medium">{it.label}</span>
@@ -168,31 +189,34 @@ function StatusModal({
 
 export default function AdminNovaOfertaPage() {
   const router = useRouter();
-  const { refreshOffers } = useAdminData();
+  const { refreshOffers, partners } = useAdminData();
 
-  const categories = useMemo(
-    () => [
-      { label: 'Gastronomia', id: 'gastronomia' },
-      { label: 'Atrações', id: 'atracoes' },
-      { label: 'Passeios', id: 'passeios' },
-      { label: 'Hospedagem', id: 'hospedagem' },
-      { label: 'Transporte', id: 'transporte' },
-      { label: 'Compras', id: 'compras' },
-      { label: 'Serviços', id: 'servicos' },
-    ],
-    []
-  );
+  const partnerOptions = useMemo(() => {
+    const list = (partners as AdminPartnerRow[])
+      .filter((p) => p && p.status !== 'lixeira')
+      .map((p) => String(p.nome || '').trim())
+      .filter(Boolean);
 
-  const partners = useMemo(
-    () => ['Cantina Bella', 'Dreamland', 'Gramado Tour', 'Bistrô do Centro', 'Serra Trips', 'Café da Colina'],
-    []
-  );
+    const uniq = Array.from(new Set(list));
+    uniq.sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    return uniq;
+  }, [partners]);
+
+  // ✅ Categorias e Destinos vindos do cadastro real
+  const [categorias, setCategorias] = useState<AdminCategoria[]>([]);
+  const [destinos, setDestinos] = useState<AdminDestino[]>([]);
+  const [loadingConfig, setLoadingConfig] = useState(true);
 
   const [titulo, setTitulo] = useState('');
-  const [parceiro, setParceiro] = useState(partners[0] ?? '');
-  const [categoriaLabel, setCategoriaLabel] = useState(categories[0]?.label ?? '');
+
+  // ✅ NÃO iniciar preenchido
+  const [parceiro, setParceiro] = useState('');
+
+  // ✅ NÃO iniciar preenchido
+  const [categoriaSlug, setCategoriaSlug] = useState('');
+  const [destinoSlug, setDestinoSlug] = useState('');
+
   const [descricao, setDescricao] = useState('');
-  const [regiao, setRegiao] = useState('Serra Gaúcha');
 
   // ✅ múltiplas imagens + ordem
   const [images, setImages] = useState<string[]>([]);
@@ -205,11 +229,66 @@ export default function AdminNovaOfertaPage() {
   const [statusModalOpen, setStatusModalOpen] = useState(false);
   const [statusToSave, setStatusToSave] = useState<OfferStatus>('rascunho');
 
-  const canSave = titulo.trim().length >= 4 && descricao.trim().length >= 10;
+  useEffect(() => {
+    let alive = true;
 
-  const removeImageAt = (idx: number) => {
-    setImages((prev) => prev.filter((_, i) => i !== idx));
-  };
+    async function loadConfig() {
+      setLoadingConfig(true);
+      try {
+        const [catsRaw, destRaw] = await Promise.all([
+          safeGetJSON('/api/admin/config/categorias'),
+          safeGetJSON('/api/admin/config/destinos'),
+        ]);
+
+        const cats: AdminCategoria[] = Array.isArray(catsRaw)
+          ? catsRaw
+          : Array.isArray(catsRaw?.categorias)
+          ? catsRaw.categorias
+          : Array.isArray(catsRaw?.items)
+          ? catsRaw.items
+          : [];
+
+        const dests: AdminDestino[] = Array.isArray(destRaw)
+          ? destRaw
+          : Array.isArray(destRaw?.destinos)
+          ? destRaw.destinos
+          : Array.isArray(destRaw?.items)
+          ? destRaw.items
+          : [];
+
+        const catsAtivos = cats.filter((c) => c && c.ativo !== false);
+        const destsAtivos = dests.filter((d) => d && d.ativo !== false);
+
+        catsAtivos.sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt-BR'));
+        destsAtivos.sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt-BR'));
+
+        if (!alive) return;
+
+        setCategorias(catsAtivos);
+        setDestinos(destsAtivos);
+
+        // ✅ NÃO seta defaults aqui
+      } catch {
+        // silêncio
+      } finally {
+        if (alive) setLoadingConfig(false);
+      }
+    }
+
+    loadConfig();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const canSave =
+    titulo.trim().length >= 4 &&
+    descricao.trim().length >= 10 &&
+    !!categoriaSlug &&
+    !!destinoSlug &&
+    !!parceiro.trim();
+
+  const removeImageAt = (idx: number) => setImages((prev) => prev.filter((_, i) => i !== idx));
 
   const moveImage = (from: number, to: number) => {
     if (from === to) return;
@@ -227,23 +306,22 @@ export default function AdminNovaOfertaPage() {
 
     setSaving(true);
     try {
-      const selectedCategory = categories.find((c) => c.label === categoriaLabel) ?? categories[0];
-
-      // ✅ garante limpeza (sem strings vazias)
       const cleanImageUrls = images.map((u) => String(u).trim()).filter(Boolean);
 
       const payload: any = {
         title: titulo.trim(),
         partnerName: parceiro.trim(),
-        city: normalizeCity(regiao),
-        categoryId: normalizeCategoryId(selectedCategory?.id ?? ''),
+
+        // ✅ grava o slug do destino (consistente com cadastro)
+        city: normalizeCity(destinoSlug),
+
+        // ✅ grava o slug da categoria (consistente com cadastro)
+        categoryId: normalizeCategoryId(categoriaSlug),
+
         status,
         description: descricao.trim(),
 
-        // ✅ PRINCIPAL (compat)
         imageUrl: cleanImageUrls[0] ? cleanImageUrls[0] : null,
-
-        // ✅ O CAMPO CORRETO QUE O BACKEND SALVA:
         imageUrls: cleanImageUrls,
 
         priceText: priceText.trim() ? priceText.trim() : null,
@@ -490,29 +568,60 @@ export default function AdminNovaOfertaPage() {
         <div className="space-y-4">
           <div className={card}>
             <label className={label}>Parceiro</label>
-            <select value={parceiro} onChange={(e) => setParceiro(e.target.value)} className={inputBase}>
-              {partners.map((p) => (
-                <option key={p} value={p}>
-                  {p}
+
+            {partnerOptions.length ? (
+              <select value={parceiro} onChange={(e) => setParceiro(e.target.value)} className={inputBase}>
+                <option value="" disabled>
+                  Selecione um parceiro
                 </option>
-              ))}
-            </select>
+                {partnerOptions.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <>
+                <input
+                  value={parceiro}
+                  onChange={(e) => setParceiro(e.target.value)}
+                  placeholder="Digite o nome do parceiro"
+                  className={inputBase}
+                />
+                <p className={help}>Nenhum parceiro cadastrado no painel ainda.</p>
+              </>
+            )}
           </div>
 
           <div className={card}>
             <label className={label}>Categoria</label>
-            <select value={categoriaLabel} onChange={(e) => setCategoriaLabel(e.target.value)} className={inputBase}>
-              {categories.map((c) => (
-                <option key={c.id} value={c.label}>
-                  {c.label}
+            <select
+              value={categoriaSlug}
+              onChange={(e) => setCategoriaSlug(e.target.value)}
+              className={inputBase}
+              disabled={loadingConfig}
+            >
+              <option value="" disabled>
+                Selecione uma categoria
+              </option>
+
+              {categorias.length ? (
+                categorias.map((c) => (
+                  <option key={c.id} value={c.slug}>
+                    {c.nome}
+                  </option>
+                ))
+              ) : (
+                <option value="" disabled>
+                  Nenhuma categoria cadastrada
                 </option>
-              ))}
+              )}
             </select>
 
             <p className={help}>
               Será salvo como:{' '}
               <span className="font-medium text-zinc-900 dark:text-zinc-200">
-                {normalizeCategoryId(categories.find((c) => c.label === categoriaLabel)?.id ?? '')}
+                {categoriaSlug ? normalizeCategoryId(categoriaSlug) : '—'}
               </span>
             </p>
           </div>
@@ -526,27 +635,34 @@ export default function AdminNovaOfertaPage() {
           </div>
 
           <div className={card}>
-            <label className={label}>Região (cidade no banco)</label>
-            <input
-              value={regiao}
-              onChange={(e) => setRegiao(e.target.value)}
-              placeholder="Ex: Serra Gaúcha"
+            <label className={label}>Região</label>
+            <select
+              value={destinoSlug}
+              onChange={(e) => setDestinoSlug(e.target.value)}
               className={inputBase}
-            />
+              disabled={loadingConfig}
+            >
+              <option value="" disabled>
+                Selecione uma região
+              </option>
+
+              {destinos.length ? (
+                destinos.map((d) => (
+                  <option key={d.id} value={d.slug}>
+                    {d.nome}
+                  </option>
+                ))
+              ) : (
+                <option value="" disabled>
+                  Nenhum destino cadastrado
+                </option>
+              )}
+            </select>
+
             <p className={help}>
               Será salvo como:{' '}
-              <span className="font-medium text-zinc-900 dark:text-zinc-200">{normalizeCity(regiao)}</span>
+              <span className="font-medium text-zinc-900 dark:text-zinc-200">{destinoSlug ? normalizeCity(destinoSlug) : '—'}</span>
             </p>
-          </div>
-
-          <div
-            className={[
-              'rounded-xl border border-dashed p-4 text-xs',
-              'border-zinc-300 bg-white text-zinc-500',
-              'dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-500',
-            ].join(' ')}
-          >
-            Próximo: usar imageUrls[] no site/app.
           </div>
         </div>
       </section>

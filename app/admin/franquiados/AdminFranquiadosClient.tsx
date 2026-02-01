@@ -1,9 +1,8 @@
-﻿'use client';
+'use client';
 
-// app/admin/parceiros/AdminParceirosClient.tsx
+// app/admin/franquiados/AdminFranquiadosClient.tsx
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 
@@ -15,9 +14,9 @@ import AdminRowActions from '../_components/AdminRowActions';
 import { useAdminToast } from '../_components/AdminToastProvider';
 import { useAdminData } from '../_components/AdminDataProvider';
 
-import type { PartnerStatus, AdminPartnerRow } from '../_data/adminMappers';
+import type { FranchiseeStatus, AdminFranchiseeRow } from '../_data/adminMappers';
 
-const isPartnerStatus = (v: string | null): v is PartnerStatus =>
+const isFranchiseeStatus = (v: string | null): v is FranchiseeStatus =>
   v === 'rascunho' || v === 'publicado' || v === 'pausado' || v === 'arquivado' || v === 'lixeira';
 
 const onlyDigits = (v: string) => (v || '').replace(/\D/g, '');
@@ -69,7 +68,7 @@ const parseAnyDate = (s: string) => {
   return Number.isNaN(t) ? 0 : t;
 };
 
-const statusWeight: Record<PartnerStatus, number> = {
+const statusWeight: Record<FranchiseeStatus, number> = {
   publicado: 1,
   rascunho: 2,
   pausado: 3,
@@ -77,7 +76,7 @@ const statusWeight: Record<PartnerStatus, number> = {
   lixeira: 5,
 };
 
-type SortKey = 'nome' | 'cidade' | 'telefone' | 'categoria' | 'status' | 'atualizadoEm';
+type SortKey = 'nome' | 'cidade' | 'whatsapp' | 'status' | 'atualizadoEm';
 type SortDir = 'asc' | 'desc';
 
 function SortIcon({
@@ -108,7 +107,7 @@ function ThSort({
   onToggle,
 }: {
   k: SortKey;
-  children: ReactNode;
+  children: React.ReactNode;
   align?: 'left' | 'right';
   className?: string;
   innerClassName?: string;
@@ -136,7 +135,6 @@ function ThSort({
   );
 }
 
-/** ✅ MODELO DA FOTO (IGUAL AO DE OFERTAS) */
 function RowThumb({ src, alt }: { src?: string | null; alt: string }) {
   const [err, setErr] = useState(false);
   const showImg = !!src && !err;
@@ -165,15 +163,19 @@ function RowThumb({ src, alt }: { src?: string | null; alt: string }) {
   );
 }
 
-export default function AdminParceirosClient() {
+export default function AdminFranquiadosClient() {
   const { showToast } = useAdminToast();
-  const { partners, setPartnerStatus, emptyPartnersTrash, deletePartnerForever } = useAdminData();
+  const {
+    franchisees,
+    setFranchiseeStatus,
+    emptyFranchiseesTrash,
+    deleteFranchiseeForever,
+  } = useAdminData();
 
   const router = useRouter();
   const pathname = usePathname();
 
-  // ✅ padrão agora é "todos" (igual Ofertas)
-  const [status, setStatus] = useState<PartnerStatus | 'todos'>('todos');
+  const [status, setStatus] = useState<FranchiseeStatus | 'todos'>('todos');
   const [q, setQ] = useState('');
 
   const [sortKey, setSortKey] = useState<SortKey>('atualizadoEm');
@@ -200,7 +202,7 @@ export default function AdminParceirosClient() {
     const statusParam = sp.get('status');
 
     if (qParam) setQ(qParam);
-    if (statusParam && isPartnerStatus(statusParam)) setStatus(statusParam);
+    if (statusParam && isFranchiseeStatus(statusParam)) setStatus(statusParam);
 
     didInitRef.current = true;
   }, []);
@@ -219,7 +221,6 @@ export default function AdminParceirosClient() {
 
     const next = sp.toString();
     const url = next ? `${pathname}?${next}` : pathname;
-
     router.replace(url, { scroll: false });
   }, [q, status, pathname, router]);
 
@@ -228,77 +229,74 @@ export default function AdminParceirosClient() {
     setQ('');
   };
 
-  const getNameById = (id: string) => (partners as AdminPartnerRow[]).find((p) => p.id === id)?.nome || id;
+  const getNameById = (id: string) => (franchisees as AdminFranchiseeRow[]).find((f) => f.id === id)?.nome || id;
 
   const handlePublish = (id: string) => {
-    setPartnerStatus(id, 'publicado');
-    showToast(`Parceiro publicado: ${getNameById(id)}`, 'success');
+    setFranchiseeStatus(id, 'publicado');
+    showToast(`Franquiado publicado: ${getNameById(id)}`, 'success');
   };
 
   const handlePause = (id: string) => {
-    setPartnerStatus(id, 'pausado');
-    showToast(`Parceiro pausado: ${getNameById(id)}`, 'warning');
+    setFranchiseeStatus(id, 'pausado');
+    showToast(`Franquiado pausado: ${getNameById(id)}`, 'warning');
   };
 
   const handleArchive = (id: string) => {
-    setPartnerStatus(id, 'arquivado');
-    showToast(`Parceiro arquivado: ${getNameById(id)}`, 'error');
+    setFranchiseeStatus(id, 'arquivado');
+    showToast(`Franquiado arquivado: ${getNameById(id)}`, 'error');
   };
 
   const handleTrash = (id: string) => {
-    setPartnerStatus(id, 'lixeira');
+    setFranchiseeStatus(id, 'lixeira');
     showToast(`Enviado para lixeira: ${getNameById(id)}`, 'warning');
   };
 
   const handleRestore = (id: string) => {
-    setPartnerStatus(id, 'rascunho');
-    showToast(`Parceiro restaurado: ${getNameById(id)}`, 'success');
+    setFranchiseeStatus(id, 'rascunho');
+    showToast(`Franquiado restaurado: ${getNameById(id)}`, 'success');
   };
 
   const handleEmptyTrash = () => {
-    emptyPartnersTrash();
+    emptyFranchiseesTrash();
     showToast('Lixeira esvaziada', 'success');
   };
 
   const handleDeleteForever = (id: string) => {
-    deletePartnerForever(id);
+    deleteFranchiseeForever(id);
     showToast(`Excluído definitivamente: ${getNameById(id)}`, 'success');
   };
 
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
 
-    return (partners as AdminPartnerRow[])
-      .filter((p) => (status === 'todos' ? true : p.status === status))
-      .filter((p) => {
+    return (franchisees as AdminFranchiseeRow[])
+      .filter((f) => (status === 'todos' ? true : f.status === status))
+      .filter((f) => {
         if (!term) return true;
         return (
-          p.nome.toLowerCase().includes(term) ||
-          p.categoria.toLowerCase().includes(term) ||
-          p.cidade.toLowerCase().includes(term) ||
-          (p.whatsapp || '').toLowerCase().includes(term) ||
-          p.id.toLowerCase().includes(term)
+          f.nome.toLowerCase().includes(term) ||
+          f.cidade.toLowerCase().includes(term) ||
+          (f.whatsapp || '').toLowerCase().includes(term) ||
+          f.id.toLowerCase().includes(term)
         );
       });
-  }, [partners, status, q]);
+  }, [franchisees, status, q]);
 
   const sorted = useMemo(() => {
     const dir = sortDir === 'asc' ? 1 : -1;
 
-    const getValue = (p: AdminPartnerRow, key: SortKey) => {
+    const getValue = (f: AdminFranchiseeRow, key: SortKey) => {
       switch (key) {
         case 'nome':
-          return (p.nome || '').toLowerCase();
+          return (f.nome || '').toLowerCase();
         case 'cidade':
-          return (p.cidade || '').toLowerCase();
-        case 'telefone':
-          return (p.whatsapp || '').toLowerCase();
-        case 'categoria':
-          return (p.categoria || '').toLowerCase();
+          return (f.cidade || '').toLowerCase();
+        case 'whatsapp':
+          return (f.whatsapp || '').toLowerCase();
         case 'status':
-          return statusWeight[p.status] ?? 999;
+          return statusWeight[f.status] ?? 999;
         case 'atualizadoEm':
-          return parseAnyDate(p.atualizadoEm);
+          return parseAnyDate(f.atualizadoEm);
         default:
           return '';
       }
@@ -320,8 +318,8 @@ export default function AdminParceirosClient() {
   }, [filtered, sortKey, sortDir]);
 
   const counts = useMemo(() => {
-    const rows = partners as AdminPartnerRow[];
-    const base: Record<'todos' | PartnerStatus, number> = {
+    const rows = franchisees as AdminFranchiseeRow[];
+    const base: Record<'todos' | FranchiseeStatus, number> = {
       todos: rows.length,
       rascunho: 0,
       publicado: 0,
@@ -329,11 +327,10 @@ export default function AdminParceirosClient() {
       arquivado: 0,
       lixeira: 0,
     };
-    for (const p of rows) base[p.status] += 1;
+    for (const f of rows) base[f.status] += 1;
     return base;
-  }, [partners]);
+  }, [franchisees]);
 
-  // ✅ ordem igual Ofertas: Todos primeiro
   const filterItems = useMemo(
     () => [
       { key: 'todos' as const, label: 'Todos', count: counts.todos },
@@ -347,26 +344,13 @@ export default function AdminParceirosClient() {
   );
 
   const hasFilters = q.trim().length > 0 || status !== 'todos';
-
   const shiftInner = '-ml-10';
-
-  const getPartnerThumb = (p: AdminPartnerRow) => {
-    const any = p as AdminPartnerRow & {
-      logoUrl?: string | null;
-      imagemUrl?: string | null;
-      imageUrl?: string | null;
-      thumbnailUrl?: string | null;
-      thumbUrl?: string | null;
-      fotoUrl?: string | null;
-    };
-    return any.logoUrl ?? any.imagemUrl ?? any.imageUrl ?? any.thumbnailUrl ?? any.thumbUrl ?? any.fotoUrl ?? null;
-  };
 
   return (
     <main className="space-y-4">
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Parceiros</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Franquiados</h1>
           <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
             Listar, buscar e filtrar por status. Itens podem ir para arquivado ou lixeira.
           </p>
@@ -374,25 +358,25 @@ export default function AdminParceirosClient() {
 
         <div className="flex items-center gap-2">
           <Link
-            href="/admin/parceiros/novo"
+            href="/admin/franquiados/novo"
             className={[
               'rounded-lg px-3 py-2 text-sm font-medium transition',
               'border border-zinc-200 bg-zinc-100 text-zinc-900 hover:bg-zinc-200',
               'dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800',
             ].join(' ')}
           >
-            Novo parceiro
+            Novo franquiado
           </Link>
         </div>
       </div>
 
-      <AdminFiltersBar<PartnerStatus | 'todos'>
+      <AdminFiltersBar<FranchiseeStatus | 'todos'>
         value={status}
         onChange={setStatus}
         items={filterItems}
         search={q}
         onSearch={setQ}
-        placeholder="Buscar por nome, cidade, categoria..."
+        placeholder="Buscar por nome, cidade..."
       />
 
       {status === 'lixeira' && (
@@ -446,7 +430,8 @@ export default function AdminParceirosClient() {
                   'dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200',
                 ].join(' ')}
               >
-                busca: <span className="font-medium text-zinc-900 dark:text-zinc-100">&quot;{q.trim()}&quot;</span>
+                busca:{' '}
+                <span className="font-medium text-zinc-900 dark:text-zinc-100">&quot;{q.trim()}&quot;</span>
               </span>
             )}
           </div>
@@ -469,8 +454,8 @@ export default function AdminParceirosClient() {
         footer={
           <>
             Mostrando <span className="text-zinc-900 dark:text-zinc-300">{sorted.length}</span> de{' '}
-            <span className="text-zinc-900 dark:text-zinc-300">{(partners as AdminPartnerRow[]).length}</span>{' '}
-            parceiros.
+            <span className="text-zinc-900 dark:text-zinc-300">{(franchisees as AdminFranchiseeRow[]).length}</span>{' '}
+            franquiados.
           </>
         }
       >
@@ -480,7 +465,6 @@ export default function AdminParceirosClient() {
             <col />
             <col />
             <col style={{ width: '170px' }} />
-            <col style={{ width: '150px' }} />
             <col style={{ width: '140px' }} />
             <col style={{ width: '170px' }} />
             <col style={{ width: '190px' }} />
@@ -495,25 +479,19 @@ export default function AdminParceirosClient() {
               <ThSort k="nome" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>
                 Nome
               </ThSort>
+
               <ThSort k="cidade" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>
                 Cidade
               </ThSort>
 
-              <ThSort k="telefone" innerClassName={shiftInner} sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>
+              <ThSort k="whatsapp" innerClassName={shiftInner} sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>
                 Telefone
               </ThSort>
-              <ThSort
-                k="categoria"
-                innerClassName={shiftInner}
-                sortKey={sortKey}
-                sortDir={sortDir}
-                onToggle={toggleSort}
-              >
-                Categoria
-              </ThSort>
+
               <ThSort k="status" innerClassName={shiftInner} sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>
                 Status
               </ThSort>
+
               <ThSort
                 k="atualizadoEm"
                 innerClassName={shiftInner}
@@ -531,39 +509,37 @@ export default function AdminParceirosClient() {
           <tbody className="divide-y divide-zinc-200 dark:divide-zinc-900">
             {sorted.length === 0 ? (
               <tr className="h-[64px]">
-                <td className="px-3 py-6 text-sm text-zinc-600 dark:text-zinc-500" colSpan={8}>
-                  Nenhum parceiro encontrado com os filtros atuais.
+                <td className="px-3 py-6 text-sm text-zinc-600 dark:text-zinc-500" colSpan={7}>
+                  Nenhum franquiado encontrado com os filtros atuais.
                 </td>
               </tr>
             ) : (
-              sorted.map((p) => {
-                const whatsappHref =
-                  (p as AdminPartnerRow & { whatsappHref?: string }).whatsappHref || buildWhatsappHref(p.whatsapp);
-                const phoneLabel = formatBRPhone(p.whatsapp) || p.whatsapp;
-                const thumb = getPartnerThumb(p);
+              sorted.map((f) => {
+                const whatsappHref = f.whatsappHref || buildWhatsappHref(f.whatsapp);
+                const phoneLabel = formatBRPhone(f.whatsapp) || f.whatsapp;
 
                 return (
-                  <tr key={p.id} className="h-[54px] text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900/30">
+                  <tr key={f.id} className="h-[54px] text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900/30">
                     <td className="pl-3 pr-0 py-2 align-middle">
                       <div className="flex h-[54px] items-center">
-                        <RowThumb src={thumb} alt={p.nome} />
+                        <RowThumb src={f.imageUrl ?? null} alt={f.nome} />
                       </div>
                     </td>
 
                     <td className="px-3 py-2 align-middle">
                       <div className="flex h-[54px] flex-col justify-center leading-[1.05]">
-                        <div className="truncate font-medium text-zinc-900 dark:text-zinc-100" title={p.nome}>
-                          {p.nome}
+                        <div className="truncate font-medium text-zinc-900 dark:text-zinc-100" title={f.nome}>
+                          {f.nome}
                         </div>
-                        <div className="mt-1 truncate text-xs text-zinc-500 dark:text-zinc-500" title={p.id}>
-                          {p.id}
+                        <div className="mt-1 truncate text-xs text-zinc-500 dark:text-zinc-500" title={f.id}>
+                          {f.id}
                         </div>
                       </div>
                     </td>
 
                     <td className="px-3 py-2 align-middle text-zinc-700 dark:text-zinc-200">
-                      <span className="block truncate" title={p.cidade}>
-                        {p.cidade}
+                      <span className="block truncate" title={f.cidade}>
+                        {f.cidade}
                       </span>
                     </td>
 
@@ -585,31 +561,23 @@ export default function AdminParceirosClient() {
 
                     <td className="px-2 py-2 align-middle">
                       <div className={shiftInner}>
-                        <span className="block truncate text-zinc-700 dark:text-zinc-200" title={p.categoria}>
-                          {p.categoria}
-                        </span>
-                      </div>
-                    </td>
-
-                    <td className="px-2 py-2 align-middle">
-                      <div className={shiftInner}>
                         <div className="whitespace-nowrap">
-                          <AdminStatusPill status={p.status} />
+                          <AdminStatusPill status={f.status} />
                         </div>
                       </div>
                     </td>
 
                     <td className="px-3 py-2 align-middle text-zinc-600 dark:text-zinc-300">
                       <div className={shiftInner}>
-                        <span className="whitespace-nowrap">{p.atualizadoEm}</span>
+                        <span className="whitespace-nowrap">{f.atualizadoEm}</span>
                       </div>
                     </td>
 
                     <td className="px-3 py-2 align-middle">
                       <div className="flex justify-end whitespace-nowrap">
                         <AdminRowActions
-                          id={p.id}
-                          status={p.status}
+                          id={f.id}
+                          status={f.status}
                           onView={(id) => showToast(`Visualizar: ${getNameById(id)}`, 'success')}
                           onEdit={(id) => showToast(`Editar: ${getNameById(id)}`, 'success')}
                           onPublish={handlePublish}
@@ -618,8 +586,8 @@ export default function AdminParceirosClient() {
                           onTrash={handleTrash}
                           onRestore={handleRestore}
                           onDeleteForever={handleDeleteForever}
-                          viewBaseHref="/admin/parceiros"
-                          editBaseHref="/admin/parceiros/editar"
+                          viewBaseHref="/admin/franquiados"
+                          editBaseHref="/admin/franquiados/editar"
                         />
                       </div>
                     </td>

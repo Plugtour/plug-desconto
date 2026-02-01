@@ -147,8 +147,8 @@ export default function AdminOfertasClient() {
   const { showToast } = useAdminToast();
   const { offers, setOfferStatus, emptyOffersTrash, deleteOfferForever } = useAdminData();
 
-  // ✅ padrão agora é "publicado"
-  const [status, setStatus] = useState<OfferStatus | 'todos'>('publicado');
+  // ✅ padrão: "todos" (mas sem incluir lixeira)
+  const [status, setStatus] = useState<OfferStatus | 'todos'>('todos');
   const [q, setQ] = useState('');
 
   const [sortKey, setSortKey] = useState<SortKey>('atualizadoEm');
@@ -208,7 +208,14 @@ export default function AdminOfertasClient() {
     const term = q.trim().toLowerCase();
 
     return (offers as OfferItem[])
-      .filter((o) => (status === 'todos' ? true : o.status === status))
+      .filter((o) => {
+        // ✅ REGRA PRINCIPAL:
+        // - "todos" = tudo MENOS lixeira
+        // - "lixeira" = só lixeira
+        // - demais = status exato
+        if (status === 'todos') return o.status !== 'lixeira';
+        return o.status === status;
+      })
       .filter((o) => {
         if (!term) return true;
         return (
@@ -256,35 +263,39 @@ export default function AdminOfertasClient() {
   }, [filtered, sortKey, sortDir]);
 
   const counts = useMemo(() => {
+    const list = offers as OfferItem[];
+
     const base: Record<'todos' | OfferStatus, number> = {
-      todos: (offers as OfferItem[]).length,
+      // ✅ "todos" NÃO conta lixeira
+      todos: list.filter((o) => o.status !== 'lixeira').length,
       rascunho: 0,
       publicado: 0,
       pausado: 0,
       arquivado: 0,
       lixeira: 0,
     };
-    for (const o of offers as OfferItem[]) base[o.status] += 1;
+
+    for (const o of list) base[o.status] += 1;
     return base;
   }, [offers]);
 
-  // ✅ ordem: Publicado, Rascunho, Pausado, Arquivado, Todos, Lixeira
+  // ✅ ordem: Todos primeiro
   const filterItems = useMemo(
     () => [
-      { key: 'publicado' as const, label: 'Publicado', count: counts.publicado },
-      { key: 'rascunho' as const, label: 'Rascunho', count: counts.rascunho },
-      { key: 'pausado' as const, label: 'Pausado', count: counts.pausado },
-      { key: 'arquivado' as const, label: 'Arquivado', count: counts.arquivado },
       { key: 'todos' as const, label: 'Todos', count: counts.todos },
+      { key: 'publicado' as const, label: 'Publicado', count: counts.publicado },
+      { key: 'pausado' as const, label: 'Pausado', count: counts.pausado },
+      { key: 'rascunho' as const, label: 'Rascunho', count: counts.rascunho },
+      { key: 'arquivado' as const, label: 'Arquivado', count: counts.arquivado },
       { key: 'lixeira' as const, label: 'Lixeira', count: counts.lixeira },
     ],
     [counts]
   );
 
-  const hasFilters = q.trim().length > 0 || status !== 'publicado';
+  const hasFilters = q.trim().length > 0 || status !== 'todos';
 
   const clearFilters = () => {
-    setStatus('publicado');
+    setStatus('todos');
     setQ('');
   };
 
@@ -310,7 +321,7 @@ export default function AdminOfertasClient() {
         </Link>
       </div>
 
-      <AdminFiltersBar<OfferStatus>
+      <AdminFiltersBar<OfferStatus | 'todos'>
         value={status}
         onChange={setStatus}
         items={filterItems}
@@ -321,7 +332,9 @@ export default function AdminOfertasClient() {
 
       {status === 'lixeira' && (
         <div className="flex items-center justify-between rounded-xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-900 dark:bg-zinc-950">
-          <div className="text-xs text-zinc-600 dark:text-zinc-400">Itens na lixeira podem ser restaurados ou excluídos definitivamente.</div>
+          <div className="text-xs text-zinc-600 dark:text-zinc-400">
+            Itens na lixeira podem ser restaurados ou excluídos definitivamente.
+          </div>
 
           <button
             type="button"
@@ -350,7 +363,7 @@ export default function AdminOfertasClient() {
           <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400">
             <span className="text-zinc-500 dark:text-zinc-500">Filtrado por:</span>
 
-            {status !== 'publicado' && (
+            {status !== 'todos' && (
               <span
                 className={[
                   'rounded-full border px-2 py-1',
@@ -394,7 +407,13 @@ export default function AdminOfertasClient() {
         footer={
           <>
             Mostrando <span className="text-zinc-900 dark:text-zinc-300">{sorted.length}</span> de{' '}
-            <span className="text-zinc-900 dark:text-zinc-300">{(offers as OfferItem[]).length}</span> ofertas.
+            <span className="text-zinc-900 dark:text-zinc-300">
+              {(() => {
+                const list = offers as OfferItem[];
+                return status === 'todos' ? list.filter((o) => o.status !== 'lixeira').length : list.length;
+              })()}
+            </span>{' '}
+            ofertas.
           </>
         }
       >
@@ -417,6 +436,7 @@ export default function AdminOfertasClient() {
               <ThSort k="parceiro" innerClassName={shiftInner} sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>
                 Parceiro
               </ThSort>
+
               <ThSort
                 k="categoria"
                 innerClassName={shiftInner}
@@ -426,9 +446,11 @@ export default function AdminOfertasClient() {
               >
                 Categoria
               </ThSort>
+
               <ThSort k="status" innerClassName={shiftInner} sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort}>
                 Status
               </ThSort>
+
               <ThSort
                 k="atualizadoEm"
                 innerClassName={shiftInner}
@@ -519,4 +541,3 @@ export default function AdminOfertasClient() {
     </main>
   );
 }
- 

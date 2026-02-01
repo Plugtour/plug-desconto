@@ -1,4 +1,3 @@
-import { BarChart3 } from 'lucide-react';
 import { Header, Box, Placeholder } from '../_components/AdminPageUI';
 
 export default function AdminRelatoriosPage() {

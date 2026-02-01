@@ -4,6 +4,10 @@ export type OfferStatus = 'rascunho' | 'publicado' | 'pausado' | 'arquivado' | '
 export type PartnerStatus = OfferStatus;
 export type AffiliateStatus = OfferStatus;
 
+// ✅ novos
+export type AmbassadorStatus = OfferStatus;
+export type FranchiseeStatus = OfferStatus;
+
 function formatDateBR(value: string | Date | null | undefined) {
   if (!value) return '-';
   const d = value instanceof Date ? value : new Date(value);
@@ -35,7 +39,6 @@ function pickFirstFromArray(v: any): string | null {
 }
 
 function pickImageUrl(x: any): string | null {
-  // ✅ aceita também images[] como fallback
   const raw =
     x?.imageUrl ??
     x?.imagemUrl ??
@@ -79,8 +82,6 @@ export type AdminPartnerRow = {
   ofertasAtivas: number;
   atualizadoEm: string;
   imageUrl?: string | null;
-
-  // ✅ opcional (para galeria no futuro)
   images?: string[] | null;
 };
 
@@ -97,6 +98,30 @@ export type AdminAffiliateRow = {
   canal?: string;
   leadsMes?: number;
   vendasMes?: number;
+};
+
+// ✅ novos
+export type AdminAmbassadorRow = {
+  id: string;
+  nome: string;
+  email: string;
+  whatsapp: string;
+  whatsappHref: string;
+  codigo: string;
+  status: AmbassadorStatus;
+  atualizadoEm: string;
+  imageUrl?: string | null;
+};
+
+export type AdminFranchiseeRow = {
+  id: string;
+  nome: string;
+  cidade: string;
+  whatsapp: string;
+  whatsappHref: string;
+  status: FranchiseeStatus;
+  atualizadoEm: string;
+  imageUrl?: string | null;
 };
 
 // =========================
@@ -189,5 +214,55 @@ export const mapAffiliate = (a: any): AdminAffiliateRow => {
     canal: a?.canal,
     leadsMes: a?.leadsMes,
     vendasMes: a?.vendasMes,
+  };
+};
+
+// =========================
+// AMBASSADORS
+// =========================
+
+export const mapAmbassador = (a: any): AdminAmbassadorRow => {
+  const id = String(a?.id ?? '');
+  const nome = String(a?.nome ?? a?.name ?? '');
+
+  const email = String(a?.email ?? '').trim() || `${slugify(nome || id).toLowerCase()}@embaixador.local`;
+  const whatsapp = String(a?.whatsapp ?? '').trim() || '51999999999';
+  const codigo = String(a?.codigo ?? a?.code ?? '').trim() || slugify(nome || id) || 'CODIGO';
+  const whatsappHref = String(a?.whatsappHref ?? '').trim() || buildWhatsappHref(whatsapp);
+
+  return {
+    id,
+    nome,
+    email,
+    whatsapp,
+    whatsappHref,
+    codigo,
+    status: (a?.status ?? 'rascunho') as AmbassadorStatus,
+    atualizadoEm: formatDateBR(a?.updatedAt ?? a?.createdAt),
+    imageUrl: pickImageUrl(a),
+  };
+};
+
+// =========================
+// FRANCHISEES
+// =========================
+
+export const mapFranchisee = (f: any): AdminFranchiseeRow => {
+  const id = String(f?.id ?? '');
+  const nome = String(f?.nome ?? f?.name ?? '');
+
+  const cidade = String(f?.cidade ?? f?.city ?? '');
+  const whatsapp = String(f?.whatsapp ?? '').trim() || '51999999999';
+  const whatsappHref = String(f?.whatsappHref ?? '').trim() || buildWhatsappHref(whatsapp);
+
+  return {
+    id,
+    nome,
+    cidade,
+    whatsapp,
+    whatsappHref,
+    status: (f?.status ?? 'rascunho') as FranchiseeStatus,
+    atualizadoEm: formatDateBR(f?.updatedAt ?? f?.createdAt),
+    imageUrl: pickImageUrl(f),
   };
 };
