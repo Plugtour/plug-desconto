@@ -2,7 +2,7 @@
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-import { NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import { deleteDestino, updateDestino } from '@/app/admin/_store/configStore';
 
 type AdminStatus = 'rascunho' | 'publicado' | 'pausado' | 'arquivado' | 'lixeira';
@@ -12,16 +12,17 @@ function isAdminStatus(v: any): v is AdminStatus {
 }
 
 /**
- * ✅ Rota de compatibilidade
- * Alguns pontos antigos do projeto ainda chamam:
- *   /api/admin/config/:id
- * Este handler mantém compatibilidade tratando como "destino".
+ * Rota de compatibilidade:
+ * /api/admin/config/[id]
+ * Mantém o comportamento como "destino" (PUT/DELETE).
  */
+type Ctx = { params: Promise<{ id: string }> };
 
-export async function PUT(req: Request, { params }: { params: { id: string } }) {
+export async function PUT(req: NextRequest, context: Ctx) {
   try {
-    const id = String(params?.id ?? '').trim();
-    if (!id) throw new Error('ID inválido.');
+    const { id } = await context.params;
+    const cleanId = String(id ?? '').trim();
+    if (!cleanId) throw new Error('ID inválido.');
 
     const body = (await req.json().catch(() => null)) as
       | { nome?: string; ativo?: boolean; status?: AdminStatus }
@@ -33,7 +34,6 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
 
     if (typeof body.nome === 'string') patch.nome = body.nome;
 
-    // Se veio "status", converte também para "ativo" quando aplicável
     if (isAdminStatus(body.status)) {
       patch.status = body.status;
 
@@ -42,24 +42,24 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
       if (body.status === 'pausado') patch.ativo = false;
     }
 
-    // Se veio "ativo" direto, respeita
     if (typeof body.ativo === 'boolean') {
       patch.ativo = body.ativo;
     }
 
-    const updated = await updateDestino(id, patch);
+    const updated = await updateDestino(cleanId, patch);
     return NextResponse.json({ destino: updated });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'Erro ao atualizar.' }, { status: 400 });
   }
 }
 
-export async function DELETE(_: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, context: Ctx) {
   try {
-    const id = String(params?.id ?? '').trim();
-    if (!id) throw new Error('ID inválido.');
+    const { id } = await context.params;
+    const cleanId = String(id ?? '').trim();
+    if (!cleanId) throw new Error('ID inválido.');
 
-    await deleteDestino(id);
+    await deleteDestino(cleanId);
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'Erro ao excluir.' }, { status: 400 });
