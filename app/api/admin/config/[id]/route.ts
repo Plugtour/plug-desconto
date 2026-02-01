@@ -1,5 +1,6 @@
-// app/api/admin/config/destinos/[id]/route.ts
+// app/api/admin/config/[id]/route.ts
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
 import { deleteDestino, updateDestino } from '@/app/admin/_store/configStore';
@@ -10,12 +11,18 @@ function isAdminStatus(v: any): v is AdminStatus {
   return v === 'rascunho' || v === 'publicado' || v === 'pausado' || v === 'arquivado' || v === 'lixeira';
 }
 
+/**
+ * ✅ Rota de compatibilidade
+ * Alguns pontos antigos do projeto ainda chamam:
+ *   /api/admin/config/:id
+ * Este handler mantém compatibilidade tratando como "destino".
+ */
+
 export async function PUT(req: Request, { params }: { params: { id: string } }) {
   try {
     const id = String(params?.id ?? '').trim();
     if (!id) throw new Error('ID inválido.');
 
-    // Aceita tanto o formato antigo (ativo) quanto o novo (status)
     const body = (await req.json().catch(() => null)) as
       | { nome?: string; ativo?: boolean; status?: AdminStatus }
       | null;

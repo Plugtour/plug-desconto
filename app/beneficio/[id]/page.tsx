@@ -13,7 +13,7 @@ import { benefitUrl, benefitCanonicalUrl, benefitPath } from '@/lib/urls';
 
 import CopyButton from './CopyButton';
 
-type PageParams = Promise<{ id: string }>;
+type PageParams = { id: string };
 
 /* =========================
    Utils
@@ -31,11 +31,7 @@ function normalizeSlugOrId(value: string) {
   return safeDecode(value).trim();
 }
 
-function buildSeoDescription(offer: {
-  benefit: string;
-  partner: string;
-  description?: string;
-}) {
+function buildSeoDescription(offer: { benefit: string; partner: string; description?: string }) {
   const base = `${offer.benefit} em ${offer.partner}.`;
   const extra = (offer.description || '').replace(/\s+/g, ' ').trim();
   const combined = extra ? `${base} ${extra}` : base;
@@ -46,12 +42,8 @@ function buildSeoDescription(offer: {
    SEO
 ========================= */
 
-export async function generateMetadata({
-  params,
-}: {
-  params: PageParams;
-}): Promise<Metadata> {
-  const { id } = await params;
+export async function generateMetadata({ params }: { params: PageParams }): Promise<Metadata> {
+  const { id } = params;
   const raw = normalizeSlugOrId(id);
 
   const offer = await apiGetOffer(raw);
@@ -69,8 +61,7 @@ export async function generateMetadata({
 
   const canonicalPath = benefitCanonicalUrl(offer);
 
-  const img =
-    Array.isArray(offer.images) && offer.images.length > 0 ? offer.images[0] : null;
+  const img = Array.isArray(offer.images) && offer.images.length > 0 ? offer.images[0] : null;
 
   return {
     title,
@@ -82,9 +73,7 @@ export async function generateMetadata({
       title,
       description,
       siteName: 'Plug Desconto',
-      images: img
-        ? [{ url: img, width: 1200, height: 630 }]
-        : [{ url: '/og.png', width: 1200, height: 630 }],
+      images: img ? [{ url: img, width: 1200, height: 630 }] : [{ url: '/og.png', width: 1200, height: 630 }],
     },
     twitter: {
       card: 'summary_large_image',
@@ -100,13 +89,7 @@ export async function generateMetadata({
    UI helpers
 ========================= */
 
-function Badge({
-  children,
-  variant,
-}: {
-  children: React.ReactNode;
-  variant: 'available' | 'used';
-}) {
+function Badge({ children, variant }: { children: React.ReactNode; variant: 'available' | 'used' }) {
   const cls =
     variant === 'used'
       ? 'bg-rose-950/40 text-rose-200 border-rose-900/60'
@@ -114,22 +97,13 @@ function Badge({
 
   return (
     <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${cls}`}>
-      <span
-        className={`h-2 w-2 rounded-full ${variant === 'used' ? 'bg-rose-400' : 'bg-emerald-400'}`}
-        aria-hidden="true"
-      />
+      <span className={`h-2 w-2 rounded-full ${variant === 'used' ? 'bg-rose-400' : 'bg-emerald-400'}`} aria-hidden="true" />
       {children}
     </span>
   );
 }
 
-function Card({
-  children,
-  className = '',
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
+function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return <section className={`rounded-2xl border border-zinc-800 bg-zinc-950 ${className}`}>{children}</section>;
 }
 
@@ -138,7 +112,7 @@ function Card({
 ========================= */
 
 export default async function BenefitPage({ params }: { params: PageParams }) {
-  const { id } = await params;
+  const { id } = params;
   const raw = normalizeSlugOrId(id);
   const rawLower = raw.toLowerCase();
 
@@ -161,9 +135,7 @@ export default async function BenefitPage({ params }: { params: PageParams }) {
   const usedCookieKey = `pd_offer_used_${safeOffer.id}`;
   const isUsed = canUseBenefits && cookieStore.get(usedCookieKey)?.value === '1';
 
-  const voucher = canUseBenefits
-    ? generateVoucherCode({ offerId: safeOffer.id, userId: 'user' })
-    : null;
+  const voucher = canUseBenefits ? generateVoucherCode({ offerId: safeOffer.id, userId: 'user' }) : null;
 
   const benefitPathStr = benefitPath(safeOffer);
 
@@ -189,8 +161,7 @@ export default async function BenefitPage({ params }: { params: PageParams }) {
   const canonicalPath = benefitCanonicalUrl(safeOffer);
   const nextUrl = encodeURIComponent(canonicalPath);
 
-  const heroImg =
-    Array.isArray(safeOffer.images) && safeOffer.images.length > 0 ? safeOffer.images[0] : null;
+  const heroImg = Array.isArray(safeOffer.images) && safeOffer.images.length > 0 ? safeOffer.images[0] : null;
 
   const benefitText = safeOffer.benefit || safeOffer.title || '';
 
@@ -222,9 +193,7 @@ export default async function BenefitPage({ params }: { params: PageParams }) {
           <div className="text-xs text-zinc-400">Benefício</div>
           <div className="mt-1 text-lg font-semibold text-zinc-50">{benefitText}</div>
 
-          {!!safeOffer.description && (
-            <p className="mt-3 text-sm leading-relaxed text-zinc-300">{safeOffer.description}</p>
-          )}
+          {!!safeOffer.description && <p className="mt-3 text-sm leading-relaxed text-zinc-300">{safeOffer.description}</p>}
         </Card>
 
         <Card className="p-4">
