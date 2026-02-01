@@ -13,7 +13,22 @@ import { benefitUrl, benefitCanonicalUrl, benefitPath } from '@/lib/urls';
 
 import CopyButton from './CopyButton';
 
+/* =========================
+   Tipos
+========================= */
+
 type PageParams = { id: string };
+
+/* =========================
+   Cookies compat (sync/async)
+========================= */
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function getCookieStore(): Promise<any> {
+  const c: any = cookies();
+  if (typeof c?.then === 'function') return await c; // cookies() veio como Promise
+  return c; // cookies() normal
+}
 
 /* =========================
    Utils
@@ -42,9 +57,12 @@ function buildSeoDescription(offer: { benefit: string; partner: string; descript
    SEO
 ========================= */
 
-export async function generateMetadata({ params }: { params: PageParams }): Promise<Metadata> {
-  const { id } = params;
-  const raw = normalizeSlugOrId(id);
+export async function generateMetadata({
+  params,
+}: {
+  params: PageParams;
+}): Promise<Metadata> {
+  const raw = normalizeSlugOrId(params.id);
 
   const offer = await apiGetOffer(raw);
   if (!offer) return {};
@@ -89,7 +107,13 @@ export async function generateMetadata({ params }: { params: PageParams }): Prom
    UI helpers
 ========================= */
 
-function Badge({ children, variant }: { children: React.ReactNode; variant: 'available' | 'used' }) {
+function Badge({
+  children,
+  variant,
+}: {
+  children: React.ReactNode;
+  variant: 'available' | 'used';
+}) {
   const cls =
     variant === 'used'
       ? 'bg-rose-950/40 text-rose-200 border-rose-900/60'
@@ -97,7 +121,7 @@ function Badge({ children, variant }: { children: React.ReactNode; variant: 'ava
 
   return (
     <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${cls}`}>
-      <span className={`h-2 w-2 rounded-full ${variant === 'used' ? 'bg-rose-400' : 'bg-emerald-400'}`} aria-hidden="true" />
+      <span className={`h-2 w-2 rounded-full ${variant === 'used' ? 'bg-rose-400' : 'bg-emerald-400'}`} />
       {children}
     </span>
   );
@@ -112,32 +136,30 @@ function Card({ children, className = '' }: { children: React.ReactNode; classNa
 ========================= */
 
 export default async function BenefitPage({ params }: { params: PageParams }) {
-  const { id } = params;
-  const raw = normalizeSlugOrId(id);
+  const raw = normalizeSlugOrId(params.id);
   const rawLower = raw.toLowerCase();
 
   const offer = await apiGetOffer(raw);
   if (!offer) return notFound();
 
-  const safeOffer = offer;
+  const slugLower = (offer.slug || '').toLowerCase().trim();
+  const idLower = (offer.id || '').toLowerCase().trim();
 
-  const slugLower = (safeOffer.slug || '').toLowerCase().trim();
-  const idLower = (safeOffer.id || '').toLowerCase().trim();
-
-  if (safeOffer.slug && rawLower === idLower && rawLower !== slugLower) {
-    redirect(benefitUrl(safeOffer));
+  if (offer.slug && rawLower === idLower && rawLower !== slugLower) {
+    redirect(benefitUrl(offer));
   }
 
   const session = await getSession();
   const canUseBenefits = session.role === 'user' && session.planActive;
 
-  const cookieStore = await cookies();
-  const usedCookieKey = `pd_offer_used_${safeOffer.id}`;
-  const isUsed = canUseBenefits && cookieStore.get(usedCookieKey)?.value === '1';
+  const usedCookieKey = `pd_offer_used_${offer.id}`;
 
-  const voucher = canUseBenefits ? generateVoucherCode({ offerId: safeOffer.id, userId: 'user' }) : null;
+  const cookieStore = await getCookieStore();
+  const isUsed = canUseBenefits && cookieStore.get?.(usedCookieKey)?.value === '1';
 
-  const benefitPathStr = benefitPath(safeOffer);
+  const voucher = canUseBenefits ? generateVoucherCode({ offerId: offer.id, userId: 'user' }) : null;
+
+  const benefitPathStr = benefitPath(offer);
 
   async function toggleUsedAction() {
     'use server';
@@ -145,10 +167,10 @@ export default async function BenefitPage({ params }: { params: PageParams }) {
     const s = await getSession();
     if (!(s.role === 'user' && s.planActive)) return;
 
-    const store = await cookies();
-    const current = store.get(usedCookieKey)?.value === '1';
+    const store = await getCookieStore();
+    const current = store.get?.(usedCookieKey)?.value === '1';
 
-    store.set(usedCookieKey, current ? '0' : '1', {
+    store.set?.(usedCookieKey, current ? '0' : '1', {
       path: '/',
       httpOnly: true,
       sameSite: 'lax',
@@ -158,30 +180,29 @@ export default async function BenefitPage({ params }: { params: PageParams }) {
     revalidatePath(benefitPathStr);
   }
 
-  const canonicalPath = benefitCanonicalUrl(safeOffer);
+  const canonicalPath = benefitCanonicalUrl(offer);
   const nextUrl = encodeURIComponent(canonicalPath);
 
-  const heroImg = Array.isArray(safeOffer.images) && safeOffer.images.length > 0 ? safeOffer.images[0] : null;
-
-  const benefitText = safeOffer.benefit || safeOffer.title || '';
+  const heroImg = Array.isArray(offer.images) && offer.images.length > 0 ? offer.images[0] : null;
+  const benefitText = offer.benefit || offer.title || '';
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-6">
       <div className="space-y-4">
         {heroImg && (
           <div className="relative h-64 w-full overflow-hidden rounded-2xl border border-zinc-800">
-            <Image src={heroImg} alt={safeOffer.title} fill className="object-cover" sizes="100vw" priority />
+            <Image src={heroImg} alt={offer.title} fill className="object-cover" sizes="100vw" priority />
           </div>
         )}
 
         <div className="flex flex-col gap-2">
-          <div className="text-xs text-zinc-400">{safeOffer.category}</div>
+          <div className="text-xs text-zinc-400">{offer.category}</div>
 
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              <h1 className="text-2xl font-bold text-zinc-50">{safeOffer.title}</h1>
+              <h1 className="text-2xl font-bold text-zinc-50">{offer.title}</h1>
               <p className="mt-1 text-sm text-zinc-300">
-                Parceiro: <strong className="text-zinc-100">{safeOffer.partner}</strong>
+                Parceiro: <strong className="text-zinc-100">{offer.partner}</strong>
               </p>
             </div>
 
@@ -193,7 +214,7 @@ export default async function BenefitPage({ params }: { params: PageParams }) {
           <div className="text-xs text-zinc-400">Benefício</div>
           <div className="mt-1 text-lg font-semibold text-zinc-50">{benefitText}</div>
 
-          {!!safeOffer.description && <p className="mt-3 text-sm leading-relaxed text-zinc-300">{safeOffer.description}</p>}
+          {!!offer.description && <p className="mt-3 text-sm leading-relaxed text-zinc-300">{offer.description}</p>}
         </Card>
 
         <Card className="p-4">
