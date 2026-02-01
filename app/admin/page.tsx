@@ -34,8 +34,7 @@ function buildStats(list: AnyRow[]) {
 
 function pickStatus(v: string | null | undefined) {
   const s = (v || '').toLowerCase();
-  if (s === 'rascunho' || s === 'publicado' || s === 'pausado' || s === 'arquivado' || s === 'lixeira')
-    return s;
+  if (s === 'rascunho' || s === 'publicado' || s === 'pausado' || s === 'arquivado' || s === 'lixeira') return s;
   return null;
 }
 
@@ -103,7 +102,7 @@ export default function AdminDashboardPage() {
     {
       title: 'Destinos',
       total: destinosStats.total,
-      href: '/admin/configuracoes',
+      href: '/admin/configuracoes/destinos',
       items: [
         { label: 'Rascunho', count: destinosStats.rascunho, tone: 'blue' },
         { label: 'Arquivado', count: destinosStats.arquivado, tone: 'red' },
@@ -162,7 +161,6 @@ export default function AdminDashboardPage() {
     },
   ];
 
-  // ✅ Linha com 3 cards (últimos itens) — usando o que estiver cadastrado no provider
   const recentCards = useMemo(() => {
     const clients = (adminAny?.clients ?? adminAny?.clientes ?? []) as any[];
 
@@ -197,23 +195,18 @@ export default function AdminDashboardPage() {
 
   return (
     <main className="w-full space-y-6">
-      {/* TOPO */}
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
         <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Visão rápida do painel (dados do Admin em memória).</p>
       </div>
 
-      {/* CARDS RESUMO */}
       <AdminDashboardSummary cards={cards} />
 
-      {/* LINHA 2: GRÁFICO + CARD RESUMO */}
       <section className="grid w-full grid-cols-1 gap-4 md:grid-cols-3">
-        {/* GRÁFICO (sem card / sem fundo) */}
         <div className="md:col-span-2">
           <AdminDashboardChart />
         </div>
 
-        {/* CARD RESUMO */}
         <div className="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-950">
           <div className="space-y-4">
             <div>
@@ -234,7 +227,6 @@ export default function AdminDashboardPage() {
         </div>
       </section>
 
-      {/* ✅ NOVA LINHA: 3 CARDS (Clientes / Afiliados / Embaixadores) */}
       <AdminRecentCardsRow cards={recentCards} columns={3} maxRows={4} />
     </main>
   );

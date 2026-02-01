@@ -4,7 +4,7 @@
       "id": "dest_bymnf5gmkzmxbo7",
       "nome": "Florianópolis",
       "slug": "florianopolis",
-      "ativo": true,
+      "status": "publicado",
       "criadoEm": "2026-01-29T15:54:39.313Z",
       "atualizadoEm": "2026-01-29T15:54:39.313Z"
     },
@@ -12,9 +12,17 @@
       "id": "dest_symabg4mkzn2n11",
       "nome": "Gramado",
       "slug": "gramado",
-      "ativo": true,
+      "status": "publicado",
       "criadoEm": "2026-01-29T15:58:47.317Z",
       "atualizadoEm": "2026-01-29T15:58:47.317Z"
+    },
+    {
+      "id": "dest_84eq82wml3cftyx",
+      "nome": "Recife",
+      "slug": "recife",
+      "status": "rascunho",
+      "criadoEm": "2026-02-01T06:12:11.766Z",
+      "atualizadoEm": "2026-02-01T06:12:11.766Z"
     }
   ],
   "categorias": [
@@ -33,6 +41,14 @@
       "ativo": true,
       "criadoEm": "2026-01-29T15:59:19.146Z",
       "atualizadoEm": "2026-01-29T15:59:19.146Z"
+    },
+    {
+      "id": "cat_ufy7r3qml3dxzof",
+      "nome": "teste",
+      "slug": "teste",
+      "ativo": true,
+      "criadoEm": "2026-02-01T06:54:18.588Z",
+      "atualizadoEm": "2026-02-01T06:54:18.588Z"
     }
   ]
 }

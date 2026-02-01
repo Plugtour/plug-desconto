@@ -2,11 +2,13 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 
+export type AdminStatus = 'rascunho' | 'publicado' | 'pausado' | 'arquivado' | 'lixeira';
+
 export type AdminDestino = {
   id: string;
   nome: string;
   slug: string;
-  ativo: boolean;
+  status: AdminStatus;
   criadoEm: string;
   atualizadoEm: string;
 };
@@ -21,7 +23,7 @@ export type AdminCategoria = {
 };
 
 type AdminConfigDB = {
-  destinos: AdminDestino[];
+  destinos: any[]; // mantemos any aqui pra suportar migração de dados antigos
   categorias: AdminCategoria[];
 };
 
@@ -52,39 +54,79 @@ async function ensureFile() {
   }
 }
 
-export async function readConfig(): Promise<AdminConfigDB> {
-  await ensureFile();
-  const raw = await fs.readFile(DB_PATH, 'utf-8');
-  return JSON.parse(raw) as AdminConfigDB;
+/**
+ * ✅ Migra destinos antigos:
+ * - se não existir status, tenta usar "ativo" antigo:
+ *   ativo=true -> publicado
+ *   ativo=false -> rascunho
+ */
+function normalizeDestino(d: any): AdminDestino {
+  const now = new Date().toISOString();
+  const nome = String(d?.nome ?? '').trim();
+  const criadoEm = String(d?.criadoEm ?? d?.createdAt ?? now);
+  const atualizadoEm = String(d?.atualizadoEm ?? d?.updatedAt ?? criadoEm);
+
+  let status = String(d?.status ?? '').toLowerCase() as AdminStatus;
+  if (
+    status !== 'rascunho' &&
+    status !== 'publicado' &&
+    status !== 'pausado' &&
+    status !== 'arquivado' &&
+    status !== 'lixeira'
+  ) {
+    const ativo = Boolean(d?.ativo ?? true);
+    status = ativo ? 'publicado' : 'rascunho';
+  }
+
+  const slug = String(d?.slug ?? slugify(nome));
+
+  return {
+    id: String(d?.id ?? uid('dest')),
+    nome,
+    slug,
+    status,
+    criadoEm,
+    atualizadoEm,
+  };
 }
 
-export async function writeConfig(db: AdminConfigDB) {
+export async function readConfig(): Promise<{ destinos: AdminDestino[]; categorias: AdminCategoria[] }> {
+  await ensureFile();
+  const raw = await fs.readFile(DB_PATH, 'utf-8');
+  const parsed = JSON.parse(raw) as AdminConfigDB;
+
+  const destinos = Array.isArray(parsed.destinos) ? parsed.destinos.map(normalizeDestino) : [];
+  const categorias = Array.isArray(parsed.categorias) ? parsed.categorias : [];
+
+  // ✅ grava de volta já normalizado (migração silenciosa)
+  await fs.writeFile(DB_PATH, JSON.stringify({ destinos, categorias }, null, 2), 'utf-8');
+
+  return { destinos, categorias };
+}
+
+export async function writeConfig(db: { destinos: AdminDestino[]; categorias: AdminCategoria[] }) {
   await fs.writeFile(DB_PATH, JSON.stringify(db, null, 2), 'utf-8');
 }
 
-export async function listDestinos() {
+export async function listDestinos(): Promise<AdminDestino[]> {
   const db = await readConfig();
   return db.destinos.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
-}
-
-export async function listCategorias() {
-  const db = await readConfig();
-  return db.categorias.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 }
 
 export async function createDestino(nome: string) {
   const db = await readConfig();
   const now = new Date().toISOString();
-  const slug = slugify(nome);
+  const clean = nome.trim();
+  const slug = slugify(clean);
 
   const exists = db.destinos.some((d) => d.slug === slug);
   if (exists) throw new Error('Já existe um destino com esse nome.');
 
   const item: AdminDestino = {
     id: uid('dest'),
-    nome: nome.trim(),
+    nome: clean,
     slug,
-    ativo: true,
+    status: 'publicado',
     criadoEm: now,
     atualizadoEm: now,
   };
@@ -94,7 +136,10 @@ export async function createDestino(nome: string) {
   return item;
 }
 
-export async function updateDestino(id: string, patch: Partial<Pick<AdminDestino, 'nome' | 'ativo'>>) {
+export async function updateDestino(
+  id: string,
+  patch: Partial<Pick<AdminDestino, 'nome' | 'status'>>
+) {
   const db = await readConfig();
   const idx = db.destinos.findIndex((d) => d.id === id);
   if (idx === -1) throw new Error('Destino não encontrado.');
@@ -108,11 +153,22 @@ export async function updateDestino(id: string, patch: Partial<Pick<AdminDestino
   const conflict = db.destinos.some((d) => d.id !== id && d.slug === nextSlug);
   if (conflict) throw new Error('Já existe outro destino com esse nome.');
 
+  let nextStatus = (patch.status ?? current.status) as AdminStatus;
+  if (
+    nextStatus !== 'rascunho' &&
+    nextStatus !== 'publicado' &&
+    nextStatus !== 'pausado' &&
+    nextStatus !== 'arquivado' &&
+    nextStatus !== 'lixeira'
+  ) {
+    nextStatus = current.status;
+  }
+
   db.destinos[idx] = {
     ...current,
     nome: nextNome,
     slug: nextSlug,
-    ativo: patch.ativo ?? current.ativo,
+    status: nextStatus,
     atualizadoEm: now,
   };
 
@@ -127,6 +183,13 @@ export async function deleteDestino(id: string) {
   if (db.destinos.length === before) throw new Error('Destino não encontrado.');
   await writeConfig(db);
   return true;
+}
+
+// ===== categorias (mantido como estava) =====
+
+export async function listCategorias() {
+  const db = await readConfig();
+  return db.categorias.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 }
 
 export async function createCategoria(nome: string) {

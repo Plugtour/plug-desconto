@@ -15,29 +15,30 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     const id = String(params?.id ?? '').trim();
     if (!id) throw new Error('ID inválido.');
 
-    // Aceita tanto o formato antigo (ativo) quanto o novo (status)
     const body = (await req.json().catch(() => null)) as
-      | { nome?: string; ativo?: boolean; status?: AdminStatus }
+      | { nome?: string; status?: AdminStatus; ativo?: boolean }
       | null;
 
     if (!body) throw new Error('Body inválido.');
 
     const patch: any = {};
 
+    // nome
     if (typeof body.nome === 'string') patch.nome = body.nome;
 
-    // Se veio "status", converte também para "ativo" quando aplicável
+    // status (novo padrão)
     if (isAdminStatus(body.status)) {
       patch.status = body.status;
-
-      // compat com legado (ativo)
-      if (body.status === 'publicado') patch.ativo = true;
-      if (body.status === 'pausado') patch.ativo = false;
     }
 
-    // Se veio "ativo" direto, respeita
+    // compat legado (se vier ativo)
     if (typeof body.ativo === 'boolean') {
-      patch.ativo = body.ativo;
+      patch.status = body.ativo ? 'publicado' : 'pausado';
+    }
+
+    // se não veio nada pra atualizar
+    if (!('nome' in patch) && !('status' in patch)) {
+      throw new Error('Nada para atualizar.');
     }
 
     const updated = await updateDestino(id, patch);

@@ -1,6 +1,5 @@
 ﻿'use client';
 
-// app/admin/_components/AdminDataProvider.tsx
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type {
   OfferStatus,
@@ -14,13 +13,9 @@ import type {
   AdminFranchiseeRow as MappedFranchiseeRow,
 } from '../_data/adminMappers';
 
-import {
-  mapPartner,
-  mapAffiliate,
-  mapAmbassador,
-  mapFranchisee,
-  mapDbOfferToAdminRow,
-} from '../_data/adminMappers';
+import { mapPartner, mapAffiliate, mapAmbassador, mapFranchisee, mapDbOfferToAdminRow } from '../_data/adminMappers';
+
+type AdminStatus = 'rascunho' | 'publicado' | 'pausado' | 'arquivado' | 'lixeira';
 
 type AdminOfferRow = {
   id: string;
@@ -36,6 +31,15 @@ type AdminPartnerRow = MappedPartnerRow;
 type AdminAffiliateRow = MappedAffiliateRow;
 type AdminAmbassadorRow = MappedAmbassadorRow;
 type AdminFranchiseeRow = MappedFranchiseeRow;
+
+type AdminDestinoRow = {
+  id: string;
+  nome: string;
+  slug: string;
+  status: AdminStatus;
+  criadoEm: string;
+  atualizadoEm: string;
+};
 
 type SessionRole = 'guest' | 'user' | 'affiliate' | 'partner' | 'master';
 type Session = {
@@ -102,6 +106,10 @@ type AdminDataContextValue = {
   // ✅ novos
   ambassadors: AdminAmbassadorRow[];
   franchisees: AdminFranchiseeRow[];
+
+  // ✅ config
+  destinos: AdminDestinoRow[];
+  refreshDestinos: () => Promise<void>;
 
   refreshOffers: () => Promise<void>;
   refreshSession: () => Promise<void>;
@@ -205,6 +213,12 @@ function removeFromLsById(key: string, id: string) {
   window.localStorage.setItem(key, JSON.stringify(next));
 }
 
+function pickDestinoStatus(d: any): AdminStatus {
+  const s = String(d?.status ?? '').toLowerCase();
+  if (s === 'rascunho' || s === 'publicado' || s === 'pausado' || s === 'arquivado' || s === 'lixeira') return s;
+  return d?.ativo ? 'publicado' : 'pausado';
+}
+
 export function AdminDataProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
 
@@ -215,6 +229,9 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
   // ✅ novos
   const [ambassadors, setAmbassadors] = useState<AdminAmbassadorRow[]>([]);
   const [franchisees, setFranchisees] = useState<AdminFranchiseeRow[]>([]);
+
+  // ✅ config
+  const [destinos, setDestinos] = useState<AdminDestinoRow[]>([]);
 
   const [loaded, setLoaded] = useState(false);
 
@@ -237,6 +254,23 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
 
     const items = Array.isArray(data?.items) ? data.items : [];
     setOffers(items.map(mapDbOfferToAdminRow));
+  };
+
+  const refreshDestinos = async () => {
+    const { res, data } = await fetchJson('/api/admin/config/destinos');
+    if (!res.ok) return;
+
+    const list = Array.isArray(data?.destinos) ? data.destinos : [];
+    const mapped = list.map((d: any) => ({
+      id: String(d?.id ?? ''),
+      nome: String(d?.nome ?? ''),
+      slug: String(d?.slug ?? ''),
+      status: pickDestinoStatus(d),
+      criadoEm: String(d?.criadoEm ?? d?.createdAt ?? ''),
+      atualizadoEm: String(d?.atualizadoEm ?? d?.updatedAt ?? ''),
+    }));
+
+    setDestinos(mapped);
   };
 
   /**
@@ -274,6 +308,7 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
     refreshMockLists();
     refreshSession().catch(() => {});
     refreshOffers().catch(() => {});
+    refreshDestinos().catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loaded]);
 
@@ -658,6 +693,9 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
       ambassadors,
       franchisees,
 
+      destinos,
+      refreshDestinos,
+
       refreshOffers,
       refreshSession,
 
@@ -691,7 +729,7 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
       createFranchisee,
       updateFranchisee,
     }),
-    [session, offers, partners, affiliates, ambassadors, franchisees]
+    [session, offers, partners, affiliates, ambassadors, franchisees, destinos]
   );
 
   return <AdminDataContext.Provider value={value}>{children}</AdminDataContext.Provider>;
