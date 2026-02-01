@@ -8,7 +8,7 @@ import { cookies, headers } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
 
-type Ctx = { params: Promise<{ id: string }> };
+type Ctx = { params: { id: string } };
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -22,11 +22,7 @@ function requireMaster() {
   const c: any = cookies();
   const getCookieValue = (obj: any) => obj?.get?.(getSessionCookieName())?.value ?? null;
 
-  const raw =
-    typeof c?.then === 'function'
-      ? // cookies() retornou Promise
-        null
-      : getCookieValue(c);
+  const raw = typeof c?.then === 'function' ? null : getCookieValue(c);
 
   // Se cookies() veio como Promise, vamos resolver do jeito correto no runtime:
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -87,7 +83,7 @@ export async function GET(_req: NextRequest, context: Ctx) {
   const session = await requireMaster();
   if (!session) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
 
-  const { id } = await context.params;
+  const { id } = context.params;
   const cleanId = String(id ?? '').trim();
   if (!cleanId) return NextResponse.json({ ok: false, error: 'missing_id' }, { status: 400 });
 
@@ -109,7 +105,7 @@ export async function PATCH(req: NextRequest, context: Ctx) {
   const session = await requireMaster();
   if (!session) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
 
-  const { id } = await context.params;
+  const { id } = context.params;
   const cleanId = String(id ?? '').trim();
   if (!cleanId) return NextResponse.json({ ok: false, error: 'missing_id' }, { status: 400 });
 
@@ -179,7 +175,7 @@ export async function PUT(req: NextRequest, context: Ctx) {
   const session = await requireMaster();
   if (!session) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
 
-  const { id } = await context.params;
+  const { id } = context.params;
   const cleanId = String(id ?? '').trim();
   if (!cleanId) return NextResponse.json({ ok: false, error: 'missing_id' }, { status: 400 });
 
@@ -267,7 +263,7 @@ export async function DELETE(_req: NextRequest, context: Ctx) {
   const session = await requireMaster();
   if (!session) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
 
-  const { id } = await context.params;
+  const { id } = context.params;
   const cleanId = String(id ?? '').trim();
   if (!cleanId) return NextResponse.json({ ok: false, error: 'missing_id' }, { status: 400 });
 

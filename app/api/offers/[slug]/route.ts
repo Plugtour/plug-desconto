@@ -18,7 +18,7 @@ function looksLikeCuid(value: string) {
   return /^c[a-z0-9]{24,}$/i.test(value);
 }
 
-type RouteCtx = { params: Promise<{ slug: string }> };
+type RouteCtx = { params: { slug: string } };
 
 type ApiOffer = {
   id: string;
@@ -100,7 +100,7 @@ function mapOffer(db: {
 
 export async function GET(_request: Request, context: RouteCtx) {
   try {
-    const { slug } = await context.params;
+    const { slug } = context.params;
     const raw = decodeURIComponent(slug || '');
 
     const whereBase: Prisma.OfferWhereInput = {};
@@ -168,9 +168,6 @@ export async function GET(_request: Request, context: RouteCtx) {
     return NextResponse.json({ item: mapOffer(row) }, { status: 200 });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : String(e);
-    return NextResponse.json(
-      { error: 'Falha ao buscar oferta', detail: message },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Falha ao buscar oferta', detail: message }, { status: 500 });
   }
 }
