@@ -10,7 +10,13 @@ type IconKey =
   | 'bed'
   | 'bag'
   | 'car'
-  | 'star';
+  | 'star'
+  | 'food'
+  | 'service'
+  | 'shopping'
+  | 'hotel'
+  | 'transfer'
+  | 'attraction';
 
 type CategoryItem = {
   id: string;
@@ -38,13 +44,7 @@ type Props = {
 /* =========================
    SETAS (duplas abertas) — IGUAL MenuCarousel
 ========================= */
-function DoubleChevronOpen({
-  dir,
-  className,
-}: {
-  dir: 'left' | 'right';
-  className?: string;
-}) {
+function DoubleChevronOpen({ dir, className }: { dir: 'left' | 'right'; className?: string }) {
   const flip = dir === 'left';
   return (
     <svg viewBox="0 0 28 28" className={className} aria-hidden="true" fill="none">
@@ -63,13 +63,30 @@ function DoubleChevronOpen({
 }
 
 /* =========================
-   ÍCONES — IGUAL MenuCarousel
+   ÍCONES — COMPAT (ANTIGO + NOVO)
 ========================= */
 function Icon({ iconKey, className }: { iconKey: IconKey; className?: string }) {
   const common = 'h-5 w-5';
   const cls = className ? `${common} ${className}` : common;
 
-  switch (iconKey) {
+  // ✅ normaliza para o novo padrão quando vier do antigo
+  const k: IconKey =
+    iconKey === 'fork'
+      ? 'food'
+      : iconKey === 'spark'
+        ? 'service'
+        : iconKey === 'bag'
+          ? 'shopping'
+          : iconKey === 'bed'
+            ? 'hotel'
+            : iconKey === 'car'
+              ? 'transfer'
+              : iconKey === 'star'
+                ? 'attraction'
+                : iconKey;
+
+  switch (k) {
+    // mantém caso exista em algum lugar (destino/localização)
     case 'pin':
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none">
@@ -87,6 +104,7 @@ function Icon({ iconKey, className }: { iconKey: IconKey; className?: string }) 
         </svg>
       );
 
+    // ticket (amarelo)
     case 'ticket':
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none">
@@ -100,7 +118,8 @@ function Icon({ iconKey, className }: { iconKey: IconKey; className?: string }) 
         </svg>
       );
 
-    case 'spark':
+    // service (azul)
+    case 'service':
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none">
           <path
@@ -118,7 +137,8 @@ function Icon({ iconKey, className }: { iconKey: IconKey; className?: string }) 
         </svg>
       );
 
-    case 'fork':
+    // food (vermelho)
+    case 'food':
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none">
           <path d="M7 3v7M10 3v7M8.5 10v11" stroke="#EF4444" strokeWidth="2" strokeLinecap="round" />
@@ -126,7 +146,8 @@ function Icon({ iconKey, className }: { iconKey: IconKey; className?: string }) 
         </svg>
       );
 
-    case 'bed':
+    // hotel (roxo)
+    case 'hotel':
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none">
           <path
@@ -145,7 +166,8 @@ function Icon({ iconKey, className }: { iconKey: IconKey; className?: string }) 
         </svg>
       );
 
-    case 'bag':
+    // shopping (laranja)
+    case 'shopping':
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none">
           <path d="M7.5 9h9l-.7 10H8.2L7.5 9z" stroke="#F97316" strokeWidth="2" strokeLinejoin="round" />
@@ -158,7 +180,8 @@ function Icon({ iconKey, className }: { iconKey: IconKey; className?: string }) 
         </svg>
       );
 
-    case 'car':
+    // transfer (ciano)
+    case 'transfer':
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none">
           <path
@@ -176,7 +199,8 @@ function Icon({ iconKey, className }: { iconKey: IconKey; className?: string }) 
         </svg>
       );
 
-    case 'star':
+    // attraction (estrela amarela)
+    case 'attraction':
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none">
           <path
@@ -193,12 +217,7 @@ function Icon({ iconKey, className }: { iconKey: IconKey; className?: string }) 
   }
 }
 
-export default function FloatingTopMenu({
-  categories,
-  visible,
-  onOpenModal,
-  onCategoryClick,
-}: Props) {
+export default function FloatingTopMenu({ categories, visible, onOpenModal, onCategoryClick }: Props) {
   const scrollerRef = useRef<HTMLDivElement | null>(null);
 
   const [canLeft, setCanLeft] = useState(false);
@@ -324,9 +343,7 @@ export default function FloatingTopMenu({
       style={{
         top: 'var(--app-header-h, 55px)',
         transform: canShow ? 'translateY(0px)' : 'translateY(-100%)',
-        transitionTimingFunction: canShow
-          ? 'cubic-bezier(0.16, 1, 0.3, 1)'
-          : 'cubic-bezier(0.4, 0, 0.2, 1)',
+        transitionTimingFunction: canShow ? 'cubic-bezier(0.16, 1, 0.3, 1)' : 'cubic-bezier(0.4, 0, 0.2, 1)',
       }}
     >
       <section className="relative px-4 pt-0">

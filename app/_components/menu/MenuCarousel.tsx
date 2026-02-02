@@ -13,6 +13,11 @@ type CategoryItem = {
   iconKey: IconKey;
 };
 
+/**
+ * ✅ Compatível com:
+ * - padrão antigo (pin, spark, fork, bed, bag, car, star)
+ * - padrão novo do Admin (food, ticket, service, shopping, hotel, transfer, attraction)
+ */
 type IconKey =
   | 'pin'
   | 'ticket'
@@ -21,14 +26,20 @@ type IconKey =
   | 'bed'
   | 'bag'
   | 'car'
-  | 'star';
+  | 'star'
+  | 'food'
+  | 'service'
+  | 'shopping'
+  | 'hotel'
+  | 'transfer'
+  | 'attraction';
 
 type Props = {
   categories: CategoryItem[];
   className?: string;
 
   /**
-   * ✅ NOVO: ao clicar em QUALQUER categoria, abre o modal
+   * ✅ ao clicar em QUALQUER categoria, abre o modal
    * e envia o nome da categoria (ex: "Passeios")
    */
   onOpenModal?: (categoryName: string) => void;
@@ -43,13 +54,7 @@ type Props = {
    SETAS (duplas, abertas, sem fundo)
 ========================= */
 
-function DoubleChevronOpen({
-  dir,
-  className,
-}: {
-  dir: 'left' | 'right';
-  className?: string;
-}) {
+function DoubleChevronOpen({ dir, className }: { dir: 'left' | 'right'; className?: string }) {
   const flip = dir === 'left';
   return (
     <svg viewBox="0 0 28 28" className={className} aria-hidden="true" fill="none">
@@ -71,17 +76,28 @@ function DoubleChevronOpen({
    ÍCONES
 ========================= */
 
-function Icon({
-  iconKey,
-  className,
-}: {
-  iconKey: IconKey;
-  className?: string;
-}) {
+function Icon({ iconKey, className }: { iconKey: IconKey; className?: string }) {
   const common = 'h-5 w-5';
   const cls = className ? `${common} ${className}` : common;
 
-  switch (iconKey) {
+  // ✅ normaliza para o novo padrão quando vier do antigo
+  const k: IconKey =
+    iconKey === 'fork'
+      ? 'food'
+      : iconKey === 'spark'
+        ? 'service'
+        : iconKey === 'bag'
+          ? 'shopping'
+          : iconKey === 'bed'
+            ? 'hotel'
+            : iconKey === 'car'
+              ? 'transfer'
+              : iconKey === 'star'
+                ? 'attraction'
+                : iconKey;
+
+  switch (k) {
+    // mantém caso exista em algum lugar (destino/localização)
     case 'pin':
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none">
@@ -99,6 +115,7 @@ function Icon({
         </svg>
       );
 
+    // ✅ Admin -> ticket (amarelo)
     case 'ticket':
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none">
@@ -112,7 +129,8 @@ function Icon({
         </svg>
       );
 
-    case 'spark':
+    // ✅ Admin -> service (azul)
+    case 'service':
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none">
           <path
@@ -130,7 +148,8 @@ function Icon({
         </svg>
       );
 
-    case 'fork':
+    // ✅ Admin -> food (vermelho)
+    case 'food':
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none">
           <path
@@ -148,7 +167,8 @@ function Icon({
         </svg>
       );
 
-    case 'bed':
+    // ✅ Admin -> hotel (roxo)
+    case 'hotel':
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none">
           <path
@@ -172,7 +192,8 @@ function Icon({
         </svg>
       );
 
-    case 'bag':
+    // ✅ Admin -> shopping (laranja)
+    case 'shopping':
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none">
           <path
@@ -190,7 +211,8 @@ function Icon({
         </svg>
       );
 
-    case 'car':
+    // ✅ Admin -> transfer (ciano)
+    case 'transfer':
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none">
           <path
@@ -213,7 +235,8 @@ function Icon({
         </svg>
       );
 
-    case 'star':
+    // ✅ Admin -> attraction (estrela amarela)
+    case 'attraction':
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none">
           <path
@@ -230,12 +253,7 @@ function Icon({
   }
 }
 
-export default function MenuCarousel({
-  categories,
-  className,
-  onOpenModal,
-  onCategoryClick,
-}: Props) {
+export default function MenuCarousel({ categories, className, onOpenModal, onCategoryClick }: Props) {
   const scrollerRef = useRef<HTMLDivElement | null>(null);
 
   const [canLeft, setCanLeft] = useState(false);
@@ -247,10 +265,7 @@ export default function MenuCarousel({
   const [leftAnim, setLeftAnim] = useState<'enter' | 'exit'>('enter');
   const [rightAnim, setRightAnim] = useState<'enter' | 'exit'>('enter');
 
-  const pagesCount = useMemo(
-    () => Math.max(1, Math.ceil(categories.length / 8)),
-    [categories.length]
-  );
+  const pagesCount = useMemo(() => Math.max(1, Math.ceil(categories.length / 8)), [categories.length]);
 
   function computeNavState() {
     const el = scrollerRef.current;

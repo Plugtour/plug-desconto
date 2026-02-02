@@ -18,13 +18,14 @@ export type AdminCategoria = {
   nome: string;
   slug: string;
   ativo: boolean;
+  iconKey?: string | null;
   criadoEm: string;
   atualizadoEm: string;
 };
 
 type AdminConfigDB = {
   destinos: any[]; // mantemos any aqui pra suportar migração de dados antigos
-  categorias: AdminCategoria[];
+  categorias: any[]; // mantemos any aqui pra suportar migração de dados antigos
 };
 
 const DB_PATH = path.join(process.cwd(), 'app', 'admin', '_store', 'adminConfig.json');
@@ -90,13 +91,37 @@ function normalizeDestino(d: any): AdminDestino {
   };
 }
 
+function normalizeCategoria(c: any): AdminCategoria {
+  const now = new Date().toISOString();
+  const nome = String(c?.nome ?? '').trim();
+  const criadoEm = String(c?.criadoEm ?? c?.createdAt ?? now);
+  const atualizadoEm = String(c?.atualizadoEm ?? c?.updatedAt ?? criadoEm);
+  const slug = String(c?.slug ?? slugify(nome));
+
+  const ativo = typeof c?.ativo === 'boolean' ? c.ativo : true;
+
+  const iconKeyRaw = c?.iconKey;
+  const iconKey =
+    iconKeyRaw == null ? null : String(iconKeyRaw).trim() ? String(iconKeyRaw).trim() : null;
+
+  return {
+    id: String(c?.id ?? uid('cat')),
+    nome,
+    slug,
+    ativo,
+    iconKey,
+    criadoEm,
+    atualizadoEm,
+  };
+}
+
 export async function readConfig(): Promise<{ destinos: AdminDestino[]; categorias: AdminCategoria[] }> {
   await ensureFile();
   const raw = await fs.readFile(DB_PATH, 'utf-8');
   const parsed = JSON.parse(raw) as AdminConfigDB;
 
   const destinos = Array.isArray(parsed.destinos) ? parsed.destinos.map(normalizeDestino) : [];
-  const categorias = Array.isArray(parsed.categorias) ? parsed.categorias : [];
+  const categorias = Array.isArray(parsed.categorias) ? parsed.categorias.map(normalizeCategoria) : [];
 
   // ✅ grava de volta já normalizado (migração silenciosa)
   await fs.writeFile(DB_PATH, JSON.stringify({ destinos, categorias }, null, 2), 'utf-8');
@@ -136,10 +161,7 @@ export async function createDestino(nome: string) {
   return item;
 }
 
-export async function updateDestino(
-  id: string,
-  patch: Partial<Pick<AdminDestino, 'nome' | 'status'>>
-) {
+export async function updateDestino(id: string, patch: Partial<Pick<AdminDestino, 'nome' | 'status'>>) {
   const db = await readConfig();
   const idx = db.destinos.findIndex((d) => d.id === id);
   if (idx === -1) throw new Error('Destino não encontrado.');
@@ -185,14 +207,14 @@ export async function deleteDestino(id: string) {
   return true;
 }
 
-// ===== categorias (mantido como estava) =====
+// ===== categorias =====
 
-export async function listCategorias() {
+export async function listCategorias(): Promise<AdminCategoria[]> {
   const db = await readConfig();
   return db.categorias.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 }
 
-export async function createCategoria(nome: string) {
+export async function createCategoria(nome: string, iconKey?: string | null) {
   const db = await readConfig();
   const now = new Date().toISOString();
   const slug = slugify(nome);
@@ -200,11 +222,14 @@ export async function createCategoria(nome: string) {
   const exists = db.categorias.some((c) => c.slug === slug);
   if (exists) throw new Error('Já existe uma categoria com esse nome.');
 
+  const cleanIconKey = iconKey == null ? null : String(iconKey).trim() || null;
+
   const item: AdminCategoria = {
     id: uid('cat'),
     nome: nome.trim(),
     slug,
     ativo: true,
+    iconKey: cleanIconKey,
     criadoEm: now,
     atualizadoEm: now,
   };
@@ -214,7 +239,10 @@ export async function createCategoria(nome: string) {
   return item;
 }
 
-export async function updateCategoria(id: string, patch: Partial<Pick<AdminCategoria, 'nome' | 'ativo'>>) {
+export async function updateCategoria(
+  id: string,
+  patch: Partial<Pick<AdminCategoria, 'nome' | 'ativo' | 'iconKey'>>
+) {
   const db = await readConfig();
   const idx = db.categorias.findIndex((c) => c.id === id);
   if (idx === -1) throw new Error('Categoria não encontrada.');
@@ -228,11 +256,19 @@ export async function updateCategoria(id: string, patch: Partial<Pick<AdminCateg
   const conflict = db.categorias.some((c) => c.id !== id && c.slug === nextSlug);
   if (conflict) throw new Error('Já existe outra categoria com esse nome.');
 
+  const nextIconKey =
+    patch.hasOwnProperty('iconKey')
+      ? patch.iconKey == null
+        ? null
+        : String(patch.iconKey).trim() || null
+      : current.iconKey ?? null;
+
   db.categorias[idx] = {
     ...current,
     nome: nextNome,
     slug: nextSlug,
     ativo: patch.ativo ?? current.ativo,
+    iconKey: nextIconKey,
     atualizadoEm: now,
   };
 

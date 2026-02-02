@@ -1,7 +1,11 @@
 // app/api/offers/route.ts
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 import { NextResponse } from 'next/server';
 import { Prisma, OfferStatus } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
+import { listCategorias } from '@/app/admin/_store/configStore';
 
 function normalizeCity(value: string) {
   return (value || '').trim();
@@ -19,7 +23,7 @@ type ApiOffer = {
   status: string;
 
   categoryId: string;
-  category: string;
+  category: string; // ✅ nome da categoria (quando existir)
 
   title: string;
 
@@ -45,20 +49,26 @@ function pickImages(imageUrl: string | null) {
   return url ? [url] : [];
 }
 
-function mapOffer(db: {
-  id: string;
-  slug: string;
-  city: string;
-  status: string;
-  categoryId: string;
-  title: string;
-  partnerName: string;
-  description: string | null;
-  imageUrl: string | null;
-  priceText: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-}): ApiOffer {
+function mapOffer(
+  db: {
+    id: string;
+    slug: string;
+    city: string;
+    status: string;
+    categoryId: string;
+    title: string;
+    partnerName: string;
+    description: string | null;
+    imageUrl: string | null;
+    priceText: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+  },
+  categoryNameById: Map<string, string>
+): ApiOffer {
+  const catId = (db.categoryId || '').trim();
+  const catName = categoryNameById.get(catId) || catId || '';
+
   return {
     id: db.id,
     slug: db.slug,
@@ -67,7 +77,7 @@ function mapOffer(db: {
     status: db.status,
 
     categoryId: db.categoryId,
-    category: db.categoryId,
+    category: catName, // ✅ agora é o nome real
 
     title: db.title,
 
@@ -104,6 +114,14 @@ export async function GET(request: Request) {
     if (cityParamRaw) where.city = normalizeCity(cityParamRaw);
     if (categoryParam) where.categoryId = normalizeCat(categoryParam);
 
+    // ✅ carrega categorias do Admin pra devolver o nome (category)
+    const categorias = await listCategorias();
+    const categoryNameById = new Map<string, string>();
+    for (const c of categorias || []) {
+      if (!c) continue;
+      categoryNameById.set(String(c.id), String(c.nome ?? '').trim());
+    }
+
     const rows = await prisma.offer.findMany({
       where,
       orderBy: { updatedAt: 'desc' },
@@ -124,7 +142,7 @@ export async function GET(request: Request) {
       },
     });
 
-    const items = Array.isArray(rows) ? rows.map(mapOffer) : [];
+    const items = Array.isArray(rows) ? rows.map((r) => mapOffer(r as any, categoryNameById)) : [];
     return NextResponse.json({ items, total: items.length }, { status: 200 });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : String(e);

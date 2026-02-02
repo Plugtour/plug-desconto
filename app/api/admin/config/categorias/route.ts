@@ -11,11 +11,13 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const body = (await req.json()) as { nome?: string };
+    const body = (await req.json()) as { nome?: string; iconKey?: string | null };
     const nome = (body?.nome || '').trim();
+    const iconKey = (body?.iconKey || '').trim() || null;
+
     if (!nome) return NextResponse.json({ error: 'Informe o nome.' }, { status: 400 });
 
-    const created = await createCategoria(nome);
+    const created = await createCategoria(nome, iconKey);
     return NextResponse.json({ categoria: created });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'Erro ao criar.' }, { status: 400 });

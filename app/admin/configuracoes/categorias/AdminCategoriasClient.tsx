@@ -10,13 +10,26 @@ type Categoria = {
   nome: string;
   slug: string;
   ativo: boolean;
+  iconKey?: string;
   criadoEm: string;
   atualizadoEm: string;
 };
 
+// lista controlada de ícones disponíveis
+const ICON_OPTIONS = [
+  { key: 'food', label: 'Gastronomia' },
+  { key: 'ticket', label: 'Ingressos' },
+  { key: 'service', label: 'Serviços' },
+  { key: 'shopping', label: 'Compras' },
+  { key: 'hotel', label: 'Hospedagem' },
+  { key: 'transfer', label: 'Transfers' },
+  { key: 'attraction', label: 'Atrações' },
+];
+
 export default function AdminCategoriasClient() {
   const [items, setItems] = useState<Categoria[]>([]);
   const [nome, setNome] = useState('');
+  const [iconKey, setIconKey] = useState<string>('food');
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -42,11 +55,12 @@ export default function AdminCategoriasClient() {
       const r = await fetch('/api/admin/config/categorias', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nome: v }),
+        body: JSON.stringify({ nome: v, iconKey }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j?.error || 'Erro');
       setNome('');
+      setIconKey('food');
       await refresh();
     } catch (e: any) {
       setErr(e?.message || 'Erro ao criar');
@@ -55,7 +69,7 @@ export default function AdminCategoriasClient() {
     }
   }
 
-  async function onUpdate(id: string, patch: Partial<Pick<Categoria, 'nome' | 'ativo'>>) {
+  async function onUpdate(id: string, patch: Partial<Pick<Categoria, 'nome' | 'ativo' | 'iconKey'>>) {
     setErr(null);
     try {
       const r = await fetch(`/api/admin/config/categorias/${id}`, {
@@ -108,13 +122,27 @@ export default function AdminCategoriasClient() {
 
       <div className="rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
         <div className="text-sm font-medium">Nova categoria</div>
-        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
+
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <input
             value={nome}
             onChange={(e) => setNome(e.target.value)}
             placeholder="Ex: Gastronomia"
-            className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-200 dark:border-zinc-800 dark:bg-zinc-950 dark:focus:ring-zinc-800"
+            className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-200 dark:border-zinc-800 dark:bg-zinc-950 dark:focus:ring-zinc-800"
           />
+
+          <select
+            value={iconKey}
+            onChange={(e) => setIconKey(e.target.value)}
+            className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-800 dark:bg-zinc-950"
+          >
+            {ICON_OPTIONS.map((opt) => (
+              <option key={opt.key} value={opt.key}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+
           <button
             type="button"
             onClick={onCreate}
@@ -130,13 +158,17 @@ export default function AdminCategoriasClient() {
       </div>
 
       <div className="rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
-        <div className="border-b border-zinc-200 px-4 py-3 text-sm font-medium dark:border-zinc-800">Lista</div>
+        <div className="border-b border-zinc-200 px-4 py-3 text-sm font-medium dark:border-zinc-800">
+          Lista
+        </div>
 
         <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
           {items.map((c) => (
             <Row key={c.id} item={c} onUpdate={onUpdate} onDelete={onDelete} />
           ))}
-          {items.length === 0 && <div className="px-4 py-6 text-sm text-zinc-500">Nenhuma categoria cadastrada.</div>}
+          {items.length === 0 && (
+            <div className="px-4 py-6 text-sm text-zinc-500">Nenhuma categoria cadastrada.</div>
+          )}
         </div>
       </div>
     </div>
@@ -149,21 +181,36 @@ function Row({
   onDelete,
 }: {
   item: Categoria;
-  onUpdate: (id: string, patch: Partial<Pick<Categoria, 'nome' | 'ativo'>>) => void;
+  onUpdate: (id: string, patch: Partial<Pick<Categoria, 'nome' | 'ativo' | 'iconKey'>>) => void;
   onDelete: (id: string) => void;
 }) {
   const [nome, setNome] = useState(item.nome);
-  const changed = nome.trim() !== item.nome;
+  const [iconKey, setIconKey] = useState(item.iconKey || 'food');
+
+  const changed = nome.trim() !== item.nome || iconKey !== (item.iconKey || 'food');
 
   return (
     <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 space-y-2">
         <div className="text-xs text-zinc-500">Slug: {item.slug}</div>
+
         <input
           value={nome}
           onChange={(e) => setNome(e.target.value)}
-          className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-200 dark:border-zinc-800 dark:bg-zinc-950 dark:focus:ring-zinc-800"
+          className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-200 dark:border-zinc-800 dark:bg-zinc-950 dark:focus:ring-zinc-800"
         />
+
+        <select
+          value={iconKey}
+          onChange={(e) => setIconKey(e.target.value)}
+          className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-800 dark:bg-zinc-950"
+        >
+          {ICON_OPTIONS.map((opt) => (
+            <option key={opt.key} value={opt.key}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -176,7 +223,6 @@ function Row({
               ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-900/20 dark:text-emerald-200'
               : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900',
           ].join(' ')}
-          title={item.ativo ? 'Desativar' : 'Ativar'}
         >
           {item.ativo ? 'Ativo' : 'Inativo'}
         </button>
@@ -184,7 +230,7 @@ function Row({
         <button
           type="button"
           disabled={!changed}
-          onClick={() => onUpdate(item.id, { nome })}
+          onClick={() => onUpdate(item.id, { nome, iconKey })}
           className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50 disabled:opacity-60 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900"
         >
           <Save className="h-4 w-4" />

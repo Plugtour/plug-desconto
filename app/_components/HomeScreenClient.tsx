@@ -32,13 +32,27 @@ type IconKey =
   | 'bed'
   | 'bag'
   | 'car'
-  | 'star';
+  | 'star'
+  | 'food'
+  | 'service'
+  | 'shopping'
+  | 'hotel'
+  | 'transfer'
+  | 'attraction';
 
 type CategoryItem = {
   id: string;
   title: string;
   count: number;
   iconKey: IconKey;
+};
+
+type ApiCategoria = {
+  id: string;
+  nome: string;
+  slug: string;
+  ativo: boolean;
+  iconKey?: string | null;
 };
 
 function norm(v: any) {
@@ -74,9 +88,7 @@ function mapToSponsoredOffer(o: any, fallbackCategoryTitle: string): SponsoredOf
   const city = norm(o?.city ?? o?.cidade) || null;
 
   const tags =
-    Array.isArray(o?.tags) && o.tags.length
-      ? o.tags
-      : [city || 'Serra Gaúcha', fallbackCategoryTitle, 'Top'];
+    Array.isArray(o?.tags) && o.tags.length ? o.tags : [city || 'Serra Gaúcha', fallbackCategoryTitle, 'Top'];
 
   // campos extras opcionais que seu ProductDetailContent tenta ler
   const vendorName = o?.vendorName ?? o?.parceiro ?? o?.partnerName ?? null;
@@ -109,6 +121,41 @@ function mapToSponsoredOffer(o: any, fallbackCategoryTitle: string): SponsoredOf
   } as any;
 }
 
+function normalizeIconKey(v: any): IconKey {
+  const s = norm(v);
+
+  // padrão novo
+  if (
+    s === 'food' ||
+    s === 'ticket' ||
+    s === 'service' ||
+    s === 'shopping' ||
+    s === 'hotel' ||
+    s === 'transfer' ||
+    s === 'attraction'
+  )
+    return s;
+
+  // compatibilidade com padrão antigo (caso venha de algum lugar)
+  if (s === 'pin' || s === 'spark' || s === 'fork' || s === 'bed' || s === 'bag' || s === 'car' || s === 'star')
+    return s;
+
+  // default seguro
+  return 'service';
+}
+
+function buildFallbackCategories(): CategoryItem[] {
+  return [
+    { id: 'fallback-1', title: 'Ingressos', count: 0, iconKey: 'ticket' },
+    { id: 'fallback-2', title: 'Serviços', count: 0, iconKey: 'service' },
+    { id: 'fallback-3', title: 'Gastronomia', count: 0, iconKey: 'food' },
+    { id: 'fallback-4', title: 'Hospedagem', count: 0, iconKey: 'hotel' },
+    { id: 'fallback-5', title: 'Compras', count: 0, iconKey: 'shopping' },
+    { id: 'fallback-6', title: 'Transfers', count: 0, iconKey: 'transfer' },
+    { id: 'fallback-7', title: 'Atrações', count: 0, iconKey: 'attraction' },
+  ];
+}
+
 export default function HomeScreenClient({
   regionLabel = 'Serra Gaúcha',
   offers = [],
@@ -116,28 +163,52 @@ export default function HomeScreenClient({
   regionLabel?: string;
   offers: OfferLike[];
 }) {
-  const categories: CategoryItem[] = useMemo(
-    () => [
-      { id: 'passeios', title: 'Passeios', count: 23, iconKey: 'pin' },
-      { id: 'ingressos', title: 'Ingressos', count: 31, iconKey: 'ticket' },
-      { id: 'servicos', title: 'Serviços', count: 12, iconKey: 'spark' },
-      { id: 'gastronomia', title: 'Gastronomia', count: 8, iconKey: 'fork' },
-      { id: 'hospedagem', title: 'Hospedagem', count: 5, iconKey: 'bed' },
-      { id: 'compras', title: 'Compras', count: 10, iconKey: 'bag' },
-      { id: 'transfers', title: 'Transfers', count: 14, iconKey: 'car' },
-      { id: 'atracoes', title: 'Atrações', count: 9, iconKey: 'star' },
+  const [categories, setCategories] = useState<CategoryItem[]>(() => buildFallbackCategories());
 
-      { id: 'passeios2', title: 'Passeios', count: 11, iconKey: 'pin' },
-      { id: 'ingressos2', title: 'Ingressos', count: 7, iconKey: 'ticket' },
-      { id: 'servicos2', title: 'Serviços', count: 6, iconKey: 'spark' },
-      { id: 'gastronomia2', title: 'Gastronomia', count: 4, iconKey: 'fork' },
-      { id: 'hospedagem2', title: 'Hospedagem', count: 3, iconKey: 'bed' },
-      { id: 'compras2', title: 'Compras', count: 8, iconKey: 'bag' },
-      { id: 'transfers2', title: 'Transfers', count: 5, iconKey: 'car' },
-      { id: 'atracoes2', title: 'Atrações', count: 6, iconKey: 'star' },
-    ],
-    []
-  );
+  // Carrega categorias cadastradas no Admin (ativas) e calcula count pelas offers
+  useEffect(() => {
+    let alive = true;
+
+    async function load() {
+      try {
+        const r = await fetch('/api/categories', { cache: 'no-store' });
+        const j = await r.json().catch(() => null);
+
+        const list = (j?.categories ?? j?.categorias ?? []) as ApiCategoria[];
+        const raw = Array.isArray(list) ? list : [];
+
+        const active = raw.filter((c) => c && c.ativo);
+
+        // contador por categoryId (oferta precisa ter categoryId = id da categoria)
+        const counts = new Map<string, number>();
+        const rawOffers = Array.isArray(offers) ? offers : [];
+        for (const o of rawOffers) {
+          const cid = norm(o?.categoryId ?? o?.category ?? o?.categoriaId);
+          if (!cid) continue;
+          counts.set(cid, (counts.get(cid) ?? 0) + 1);
+        }
+
+        const mapped: CategoryItem[] = active.map((c) => ({
+          id: String(c.id),
+          title: String(c.nome ?? '').trim() || 'Categoria',
+          count: counts.get(String(c.id)) ?? 0,
+          iconKey: normalizeIconKey(c.iconKey),
+        }));
+
+        // se vier vazio, mantém fallback
+        if (!alive) return;
+        setCategories(mapped.length ? mapped : buildFallbackCategories());
+      } catch {
+        if (!alive) return;
+        setCategories(buildFallbackCategories());
+      }
+    }
+
+    load();
+    return () => {
+      alive = false;
+    };
+  }, [offers]);
 
   /* =========================
      MODAL (Categorias)
@@ -240,8 +311,7 @@ export default function HomeScreenClient({
         const subtitle =
           (o?.subtitle ?? o?.subTitle ?? o?.descricaoCurta ?? o?.shortDescription ?? null) as string | null;
 
-        const categoryId =
-          (o?.categoryId ?? o?.category ?? o?.categoriaId ?? null) as string | null;
+        const categoryId = (o?.categoryId ?? o?.category ?? o?.categoriaId ?? null) as string | null;
 
         const city = (o?.city ?? o?.cidade ?? o?.locationCity ?? null) as string | null;
 
@@ -368,7 +438,7 @@ export default function HomeScreenClient({
         <div style={{ height: showFloatingMenu ? FLOATING_MENU_H : 0 }} />
       </div>
 
-      {/* ✅ MODAL (Categorias) — AGORA COM LISTA */}
+      {/* ✅ MODAL (Categorias) — com lista */}
       <MenuCarouselModal
         open={menuModalOpen}
         onClose={closeMenuModal}
@@ -407,12 +477,7 @@ export default function HomeScreenClient({
 
       <div className="pt-1">
         <div className="px-4 mt-1 pb-2">
-          <QuickSearch
-            offers={searchData}
-            categories={searchCategories}
-            useExternalModal
-            onOpenExternal={openSearchModal}
-          />
+          <QuickSearch offers={searchData} categories={searchCategories} useExternalModal onOpenExternal={openSearchModal} />
         </div>
       </div>
 

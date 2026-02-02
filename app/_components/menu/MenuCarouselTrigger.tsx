@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import MenuCarouselModal from './MenuCarouselModal';
 
 type IconKey =
@@ -11,7 +11,13 @@ type IconKey =
   | 'bed'
   | 'bag'
   | 'car'
-  | 'star';
+  | 'star'
+  | 'food'
+  | 'service'
+  | 'shopping'
+  | 'hotel'
+  | 'transfer'
+  | 'attraction';
 
 type CategoryItem = {
   id: string;
@@ -28,7 +34,10 @@ export default function MenuCarouselTrigger({ categories }: Props) {
   const [open, setOpen] = useState(false);
   const [categoryName, setCategoryName] = useState<string>('');
 
-  function handleOpen(cat: CategoryItem) {
+  const first = useMemo(() => categories?.[0] ?? null, [categories]);
+
+  function handleOpen(cat?: CategoryItem | null) {
+    if (!cat) return;
     setCategoryName(cat.title);
     setOpen(true);
   }
@@ -37,8 +46,12 @@ export default function MenuCarouselTrigger({ categories }: Props) {
     <>
       <button
         type="button"
-        onClick={() => handleOpen(categories[0])}
-        className="rounded-xl bg-zinc-900 text-white px-4 py-2 text-sm font-semibold"
+        onClick={() => handleOpen(first)}
+        disabled={!first}
+        className={[
+          'rounded-xl px-4 py-2 text-sm font-semibold',
+          first ? 'bg-zinc-900 text-white' : 'bg-zinc-300 text-zinc-600 cursor-not-allowed',
+        ].join(' ')}
       >
         Abrir menu
       </button>

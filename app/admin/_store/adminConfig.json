@@ -31,6 +31,7 @@
       "nome": "Passeios",
       "slug": "passeios",
       "ativo": true,
+      "iconKey": null,
       "criadoEm": "2026-01-29T15:59:10.845Z",
       "atualizadoEm": "2026-01-29T15:59:10.845Z"
     },
@@ -39,6 +40,7 @@
       "nome": "Gastronomia",
       "slug": "gastronomia",
       "ativo": true,
+      "iconKey": null,
       "criadoEm": "2026-01-29T15:59:19.146Z",
       "atualizadoEm": "2026-01-29T15:59:19.146Z"
     },
@@ -47,6 +49,7 @@
       "nome": "teste",
       "slug": "teste",
       "ativo": true,
+      "iconKey": null,
       "criadoEm": "2026-02-01T06:54:18.588Z",
       "atualizadoEm": "2026-02-01T06:54:18.588Z"
     }
