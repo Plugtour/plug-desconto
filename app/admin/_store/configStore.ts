@@ -46,22 +46,24 @@ function uid(prefix: string) {
   return `${prefix}_${Math.random().toString(36).slice(2, 9)}${Date.now().toString(36)}`;
 }
 
-function isReadOnlyFsError(e: unknown) {
-  const code = (e as any)?.code;
-  return code === 'EROFS' || code === 'EPERM' || code === 'EACCES';
+function isReadOnlyFS(err: any) {
+  const code = err?.code ? String(err.code) : '';
+  const msg = err?.message ? String(err.message) : '';
+  return code === 'EROFS' || msg.includes('read-only file system');
 }
 
 async function ensureFile() {
   try {
     await fs.access(DB_PATH);
-  } catch {
-    const initial: AdminConfigDB = { destinos: [], categorias: [] };
+  } catch (e: any) {
+    // se não existir, tenta criar — mas em produção pode falhar (FS read-only)
     try {
+      const initial: AdminConfigDB = { destinos: [], categorias: [] };
       await fs.writeFile(DB_PATH, JSON.stringify(initial, null, 2), 'utf-8');
-    } catch (e: unknown) {
-      // Em ambientes read-only (ex: Vercel), não dá pra criar/alterar arquivo.
-      // Para evitar derrubar rotas públicas, seguimos sem escrever.
-      if (!isReadOnlyFsError(e)) throw e;
+    } catch (err: any) {
+      // se for read-only, só ignora (não pode criar arquivo em runtime)
+      if (isReadOnlyFS(err)) return;
+      throw err;
     }
   }
 }
@@ -125,17 +127,21 @@ function normalizeCategoria(c: any): AdminCategoria {
 }
 
 export async function readConfig(): Promise<{ destinos: AdminDestino[]; categorias: AdminCategoria[] }> {
-  await ensureFile();
+  // tenta garantir o arquivo, mas não quebra se o FS for read-only
+  try {
+    await ensureFile();
+  } catch (e: any) {
+    // se der erro inesperado aqui, ainda tentamos seguir pra readFile
+  }
 
+  // tenta ler; se falhar em produção, devolve vazio (sem derrubar o site)
   let raw = '';
   try {
     raw = await fs.readFile(DB_PATH, 'utf-8');
-  } catch (e: unknown) {
-    // Se não conseguir ler, devolve vazio (não derruba SSR/rotas públicas)
-    if (isReadOnlyFsError(e) || (e as any)?.code === 'ENOENT') {
-      return { destinos: [], categorias: [] };
-    }
-    throw e;
+  } catch (e: any) {
+    // produção (Vercel): não tem como escrever/às vezes nem ler o arquivo no path esperado
+    // então retornamos config vazia para o site não cair
+    return { destinos: [], categorias: [] };
   }
 
   let parsed: AdminConfigDB;
@@ -149,11 +155,11 @@ export async function readConfig(): Promise<{ destinos: AdminDestino[]; categori
   const categorias = Array.isArray(parsed.categorias) ? parsed.categorias.map(normalizeCategoria) : [];
 
   // ✅ grava de volta já normalizado (migração silenciosa)
-  // Em ambiente read-only, apenas ignora.
+  // ⚠️ em produção pode ser read-only, então não pode derrubar o app
   try {
     await fs.writeFile(DB_PATH, JSON.stringify({ destinos, categorias }, null, 2), 'utf-8');
-  } catch (e: unknown) {
-    if (!isReadOnlyFsError(e)) throw e;
+  } catch (e: any) {
+    if (!isReadOnlyFS(e)) throw e;
   }
 
   return { destinos, categorias };
@@ -162,12 +168,8 @@ export async function readConfig(): Promise<{ destinos: AdminDestino[]; categori
 export async function writeConfig(db: { destinos: AdminDestino[]; categorias: AdminCategoria[] }) {
   try {
     await fs.writeFile(DB_PATH, JSON.stringify(db, null, 2), 'utf-8');
-  } catch (e: unknown) {
-    // Aqui é usado por rotas de admin (criar/editar). Em produção read-only não dá pra persistir.
-    if (isReadOnlyFsError(e)) {
-      throw new Error('Armazenamento de configurações está indisponível neste ambiente (read-only).');
-    }
-    throw e;
+  } catch (e: any) {
+    if (!isReadOnlyFS(e)) throw e;
   }
 }
 
@@ -278,10 +280,7 @@ export async function createCategoria(nome: string, iconKey?: string | null) {
   return item;
 }
 
-export async function updateCategoria(
-  id: string,
-  patch: Partial<Pick<AdminCategoria, 'nome' | 'ativo' | 'iconKey'>>
-) {
+export async function updateCategoria(id: string, patch: Partial<Pick<AdminCategoria, 'nome' | 'ativo' | 'iconKey'>>) {
   const db = await readConfig();
   const idx = db.categorias.findIndex((c) => c.id === id);
   if (idx === -1) throw new Error('Categoria não encontrada.');
@@ -295,11 +294,12 @@ export async function updateCategoria(
   const conflict = db.categorias.some((c) => c.id !== id && c.slug === nextSlug);
   if (conflict) throw new Error('Já existe outra categoria com esse nome.');
 
-  const nextIcon = patch.hasOwnProperty('iconKey')
-    ? typeof patch.iconKey === 'string' && patch.iconKey.trim()
-      ? patch.iconKey.trim()
-      : null
-    : current.iconKey ?? null;
+  const nextIcon =
+    patch.hasOwnProperty('iconKey')
+      ? typeof patch.iconKey === 'string' && patch.iconKey.trim()
+        ? patch.iconKey.trim()
+        : null
+      : current.iconKey ?? null;
 
   db.categorias[idx] = {
     ...current,

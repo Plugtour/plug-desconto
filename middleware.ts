@@ -20,6 +20,25 @@ function isAdminApiPath(pathname: string) {
   return pathname === '/api/admin' || pathname.startsWith('/api/admin/');
 }
 
+// ✅ Rotas que precisam ficar públicas sempre (site e auth)
+function isPublicPath(pathname: string) {
+  if (
+    pathname === '/robots.txt' ||
+    pathname === '/sitemap.xml' ||
+    pathname === '/favicon.ico'
+  ) {
+    return true;
+  }
+
+  // ✅ API pública do site
+  if (pathname === '/api/offers' || pathname.startsWith('/api/offers/')) return true;
+
+  // ✅ Auth precisa ser acessível (login, me, etc.)
+  if (pathname === '/api/auth' || pathname.startsWith('/api/auth/')) return true;
+
+  return false;
+}
+
 function readSession(req: NextRequest): Session | null {
   const cookieName = getSessionCookieName();
   const raw = req.cookies.get(cookieName)?.value;
@@ -42,6 +61,11 @@ export function middleware(req: NextRequest) {
   headers.set('x-tenant-host', host);
 
   const pathname = req.nextUrl.pathname;
+
+  // ✅ garante que rotas públicas nunca sejam bloqueadas
+  if (isPublicPath(pathname)) {
+    return NextResponse.next({ request: { headers } });
+  }
 
   // só valida permissão nos caminhos protegidos
   const needsGuard = isAdminPath(pathname) || isMasterPath(pathname) || isAdminApiPath(pathname);
