@@ -1,4 +1,32 @@
 {
-  "destinos": [],
-  "categorias": []
+  "destinos": [
+    {
+      "id": "dest_01iqhfoml751utb",
+      "nome": "Gramado",
+      "slug": "gramado",
+      "status": "publicado",
+      "criadoEm": "2026-02-03T21:56:27.071Z",
+      "atualizadoEm": "2026-02-03T21:56:27.071Z"
+    }
+  ],
+  "categorias": [
+    {
+      "id": "cat_byxv3oxml75265l",
+      "nome": "Transfers",
+      "slug": "transfers",
+      "ativo": true,
+      "iconKey": "transfer",
+      "criadoEm": "2026-02-03T21:56:41.769Z",
+      "atualizadoEm": "2026-02-03T21:56:41.769Z"
+    },
+    {
+      "id": "cat_ln5n9x8ml752cs9",
+      "nome": "Hospedagem",
+      "slug": "hospedagem",
+      "ativo": true,
+      "iconKey": "hotel",
+      "criadoEm": "2026-02-03T21:56:50.361Z",
+      "atualizadoEm": "2026-02-03T21:56:50.361Z"
+    }
+  ]
 }
