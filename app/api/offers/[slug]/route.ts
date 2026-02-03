@@ -1,5 +1,6 @@
 // app/api/offers/[slug]/route.ts
 import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 
@@ -18,7 +19,7 @@ function looksLikeCuid(value: string) {
   return /^c[a-z0-9]{24,}$/i.test(value);
 }
 
-type RouteCtx = { params: { slug: string } };
+type RouteCtx = { params: Promise<{ slug: string }> };
 
 type ApiOffer = {
   id: string;
@@ -98,9 +99,9 @@ function mapOffer(db: {
   };
 }
 
-export async function GET(_request: Request, context: RouteCtx) {
+export async function GET(_request: NextRequest, context: RouteCtx) {
   try {
-    const { slug } = context.params;
+    const { slug } = await context.params;
     const raw = decodeURIComponent(slug || '');
 
     const whereBase: Prisma.OfferWhereInput = {};
