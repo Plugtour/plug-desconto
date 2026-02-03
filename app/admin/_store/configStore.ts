@@ -28,7 +28,16 @@ type AdminConfigDB = {
   categorias: AdminCategoria[];
 };
 
-const DB_PATH = path.join(process.cwd(), 'app', 'admin', '_store', 'adminConfig.json');
+function isReadOnlyFsError(e: any) {
+  const msg = String(e?.message ?? e ?? '');
+  return msg.includes('EROFS') || msg.includes('read-only file system');
+}
+
+// ✅ Em produção na Vercel, o bundle é read-only (/var/task). Use /tmp.
+const IS_VERCEL = Boolean(process.env.VERCEL);
+const DB_PATH = IS_VERCEL
+  ? path.join('/tmp', 'adminConfig.json')
+  : path.join(process.cwd(), 'app', 'admin', '_store', 'adminConfig.json');
 
 function slugify(value: string) {
   return (value || '')
@@ -46,23 +55,16 @@ function uid(prefix: string) {
   return `${prefix}_${Math.random().toString(36).slice(2, 9)}${Date.now().toString(36)}`;
 }
 
-function isReadOnlyFS(err: any) {
-  const code = err?.code ? String(err.code) : '';
-  const msg = err?.message ? String(err.message) : '';
-  return code === 'EROFS' || msg.includes('read-only file system');
-}
-
 async function ensureFile() {
   try {
     await fs.access(DB_PATH);
   } catch (e: any) {
-    // se não existir, tenta criar — mas em produção pode falhar (FS read-only)
     try {
       const initial: AdminConfigDB = { destinos: [], categorias: [] };
       await fs.writeFile(DB_PATH, JSON.stringify(initial, null, 2), 'utf-8');
     } catch (err: any) {
-      // se for read-only, só ignora (não pode criar arquivo em runtime)
-      if (isReadOnlyFS(err)) return;
+      // Se por algum motivo não der pra gravar, não derruba a aplicação.
+      if (isReadOnlyFsError(err)) return;
       throw err;
     }
   }
@@ -127,21 +129,28 @@ function normalizeCategoria(c: any): AdminCategoria {
 }
 
 export async function readConfig(): Promise<{ destinos: AdminDestino[]; categorias: AdminCategoria[] }> {
-  // tenta garantir o arquivo, mas não quebra se o FS for read-only
+  // ✅ Se falhar ao criar/ler arquivo, devolve vazio ao invés de quebrar o site
   try {
     await ensureFile();
   } catch (e: any) {
-    // se der erro inesperado aqui, ainda tentamos seguir pra readFile
+    if (isReadOnlyFsError(e)) return { destinos: [], categorias: [] };
+    throw e;
   }
 
-  // tenta ler; se falhar em produção, devolve vazio (sem derrubar o site)
   let raw = '';
   try {
     raw = await fs.readFile(DB_PATH, 'utf-8');
   } catch (e: any) {
-    // produção (Vercel): não tem como escrever/às vezes nem ler o arquivo no path esperado
-    // então retornamos config vazia para o site não cair
-    return { destinos: [], categorias: [] };
+    if (isReadOnlyFsError(e)) return { destinos: [], categorias: [] };
+    // se o arquivo não existir por algum motivo, tenta recriar
+    try {
+      const initial: AdminConfigDB = { destinos: [], categorias: [] };
+      await fs.writeFile(DB_PATH, JSON.stringify(initial, null, 2), 'utf-8');
+      raw = JSON.stringify(initial);
+    } catch (err: any) {
+      if (isReadOnlyFsError(err)) return { destinos: [], categorias: [] };
+      throw err;
+    }
   }
 
   let parsed: AdminConfigDB;
@@ -154,12 +163,11 @@ export async function readConfig(): Promise<{ destinos: AdminDestino[]; categori
   const destinos = Array.isArray(parsed.destinos) ? parsed.destinos.map(normalizeDestino) : [];
   const categorias = Array.isArray(parsed.categorias) ? parsed.categorias.map(normalizeCategoria) : [];
 
-  // ✅ grava de volta já normalizado (migração silenciosa)
-  // ⚠️ em produção pode ser read-only, então não pode derrubar o app
+  // ✅ grava de volta já normalizado (migração silenciosa) — mas nunca derruba em prod
   try {
     await fs.writeFile(DB_PATH, JSON.stringify({ destinos, categorias }, null, 2), 'utf-8');
   } catch (e: any) {
-    if (!isReadOnlyFS(e)) throw e;
+    if (!isReadOnlyFsError(e)) throw e;
   }
 
   return { destinos, categorias };
@@ -169,7 +177,8 @@ export async function writeConfig(db: { destinos: AdminDestino[]; categorias: Ad
   try {
     await fs.writeFile(DB_PATH, JSON.stringify(db, null, 2), 'utf-8');
   } catch (e: any) {
-    if (!isReadOnlyFS(e)) throw e;
+    if (isReadOnlyFsError(e)) return;
+    throw e;
   }
 }
 
@@ -280,7 +289,10 @@ export async function createCategoria(nome: string, iconKey?: string | null) {
   return item;
 }
 
-export async function updateCategoria(id: string, patch: Partial<Pick<AdminCategoria, 'nome' | 'ativo' | 'iconKey'>>) {
+export async function updateCategoria(
+  id: string,
+  patch: Partial<Pick<AdminCategoria, 'nome' | 'ativo' | 'iconKey'>>
+) {
   const db = await readConfig();
   const idx = db.categorias.findIndex((c) => c.id === id);
   if (idx === -1) throw new Error('Categoria não encontrada.');
