@@ -11,11 +11,9 @@ function isAdminStatus(v: any): v is AdminStatus {
   return v === 'rascunho' || v === 'publicado' || v === 'pausado' || v === 'arquivado' || v === 'lixeira';
 }
 
-type Ctx = { params: Promise<{ id: string }> };
-
-export async function PUT(req: NextRequest, context: Ctx) {
+export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const { id } = await context.params;
+    const id = String(params?.id ?? '').trim();
     const cleanId = String(id ?? '').trim();
     if (!cleanId) throw new Error('ID inválido.');
 
@@ -51,9 +49,9 @@ export async function PUT(req: NextRequest, context: Ctx) {
   }
 }
 
-export async function DELETE(_req: NextRequest, context: Ctx) {
+export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const { id } = await context.params;
+    const id = String(params?.id ?? '').trim();
     const cleanId = String(id ?? '').trim();
     if (!cleanId) throw new Error('ID inválido.');
 
