@@ -1,14 +1,11 @@
-// prisma/schema.prisma
-
 generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["driverAdapters"]
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider  = "postgresql"
-  url       = env("DATABASE_URL") // ✅ Pooler (6543) na Vercel
-  directUrl = env("DIRECT_URL")   // ✅ Direto (5432) para migrations/ops
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 enum OfferStatus {
