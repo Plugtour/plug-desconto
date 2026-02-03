@@ -8,7 +8,7 @@ import { cookies, headers } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
 
-type Ctx = { params: { id: string } };
+type Ctx = { params: Promise<{ id: string }> };
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -83,7 +83,7 @@ export async function GET(_req: NextRequest, context: Ctx) {
   const session = await requireMaster();
   if (!session) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
 
-  const { id } = context.params;
+  const { id } = await context.params;
   const cleanId = String(id ?? '').trim();
   if (!cleanId) return NextResponse.json({ ok: false, error: 'missing_id' }, { status: 400 });
 
@@ -105,7 +105,7 @@ export async function PATCH(req: NextRequest, context: Ctx) {
   const session = await requireMaster();
   if (!session) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
 
-  const { id } = context.params;
+  const { id } = await context.params;
   const cleanId = String(id ?? '').trim();
   if (!cleanId) return NextResponse.json({ ok: false, error: 'missing_id' }, { status: 400 });
 
@@ -175,7 +175,7 @@ export async function PUT(req: NextRequest, context: Ctx) {
   const session = await requireMaster();
   if (!session) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
 
-  const { id } = context.params;
+  const { id } = await context.params;
   const cleanId = String(id ?? '').trim();
   if (!cleanId) return NextResponse.json({ ok: false, error: 'missing_id' }, { status: 400 });
 
@@ -263,7 +263,7 @@ export async function DELETE(_req: NextRequest, context: Ctx) {
   const session = await requireMaster();
   if (!session) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
 
-  const { id } = context.params;
+  const { id } = await context.params;
   const cleanId = String(id ?? '').trim();
   if (!cleanId) return NextResponse.json({ ok: false, error: 'missing_id' }, { status: 400 });
 
