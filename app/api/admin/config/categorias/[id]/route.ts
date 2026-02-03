@@ -2,7 +2,7 @@
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-import { NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import { deleteCategoria, updateCategoria } from '@/app/admin/_store/configStore';
 
 type AdminStatus = 'rascunho' | 'publicado' | 'pausado' | 'arquivado' | 'lixeira';
@@ -11,9 +11,11 @@ function isAdminStatus(v: any): v is AdminStatus {
   return v === 'rascunho' || v === 'publicado' || v === 'pausado' || v === 'arquivado' || v === 'lixeira';
 }
 
-export async function PUT(req: Request, { params }: { params: { id: string } }) {
+type Ctx = { params: Promise<{ id: string }> };
+
+export async function PUT(req: NextRequest, context: Ctx) {
   try {
-    const id = String(params?.id ?? '').trim();
+    const { id } = await context.params;
     const cleanId = String(id ?? '').trim();
     if (!cleanId) throw new Error('ID inválido.');
 
@@ -49,9 +51,9 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
   }
 }
 
-export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, context: Ctx) {
   try {
-    const id = String(params?.id ?? '').trim();
+    const { id } = await context.params;
     const cleanId = String(id ?? '').trim();
     if (!cleanId) throw new Error('ID inválido.');
 
