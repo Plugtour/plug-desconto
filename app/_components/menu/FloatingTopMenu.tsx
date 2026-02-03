@@ -28,21 +28,12 @@ type CategoryItem = {
 type Props = {
   categories: CategoryItem[];
   visible: boolean;
-
-  /**
-   * ✅ NOVO: abre o modal ao clicar em uma categoria
-   * e envia o nome (ex: "Passeios")
-   */
   onOpenModal?: (categoryName: string) => void;
-
-  /**
-   * ✅ opcional: captura a categoria clicada
-   */
   onCategoryClick?: (cat: CategoryItem) => void;
 };
 
 /* =========================
-   SETAS (duplas abertas) — IGUAL MenuCarousel
+   SETAS (duplas abertas)
 ========================= */
 function DoubleChevronOpen({ dir, className }: { dir: 'left' | 'right'; className?: string }) {
   const flip = dir === 'left';
@@ -63,13 +54,13 @@ function DoubleChevronOpen({ dir, className }: { dir: 'left' | 'right'; classNam
 }
 
 /* =========================
-   ÍCONES — COMPAT (ANTIGO + NOVO)
+   ÍCONES (igual MenuCarousel)
 ========================= */
 function Icon({ iconKey, className }: { iconKey: IconKey; className?: string }) {
   const common = 'h-5 w-5';
   const cls = className ? `${common} ${className}` : common;
 
-  // ✅ normaliza para o novo padrão quando vier do antigo
+  // normaliza antigo -> novo
   const k: IconKey =
     iconKey === 'fork'
       ? 'food'
@@ -86,7 +77,6 @@ function Icon({ iconKey, className }: { iconKey: IconKey; className?: string }) 
                 : iconKey;
 
   switch (k) {
-    // mantém caso exista em algum lugar (destino/localização)
     case 'pin':
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none">
@@ -96,15 +86,10 @@ function Icon({ iconKey, className }: { iconKey: IconKey; className?: string }) 
             strokeWidth="2"
             strokeLinejoin="round"
           />
-          <path
-            d="M12 11.2a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4z"
-            stroke="#22C55E"
-            strokeWidth="2"
-          />
+          <path d="M12 11.2a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4z" stroke="#22C55E" strokeWidth="2" />
         </svg>
       );
 
-    // ticket (amarelo)
     case 'ticket':
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none">
@@ -118,7 +103,6 @@ function Icon({ iconKey, className }: { iconKey: IconKey; className?: string }) 
         </svg>
       );
 
-    // service (azul)
     case 'service':
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none">
@@ -137,7 +121,6 @@ function Icon({ iconKey, className }: { iconKey: IconKey; className?: string }) 
         </svg>
       );
 
-    // food (vermelho)
     case 'food':
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none">
@@ -146,7 +129,6 @@ function Icon({ iconKey, className }: { iconKey: IconKey; className?: string }) 
         </svg>
       );
 
-    // hotel (roxo)
     case 'hotel':
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none">
@@ -166,7 +148,6 @@ function Icon({ iconKey, className }: { iconKey: IconKey; className?: string }) 
         </svg>
       );
 
-    // shopping (laranja)
     case 'shopping':
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none">
@@ -180,7 +161,6 @@ function Icon({ iconKey, className }: { iconKey: IconKey; className?: string }) 
         </svg>
       );
 
-    // transfer (ciano)
     case 'transfer':
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none">
@@ -199,7 +179,6 @@ function Icon({ iconKey, className }: { iconKey: IconKey; className?: string }) 
         </svg>
       );
 
-    // attraction (estrela amarela)
     case 'attraction':
       return (
         <svg viewBox="0 0 24 24" className={cls} fill="none">

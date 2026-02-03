@@ -15,21 +15,22 @@ type Categoria = {
   atualizadoEm: string;
 };
 
-// lista controlada de ícones disponíveis
+// lista controlada de ícones disponíveis (ícones do MENU)
 const ICON_OPTIONS = [
-  { key: 'food', label: 'Gastronomia' },
-  { key: 'ticket', label: 'Ingressos' },
-  { key: 'service', label: 'Serviços' },
-  { key: 'shopping', label: 'Compras' },
-  { key: 'hotel', label: 'Hospedagem' },
-  { key: 'transfer', label: 'Transfers' },
-  { key: 'attraction', label: 'Atrações' },
+  { key: 'pin', label: 'Passeios (pin)' },
+  { key: 'ticket', label: 'Ingressos (ticket)' },
+  { key: 'service', label: 'Serviços (service)' },
+  { key: 'food', label: 'Gastronomia (food)' },
+  { key: 'shopping', label: 'Compras (shopping)' },
+  { key: 'hotel', label: 'Hospedagem (hotel)' },
+  { key: 'transfer', label: 'Transfers (transfer)' },
+  { key: 'attraction', label: 'Atrações (attraction)' },
 ];
 
 export default function AdminCategoriasClient() {
   const [items, setItems] = useState<Categoria[]>([]);
   const [nome, setNome] = useState('');
-  const [iconKey, setIconKey] = useState<string>('food');
+  const [iconKey, setIconKey] = useState<string>('pin');
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -60,7 +61,7 @@ export default function AdminCategoriasClient() {
       const j = await r.json();
       if (!r.ok) throw new Error(j?.error || 'Erro');
       setNome('');
-      setIconKey('food');
+      setIconKey('pin');
       await refresh();
     } catch (e: any) {
       setErr(e?.message || 'Erro ao criar');
@@ -127,7 +128,7 @@ export default function AdminCategoriasClient() {
           <input
             value={nome}
             onChange={(e) => setNome(e.target.value)}
-            placeholder="Ex: Gastronomia"
+            placeholder="Ex: Passeios"
             className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-200 dark:border-zinc-800 dark:bg-zinc-950 dark:focus:ring-zinc-800"
           />
 
@@ -135,6 +136,7 @@ export default function AdminCategoriasClient() {
             value={iconKey}
             onChange={(e) => setIconKey(e.target.value)}
             className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-800 dark:bg-zinc-950"
+            aria-label="Ícone do menu"
           >
             {ICON_OPTIONS.map((opt) => (
               <option key={opt.key} value={opt.key}>
@@ -185,9 +187,9 @@ function Row({
   onDelete: (id: string) => void;
 }) {
   const [nome, setNome] = useState(item.nome);
-  const [iconKey, setIconKey] = useState(item.iconKey || 'food');
+  const [iconKey, setIconKey] = useState(item.iconKey || 'pin');
 
-  const changed = nome.trim() !== item.nome || iconKey !== (item.iconKey || 'food');
+  const changed = nome.trim() !== item.nome || iconKey !== (item.iconKey || 'pin');
 
   return (
     <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
@@ -204,6 +206,7 @@ function Row({
           value={iconKey}
           onChange={(e) => setIconKey(e.target.value)}
           className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-800 dark:bg-zinc-950"
+          aria-label="Ícone do menu"
         >
           {ICON_OPTIONS.map((opt) => (
             <option key={opt.key} value={opt.key}>

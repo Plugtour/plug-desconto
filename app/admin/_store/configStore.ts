@@ -25,7 +25,7 @@ export type AdminCategoria = {
 
 type AdminConfigDB = {
   destinos: any[]; // mantemos any aqui pra suportar migração de dados antigos
-  categorias: any[]; // mantemos any aqui pra suportar migração de dados antigos
+  categorias: AdminCategoria[];
 };
 
 const DB_PATH = path.join(process.cwd(), 'app', 'admin', '_store', 'adminConfig.json');
@@ -97,12 +97,11 @@ function normalizeCategoria(c: any): AdminCategoria {
   const criadoEm = String(c?.criadoEm ?? c?.createdAt ?? now);
   const atualizadoEm = String(c?.atualizadoEm ?? c?.updatedAt ?? criadoEm);
   const slug = String(c?.slug ?? slugify(nome));
-
   const ativo = typeof c?.ativo === 'boolean' ? c.ativo : true;
 
   const iconKeyRaw = c?.iconKey;
   const iconKey =
-    iconKeyRaw == null ? null : String(iconKeyRaw).trim() ? String(iconKeyRaw).trim() : null;
+    typeof iconKeyRaw === 'string' && iconKeyRaw.trim() ? iconKeyRaw.trim() : null;
 
   return {
     id: String(c?.id ?? uid('cat')),
@@ -209,7 +208,7 @@ export async function deleteDestino(id: string) {
 
 // ===== categorias =====
 
-export async function listCategorias(): Promise<AdminCategoria[]> {
+export async function listCategorias() {
   const db = await readConfig();
   return db.categorias.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 }
@@ -217,19 +216,21 @@ export async function listCategorias(): Promise<AdminCategoria[]> {
 export async function createCategoria(nome: string, iconKey?: string | null) {
   const db = await readConfig();
   const now = new Date().toISOString();
-  const slug = slugify(nome);
+  const cleanName = nome.trim();
+  const slug = slugify(cleanName);
 
   const exists = db.categorias.some((c) => c.slug === slug);
   if (exists) throw new Error('Já existe uma categoria com esse nome.');
 
-  const cleanIconKey = iconKey == null ? null : String(iconKey).trim() || null;
+  const cleanIcon =
+    typeof iconKey === 'string' && iconKey.trim() ? iconKey.trim() : null;
 
   const item: AdminCategoria = {
     id: uid('cat'),
-    nome: nome.trim(),
+    nome: cleanName,
     slug,
     ativo: true,
-    iconKey: cleanIconKey,
+    iconKey: cleanIcon,
     criadoEm: now,
     atualizadoEm: now,
   };
@@ -256,11 +257,11 @@ export async function updateCategoria(
   const conflict = db.categorias.some((c) => c.id !== id && c.slug === nextSlug);
   if (conflict) throw new Error('Já existe outra categoria com esse nome.');
 
-  const nextIconKey =
+  const nextIcon =
     patch.hasOwnProperty('iconKey')
-      ? patch.iconKey == null
-        ? null
-        : String(patch.iconKey).trim() || null
+      ? typeof patch.iconKey === 'string' && patch.iconKey.trim()
+        ? patch.iconKey.trim()
+        : null
       : current.iconKey ?? null;
 
   db.categorias[idx] = {
@@ -268,7 +269,7 @@ export async function updateCategoria(
     nome: nextNome,
     slug: nextSlug,
     ativo: patch.ativo ?? current.ativo,
-    iconKey: nextIconKey,
+    iconKey: nextIcon,
     atualizadoEm: now,
   };
 

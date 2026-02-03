@@ -12,10 +12,11 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = (await req.json()) as { nome?: string; iconKey?: string | null };
-    const nome = (body?.nome || '').trim();
-    const iconKey = (body?.iconKey || '').trim() || null;
 
+    const nome = (body?.nome || '').trim();
     if (!nome) return NextResponse.json({ error: 'Informe o nome.' }, { status: 400 });
+
+    const iconKey = typeof body?.iconKey === 'string' ? body.iconKey : null;
 
     const created = await createCategoria(nome, iconKey);
     return NextResponse.json({ categoria: created });

@@ -41,7 +41,7 @@ type IconKey =
   | 'attraction';
 
 type CategoryItem = {
-  id: string;
+  id: string; // usamos o slug (bate com offer.categoryId)
   title: string;
   count: number;
   iconKey: IconKey;
@@ -69,6 +69,45 @@ function safeHref(v: any) {
   return s.length ? s : '/';
 }
 
+function mapIconKey(raw: any, slugOrName: string): IconKey {
+  const k = norm(raw).toLowerCase();
+
+  // ✅ padrão do Admin
+  if (
+    k === 'food' ||
+    k === 'ticket' ||
+    k === 'service' ||
+    k === 'shopping' ||
+    k === 'hotel' ||
+    k === 'transfer' ||
+    k === 'attraction'
+  ) {
+    return k as IconKey;
+  }
+
+  // ✅ compat antigo
+  if (k === 'fork') return 'food';
+  if (k === 'spark') return 'service';
+  if (k === 'bag') return 'shopping';
+  if (k === 'bed') return 'hotel';
+  if (k === 'car') return 'transfer';
+  if (k === 'star') return 'attraction';
+  if (k === 'pin') return 'pin';
+
+  // ✅ fallback por slug/nome
+  const s = norm(slugOrName).toLowerCase();
+  if (s.includes('gast')) return 'food';
+  if (s.includes('ingre') || s.includes('ticket')) return 'ticket';
+  if (s.includes('serv')) return 'service';
+  if (s.includes('comp')) return 'shopping';
+  if (s.includes('hosp') || s.includes('hotel')) return 'hotel';
+  if (s.includes('trans')) return 'transfer';
+  if (s.includes('atra')) return 'attraction';
+  if (s.includes('pass') || s.includes('tour')) return 'pin';
+
+  return 'service';
+}
+
 /** Mapeia "offers" genérico -> SponsoredOffer (o formato que o SponsoredOffersList usa) */
 function mapToSponsoredOffer(o: any, fallbackCategoryTitle: string): SponsoredOffer {
   const id = norm(o?.id ?? o?._id) || `tmp-${Math.random().toString(16).slice(2)}`;
@@ -90,7 +129,6 @@ function mapToSponsoredOffer(o: any, fallbackCategoryTitle: string): SponsoredOf
   const tags =
     Array.isArray(o?.tags) && o.tags.length ? o.tags : [city || 'Serra Gaúcha', fallbackCategoryTitle, 'Top'];
 
-  // campos extras opcionais que seu ProductDetailContent tenta ler
   const vendorName = o?.vendorName ?? o?.parceiro ?? o?.partnerName ?? null;
   const vendorAbout = o?.vendorAbout ?? o?.description ?? o?.descricao ?? o?.shortDescription ?? null;
 
@@ -103,15 +141,11 @@ function mapToSponsoredOffer(o: any, fallbackCategoryTitle: string): SponsoredOf
     reviews,
     savingsText,
     priceText,
-
-    // opcional/extra
     tags,
     city,
     vendorName,
     vendorAbout,
     subtitle: o?.subtitle ?? o?.subTitle ?? null,
-
-    // se tiver no backend, já passa:
     whatsappHref: o?.whatsappHref ?? null,
     address: o?.address ?? null,
     addressText: o?.addressText ?? null,
@@ -121,41 +155,6 @@ function mapToSponsoredOffer(o: any, fallbackCategoryTitle: string): SponsoredOf
   } as any;
 }
 
-function normalizeIconKey(v: any): IconKey {
-  const s = norm(v);
-
-  // padrão novo
-  if (
-    s === 'food' ||
-    s === 'ticket' ||
-    s === 'service' ||
-    s === 'shopping' ||
-    s === 'hotel' ||
-    s === 'transfer' ||
-    s === 'attraction'
-  )
-    return s;
-
-  // compatibilidade com padrão antigo (caso venha de algum lugar)
-  if (s === 'pin' || s === 'spark' || s === 'fork' || s === 'bed' || s === 'bag' || s === 'car' || s === 'star')
-    return s;
-
-  // default seguro
-  return 'service';
-}
-
-function buildFallbackCategories(): CategoryItem[] {
-  return [
-    { id: 'fallback-1', title: 'Ingressos', count: 0, iconKey: 'ticket' },
-    { id: 'fallback-2', title: 'Serviços', count: 0, iconKey: 'service' },
-    { id: 'fallback-3', title: 'Gastronomia', count: 0, iconKey: 'food' },
-    { id: 'fallback-4', title: 'Hospedagem', count: 0, iconKey: 'hotel' },
-    { id: 'fallback-5', title: 'Compras', count: 0, iconKey: 'shopping' },
-    { id: 'fallback-6', title: 'Transfers', count: 0, iconKey: 'transfer' },
-    { id: 'fallback-7', title: 'Atrações', count: 0, iconKey: 'attraction' },
-  ];
-}
-
 export default function HomeScreenClient({
   regionLabel = 'Serra Gaúcha',
   offers = [],
@@ -163,52 +162,112 @@ export default function HomeScreenClient({
   regionLabel?: string;
   offers: OfferLike[];
 }) {
-  const [categories, setCategories] = useState<CategoryItem[]>(() => buildFallbackCategories());
+  /* =========================
+     OFERTAS (100% dinâmico)
+     - se vier via props, usa
+     - se vier vazio, busca /api/offers
+  ========================= */
+  const [apiOffers, setApiOffers] = useState<OfferLike[]>([]);
+  const [offersErr, setOffersErr] = useState<string | null>(null);
 
-  // Carrega categorias cadastradas no Admin (ativas) e calcula count pelas offers
+  const inputOffers = Array.isArray(offers) ? offers : [];
+
   useEffect(() => {
     let alive = true;
 
-    async function load() {
+    async function loadOffersIfNeeded() {
+      // se já veio cheio, não busca
+      if (inputOffers.length > 0) return;
+
       try {
-        const r = await fetch('/api/categories', { cache: 'no-store' });
-        const j = await r.json().catch(() => null);
-
-        const list = (j?.categories ?? j?.categorias ?? []) as ApiCategoria[];
-        const raw = Array.isArray(list) ? list : [];
-
-        const active = raw.filter((c) => c && c.ativo);
-
-        // contador por categoryId (oferta precisa ter categoryId = id da categoria)
-        const counts = new Map<string, number>();
-        const rawOffers = Array.isArray(offers) ? offers : [];
-        for (const o of rawOffers) {
-          const cid = norm(o?.categoryId ?? o?.category ?? o?.categoriaId);
-          if (!cid) continue;
-          counts.set(cid, (counts.get(cid) ?? 0) + 1);
-        }
-
-        const mapped: CategoryItem[] = active.map((c) => ({
-          id: String(c.id),
-          title: String(c.nome ?? '').trim() || 'Categoria',
-          count: counts.get(String(c.id)) ?? 0,
-          iconKey: normalizeIconKey(c.iconKey),
-        }));
-
-        // se vier vazio, mantém fallback
+        setOffersErr(null);
+        const r = await fetch('/api/offers', { cache: 'no-store' });
+        const j = await r.json();
+        const list = Array.isArray(j?.items) ? j.items : [];
         if (!alive) return;
-        setCategories(mapped.length ? mapped : buildFallbackCategories());
-      } catch {
+        setApiOffers(list);
+      } catch (e: any) {
         if (!alive) return;
-        setCategories(buildFallbackCategories());
+        setOffersErr(e?.message || 'Falha ao carregar ofertas');
+        setApiOffers([]);
       }
     }
 
-    load();
+    loadOffersIfNeeded();
+
     return () => {
       alive = false;
     };
-  }, [offers]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inputOffers.length]);
+
+  const usedOffers = inputOffers.length > 0 ? inputOffers : apiOffers;
+
+  /* =========================
+     CATEGORIAS (100% dinâmico)
+     - nome + iconKey do cadastro
+     - count calculado pelas ofertas publicadas
+  ========================= */
+  const [cats, setCats] = useState<ApiCategoria[]>([]);
+  const [catsErr, setCatsErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+
+    async function loadCats() {
+      try {
+        setCatsErr(null);
+        const r = await fetch('/api/admin/config/categorias', { cache: 'no-store' });
+        const j = await r.json();
+        const list = Array.isArray(j?.categorias) ? (j.categorias as ApiCategoria[]) : [];
+        if (!alive) return;
+        setCats(list);
+      } catch (e: any) {
+        if (!alive) return;
+        setCatsErr(e?.message || 'Falha ao carregar categorias');
+        setCats([]);
+      }
+    }
+
+    loadCats();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const categories: CategoryItem[] = useMemo(() => {
+    const rawCats = Array.isArray(cats) ? cats : [];
+    const activeCats = rawCats.filter((c) => !!c && c.ativo !== false);
+
+    const publishedOffers = Array.isArray(usedOffers) ? usedOffers : [];
+    const byCategoryIdCount = new Map<string, number>();
+
+    for (const o of publishedOffers) {
+      const cid = norm(o?.categoryId ?? o?.category ?? o?.categoriaId);
+      if (!cid) continue;
+      byCategoryIdCount.set(cid, (byCategoryIdCount.get(cid) ?? 0) + 1);
+    }
+
+    const mapped = activeCats
+      .map((c) => {
+        const id = norm(c.slug) || norm(c.id);
+        if (!id) return null;
+
+        const title = norm(c.nome) || id || 'Categoria';
+        const count = byCategoryIdCount.get(id) ?? 0;
+
+        return {
+          id,
+          title,
+          count,
+          iconKey: mapIconKey(c.iconKey, `${c.slug || ''} ${c.nome || ''}`),
+        } as CategoryItem;
+      })
+      .filter(Boolean) as CategoryItem[];
+
+    mapped.sort((a, b) => a.title.localeCompare(b.title, 'pt-BR'));
+    return mapped;
+  }, [cats, usedOffers]);
 
   /* =========================
      MODAL (Categorias)
@@ -299,7 +358,7 @@ export default function HomeScreenClient({
   }, [categories]);
 
   const searchData: SearchOffer[] = useMemo(() => {
-    const list = Array.isArray(offers) ? offers : [];
+    const list = Array.isArray(usedOffers) ? usedOffers : [];
     return list
       .map((o: any): SearchOffer | null => {
         const id = String(o?.id ?? o?._id ?? '').trim();
@@ -324,7 +383,7 @@ export default function HomeScreenClient({
         return { id, slug, title, subtitle, categoryId, city, priceText, imageUrl };
       })
       .filter(Boolean) as SearchOffer[];
-  }, [offers]);
+  }, [usedOffers]);
 
   /* =========================
      LISTA DO MODAL POR CATEGORIA
@@ -333,16 +392,12 @@ export default function HomeScreenClient({
     const selectedId = norm(menuModalCategoryId);
     const catTitle = categories.find((c) => c.id === selectedId)?.title || menuModalCategoryName || 'Categoria';
 
-    const raw = Array.isArray(offers) ? offers : [];
-    const filtered = selectedId
-      ? raw.filter((o: any) => norm(o?.categoryId ?? o?.category ?? o?.categoriaId) === selectedId)
-      : raw;
+    const raw = Array.isArray(usedOffers) ? usedOffers : [];
+    const filtered = selectedId ? raw.filter((o: any) => norm(o?.categoryId ?? o?.category ?? o?.categoriaId) === selectedId) : raw;
 
     const mapped = filtered.map((o: any) => mapToSponsoredOffer(o, catTitle));
-
     if (mapped.length) return mapped;
 
-    // fallback (não fica vazio)
     return Array.from({ length: 12 }).map((_, i) =>
       mapToSponsoredOffer(
         {
@@ -359,7 +414,7 @@ export default function HomeScreenClient({
         catTitle
       )
     );
-  }, [offers, menuModalCategoryId, menuModalCategoryName, categories, regionLabel]);
+  }, [usedOffers, menuModalCategoryId, menuModalCategoryName, categories, regionLabel]);
 
   /* =========================
      MENU FLUTUANTE (trigger)
@@ -438,7 +493,7 @@ export default function HomeScreenClient({
         <div style={{ height: showFloatingMenu ? FLOATING_MENU_H : 0 }} />
       </div>
 
-      {/* ✅ MODAL (Categorias) — com lista */}
+      {/* ✅ MODAL (Categorias) */}
       <MenuCarouselModal
         open={menuModalOpen}
         onClose={closeMenuModal}
@@ -467,17 +522,34 @@ export default function HomeScreenClient({
 
       {/* MENU CARROSSEL */}
       <div ref={gridMenuRef}>
-        <MenuCarousel categories={categories} className="pt-0" onCategoryClick={handleCategoryClick} />
+        {(catsErr || offersErr) ? (
+          <div className="px-4 pt-3 text-[12px] text-red-600">
+            {catsErr ? `Categorias: ${catsErr}` : null}
+            {catsErr && offersErr ? ' • ' : null}
+            {offersErr ? `Ofertas: ${offersErr}` : null}
+          </div>
+        ) : null}
+
+        <MenuCarousel categories={categories as any} className="pt-0" onCategoryClick={handleCategoryClick} />
       </div>
 
       <HomeBanner className="mt-4" />
 
       {/* MENU FLUTUANTE */}
-      <FloatingTopMenu categories={categories} visible={showFloatingMenu} onCategoryClick={handleCategoryClick} />
+      <FloatingTopMenu
+        categories={categories as any}
+        visible={showFloatingMenu}
+        onCategoryClick={handleCategoryClick}
+      />
 
       <div className="pt-1">
         <div className="px-4 mt-1 pb-2">
-          <QuickSearch offers={searchData} categories={searchCategories} useExternalModal onOpenExternal={openSearchModal} />
+          <QuickSearch
+            offers={searchData}
+            categories={searchCategories}
+            useExternalModal
+            onOpenExternal={openSearchModal}
+          />
         </div>
       </div>
 
