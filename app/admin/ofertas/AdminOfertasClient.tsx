@@ -291,7 +291,7 @@ export default function AdminOfertasClient() {
     ],
     [counts]
   );
-
+ 
   const hasFilters = q.trim().length > 0 || status !== 'todos';
 
   const clearFilters = () => {
