@@ -10,12 +10,7 @@ import MenuCarouselModalRight from '@/app/_components/modals/MenuCarouselModalRi
 // ✅ Modal padrão “modelo”
 import ProductDetailContent, { type ProductModalData } from '@/app/_components/product/ProductDetailContent';
 
-import {
-  getFavorites,
-  onFavoritesChange,
-  toggleFavorite,
-  type FavoriteItem,
-} from '@/app/_components/favorites/favoritesStore';
+import { getFavorites, onFavoritesChange, toggleFavorite, type FavoriteItem } from '@/app/_components/favorites/favoritesStore';
 
 type SponsoredOffer = {
   id: string;
@@ -78,6 +73,10 @@ function safeHref(v: any) {
 
 /* =========================
    IMG RESPONSIVA (thumb 106)
+   - aceita:
+     /offers/cafe-colonial
+     /offers/cafe-colonial.webp
+     /offers/cafe-colonial-w256.webp (limpa e gera variantes)
 ========================= */
 function isRemoteUrl(url: string) {
   return /^https?:\/\//i.test(url);
@@ -88,14 +87,34 @@ function addQuery(url: string, key: string, val: string | number) {
   return `${url}${sep}${encodeURIComponent(key)}=${encodeURIComponent(String(val))}`;
 }
 
+function splitUrl(url: string) {
+  const u = String(url || '').trim();
+  const clean = u.split('?')[0] || u;
+  const q = u.includes('?') ? u.slice(u.indexOf('?')) : '';
+  return { clean, q };
+}
+
+function stripWidthSuffix(pathname: string) {
+  return pathname.replace(/-w\d+(?=\.[a-z0-9]+$)/i, '');
+}
+
+function ensureExt(pathname: string) {
+  const hasExt = /\.[a-z0-9]+$/i.test(pathname);
+  return hasExt ? pathname : `${pathname}.webp`;
+}
+
 function localVariant(url: string, width: number) {
-  // /img/foto.webp -> /img/foto-w256.webp
-  const clean = url.split('?')[0] || url;
-  const q = url.includes('?') ? url.slice(url.indexOf('?')) : '';
-  const lastDot = clean.lastIndexOf('.');
-  if (lastDot <= 0) return `${clean}-w${width}${q}`;
-  const base = clean.slice(0, lastDot);
-  const ext = clean.slice(lastDot);
+  // /offers/cafe-colonial            -> /offers/cafe-colonial-w128.webp
+  // /offers/cafe-colonial.webp       -> /offers/cafe-colonial-w128.webp
+  // /offers/cafe-colonial-w256.webp  -> /offers/cafe-colonial-w128.webp
+  const { clean, q } = splitUrl(url);
+  const baseWithExt = ensureExt(stripWidthSuffix(clean));
+
+  const lastDot = baseWithExt.lastIndexOf('.');
+  if (lastDot <= 0) return `${baseWithExt}-w${width}${q}`;
+
+  const base = baseWithExt.slice(0, lastDot);
+  const ext = baseWithExt.slice(lastDot);
   return `${base}-w${width}${ext}${q}`;
 }
 
@@ -375,13 +394,7 @@ function LoadingRow({ text = 'Carregando...' }: { text?: string }) {
 
 type FilterKey = 'todos' | 'melhores' | 'descontos' | 'novo' | 'aberto' | 'perto' | 'delivery';
 
-export default function SponsoredOffersList({
-  items,
-  className,
-  title,
-  initialCount = 5,
-  step = 5,
-}: Props) {
+export default function SponsoredOffersList({ items, className, title, initialCount = 5, step = 5 }: Props) {
   const [modalOpen, setModalOpen] = useState(false);
   const [selected, setSelected] = useState<SponsoredOffer | null>(null);
 
@@ -686,19 +699,11 @@ export default function SponsoredOffersList({
               Todos
             </FilterChip>
 
-            <FilterChip
-              iconKind="melhores"
-              isActive={active === 'melhores'}
-              onClick={() => setActivePreserveScroll('melhores')}
-            >
+            <FilterChip iconKind="melhores" isActive={active === 'melhores'} onClick={() => setActivePreserveScroll('melhores')}>
               Melhores avaliados
             </FilterChip>
 
-            <FilterChip
-              iconKind="descontos"
-              isActive={active === 'descontos'}
-              onClick={() => setActivePreserveScroll('descontos')}
-            >
+            <FilterChip iconKind="descontos" isActive={active === 'descontos'} onClick={() => setActivePreserveScroll('descontos')}>
               Maiores descontos
             </FilterChip>
 
@@ -706,11 +711,7 @@ export default function SponsoredOffersList({
               Novo
             </FilterChip>
 
-            <FilterChip
-              iconKind="aberto"
-              isActive={active === 'aberto'}
-              onClick={() => setActivePreserveScroll('aberto')}
-            >
+            <FilterChip iconKind="aberto" isActive={active === 'aberto'} onClick={() => setActivePreserveScroll('aberto')}>
               Aberto agora
             </FilterChip>
 
@@ -718,11 +719,7 @@ export default function SponsoredOffersList({
               Perto de mim
             </FilterChip>
 
-            <FilterChip
-              iconKind="delivery"
-              isActive={active === 'delivery'}
-              onClick={() => setActivePreserveScroll('delivery')}
-            >
+            <FilterChip iconKind="delivery" isActive={active === 'delivery'} onClick={() => setActivePreserveScroll('delivery')}>
               Delivery
             </FilterChip>
           </div>
@@ -851,10 +848,7 @@ export default function SponsoredOffersList({
                     >
                       <HeartIcon
                         filled={isFav}
-                        className={[
-                          'h-9 w-9 transition',
-                          isFav ? 'text-red-500' : 'text-zinc-300 hover:text-zinc-400',
-                        ].join(' ')}
+                        className={['h-9 w-9 transition', isFav ? 'text-red-500' : 'text-zinc-300 hover:text-zinc-400'].join(' ')}
                       />
                     </button>
                   </div>

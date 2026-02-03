@@ -68,6 +68,10 @@ function formatPtOne(n: number) {
 
 /* =========================
    IMG RESPONSIVA (cards)
+   - aceita:
+     /offers/cafe-colonial
+     /offers/cafe-colonial.webp
+     /offers/cafe-colonial-w256.webp  (limpa e gera variantes)
 ========================= */
 function isRemoteUrl(url: string) {
   return /^https?:\/\//i.test(url);
@@ -78,14 +82,37 @@ function addQuery(url: string, key: string, val: string | number) {
   return `${url}${sep}${encodeURIComponent(key)}=${encodeURIComponent(String(val))}`;
 }
 
+function splitUrl(url: string) {
+  const u = String(url || '').trim();
+  const clean = u.split('?')[0] || u;
+  const q = u.includes('?') ? u.slice(u.indexOf('?')) : '';
+  return { clean, q };
+}
+
+// remove sufixo "-w###" se existir
+function stripWidthSuffix(pathname: string) {
+  return pathname.replace(/-w\d+(?=\.[a-z0-9]+$)/i, '');
+}
+
+// garante extensão .webp quando não houver extensão
+function ensureExt(pathname: string) {
+  const hasExt = /\.[a-z0-9]+$/i.test(pathname);
+  return hasExt ? pathname : `${pathname}.webp`;
+}
+
 function localVariant(url: string, width: number) {
-  // /img/foto.webp -> /img/foto-w512.webp
-  const clean = url.split('?')[0] || url;
-  const q = url.includes('?') ? url.slice(url.indexOf('?')) : '';
-  const lastDot = clean.lastIndexOf('.');
-  if (lastDot <= 0) return `${clean}-w${width}${q}`;
-  const base = clean.slice(0, lastDot);
-  const ext = clean.slice(lastDot);
+  // exemplos aceitos:
+  // /offers/cafe-colonial            -> /offers/cafe-colonial-w512.webp
+  // /offers/cafe-colonial.webp       -> /offers/cafe-colonial-w512.webp
+  // /offers/cafe-colonial-w256.webp  -> /offers/cafe-colonial-w512.webp
+  const { clean, q } = splitUrl(url);
+  const baseWithExt = ensureExt(stripWidthSuffix(clean));
+
+  const lastDot = baseWithExt.lastIndexOf('.');
+  if (lastDot <= 0) return `${baseWithExt}-w${width}${q}`;
+
+  const base = baseWithExt.slice(0, lastDot);
+  const ext = baseWithExt.slice(lastDot);
   return `${base}-w${width}${ext}${q}`;
 }
 
@@ -396,10 +423,9 @@ export default function ExposedCarouselRow({
                 >
                   <HeartIcon
                     filled={isFav}
-                    className={[
-                      'h-9 w-9 transition',
-                      isFav ? 'text-red-500' : 'text-zinc-300 hover:text-zinc-400',
-                    ].join(' ')}
+                    className={['h-9 w-9 transition', isFav ? 'text-red-500' : 'text-zinc-300 hover:text-zinc-400'].join(
+                      ' '
+                    )}
                   />
                 </button>
               </div>
@@ -425,9 +451,7 @@ export default function ExposedCarouselRow({
                   <div>
                     {rating !== null ? <StarsRow rating={rating} /> : null}
                     <div className="text-[12px] text-zinc-500">
-                      <span className="font-semibold text-zinc-700">
-                        {rating !== null ? formatPtOne(rating) : '—'}
-                      </span>{' '}
+                      <span className="font-semibold text-zinc-700">{rating !== null ? formatPtOne(rating) : '—'}</span>{' '}
                       de <span className="font-semibold text-zinc-700">{reviews !== null ? reviews : '—'}</span>
                     </div>
                   </div>

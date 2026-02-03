@@ -46,6 +46,10 @@ function safeHref(v: any) {
 
 /* =========================
    IMG RESPONSIVA (thumb 106)
+   - aceita:
+     /offers/cafe-colonial
+     /offers/cafe-colonial.webp
+     /offers/cafe-colonial-w256.webp (limpa e gera variantes)
 ========================= */
 function isRemoteUrl(url: string) {
   return /^https?:\/\//i.test(url);
@@ -56,14 +60,34 @@ function addQuery(url: string, key: string, val: string | number) {
   return `${url}${sep}${encodeURIComponent(key)}=${encodeURIComponent(String(val))}`;
 }
 
+function splitUrl(url: string) {
+  const u = String(url || '').trim();
+  const clean = u.split('?')[0] || u;
+  const q = u.includes('?') ? u.slice(u.indexOf('?')) : '';
+  return { clean, q };
+}
+
+function stripWidthSuffix(pathname: string) {
+  return pathname.replace(/-w\d+(?=\.[a-z0-9]+$)/i, '');
+}
+
+function ensureExt(pathname: string) {
+  const hasExt = /\.[a-z0-9]+$/i.test(pathname);
+  return hasExt ? pathname : `${pathname}.webp`;
+}
+
 function localVariant(url: string, width: number) {
-  // /img/foto.webp -> /img/foto-w256.webp
-  const clean = url.split('?')[0] || url;
-  const q = url.includes('?') ? url.slice(url.indexOf('?')) : '';
-  const lastDot = clean.lastIndexOf('.');
-  if (lastDot <= 0) return `${clean}-w${width}${q}`;
-  const base = clean.slice(0, lastDot);
-  const ext = clean.slice(lastDot);
+  // /offers/cafe-colonial            -> /offers/cafe-colonial-w128.webp
+  // /offers/cafe-colonial.webp       -> /offers/cafe-colonial-w128.webp
+  // /offers/cafe-colonial-w256.webp  -> /offers/cafe-colonial-w128.webp
+  const { clean, q } = splitUrl(url);
+  const baseWithExt = ensureExt(stripWidthSuffix(clean));
+
+  const lastDot = baseWithExt.lastIndexOf('.');
+  if (lastDot <= 0) return `${baseWithExt}-w${width}${q}`;
+
+  const base = baseWithExt.slice(0, lastDot);
+  const ext = baseWithExt.slice(lastDot);
   return `${base}-w${width}${ext}${q}`;
 }
 
@@ -80,6 +104,9 @@ function buildSrcSet(url: string, widths: number[]) {
   return widths.map((w) => `${variantUrl(u, w)} ${w}w`).join(', ');
 }
 
+/* =========================
+   ESTRELAS
+========================= */
 function Star({ fillPct }: { fillPct: number }) {
   const id = React.useId();
   const pct = Math.max(0, Math.min(100, fillPct));
@@ -556,10 +583,9 @@ export default function SponsoredOffersRow({ items, className, title = 'Patrocin
                     >
                       <HeartIcon
                         filled={isFav}
-                        className={[
-                          'h-9 w-9 transition',
-                          isFav ? 'text-red-500' : 'text-zinc-300 hover:text-zinc-400',
-                        ].join(' ')}
+                        className={['h-9 w-9 transition', isFav ? 'text-red-500' : 'text-zinc-300 hover:text-zinc-400'].join(
+                          ' '
+                        )}
                       />
                     </button>
                   </div>
@@ -606,9 +632,7 @@ export default function SponsoredOffersRow({ items, className, title = 'Patrocin
           style={{ touchAction: 'pan-y' }}
           aria-label={expanded ? 'Ver menos patrocinados' : 'Ver mais patrocinados'}
         >
-          <div className="text-[15px] font-semibold text-emerald-700 hover:text-emerald-800">
-            {expanded ? 'Ver menos' : 'Ver mais'}
-          </div>
+          <div className="text-[15px] font-semibold text-emerald-700 hover:text-emerald-800">{expanded ? 'Ver menos' : 'Ver mais'}</div>
 
           <div className="text-zinc-400">
             <DoubleChevronOpen dir={expanded ? 'up' : 'down'} className="h-10 w-10" />

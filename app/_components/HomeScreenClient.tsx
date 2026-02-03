@@ -88,6 +88,48 @@ function safeHref(v: any) {
   return s.length ? s : '/';
 }
 
+/**
+ * ✅ NORMALIZA imageUrl para funcionar com seus componentes responsivos:
+ * - se vier "/offers/foto-w256.webp" => vira "/offers/foto.webp"
+ * - se vier "foto.webp" => vira "/offers/foto.webp" (padrão do seu projeto)
+ * - se vier "/public/offers/foto.webp" => vira "/offers/foto.webp"
+ * - mantém URLs remotas (http/https)
+ */
+function normalizeImageUrl(raw: any) {
+  const s0 = norm(raw);
+  if (!s0) return null;
+
+  // remoto: mantém como está
+  if (/^https?:\/\//i.test(s0)) return s0;
+
+  // separa querystring
+  const [pathPart, queryPart] = s0.split('?');
+  let p = String(pathPart || '').trim();
+  if (!p) return null;
+
+  // remove prefixos comuns que aparecem por engano
+  p = p.replace(/\\/g, '/'); // windows
+  p = p.replace(/^(\.\/)+/g, '');
+  p = p.replace(/^public\//i, '');
+  p = p.replace(/^\/public\//i, '/');
+
+  // garante que comece com /
+  if (!p.startsWith('/')) p = `/${p}`;
+
+  // se veio "/offers/arquivo.webp" ok
+  // se veio "/images/arquivo.webp" ok
+  // se veio "/arquivo.webp" (sem pasta), assume /offers/
+  const isBareAtRoot = /^\/[^/]+\.(webp|jpg|jpeg|png|avif)$/i.test(p);
+  if (isBareAtRoot) {
+    p = p.replace(/^\/+/, '/offers/');
+  }
+
+  // remove -w### antes da extensão
+  p = p.replace(/-w\d+(?=\.(webp|jpg|jpeg|png|avif)$)/i, '');
+
+  return queryPart ? `${p}?${queryPart}` : p;
+}
+
 function mapIconKey(raw: any, slugOrName: string): IconKey {
   const k = norm(raw).toLowerCase();
 
@@ -128,14 +170,17 @@ function mapIconKey(raw: any, slugOrName: string): IconKey {
 }
 
 /** Mapeia "offers" genérico -> SponsoredOffer */
-function mapToSponsoredOffer(o: any, fallbackCategoryTitle: string): SponsoredOffer {
+function mapToSponsoredOffer(o: any, fallbackCategoryTitle: string, fallbackRegionLabel: string): SponsoredOffer {
   const id = norm(o?.id ?? o?._id) || `tmp-${Math.random().toString(16).slice(2)}`;
   const title = norm(o?.title ?? o?.name ?? o?.nome ?? o?.titulo) || 'Benefício';
 
   const slug = norm(o?.slug ?? o?.seoSlug ?? o?.slugId);
   const href = safeHref(o?.href ?? (slug ? `/beneficio/${encodeURIComponent(slug)}` : o?.link ?? '/'));
 
-  const imageUrl = norm(o?.imageUrl ?? o?.image ?? o?.cover ?? o?.coverImage ?? o?.coverImageUrl ?? o?.banner) || null;
+  // ✅ aqui: normaliza URL pra base (sem -w###)
+  const imageUrl = normalizeImageUrl(
+    o?.imageUrl ?? o?.image ?? o?.cover ?? o?.coverImage ?? o?.coverImageUrl ?? o?.banner
+  );
 
   const rating = safeNumber(o?.rating ?? o?.nota ?? o?.stars, 0);
   const reviews = safeNumber(o?.reviews ?? o?.reviewsCount ?? o?.avaliacoes, 0);
@@ -145,8 +190,11 @@ function mapToSponsoredOffer(o: any, fallbackCategoryTitle: string): SponsoredOf
 
   const city = norm(o?.city ?? o?.cidade) || null;
 
+  // ✅ IMPORTANTÍSSIMO: seus componentes montam tagsLine só quando tem 3 tags.
   const tags =
-    Array.isArray(o?.tags) && o.tags.length ? o.tags : [city || 'Serra Gaúcha', fallbackCategoryTitle];
+    Array.isArray(o?.tags) && o.tags.length
+      ? o.tags
+      : [city || fallbackRegionLabel || 'Serra Gaúcha', fallbackCategoryTitle, 'Oferta'];
 
   const vendorName = o?.vendorName ?? o?.parceiro ?? o?.partnerName ?? null;
   const vendorAbout = o?.vendorAbout ?? o?.description ?? o?.descricao ?? o?.shortDescription ?? null;
@@ -309,20 +357,22 @@ export default function HomeScreenClient({
     }
 
     // 1) Preferência: categorias do admin
-    const adminCats = (catMaps.activeCats || []).map((c) => {
-      const slug = norm(c.slug) || norm(c.id);
-      if (!slug) return null;
+    const adminCats = (catMaps.activeCats || [])
+      .map((c) => {
+        const slug = norm(c.slug) || norm(c.id);
+        if (!slug) return null;
 
-      const title = norm(c.nome) || slug || 'Categoria';
-      const count = bySlugCount.get(slug) ?? 0;
+        const title = norm(c.nome) || slug || 'Categoria';
+        const count = bySlugCount.get(slug) ?? 0;
 
-      return {
-        id: slug,
-        title,
-        count,
-        iconKey: mapIconKey(c.iconKey, `${c.slug || ''} ${c.nome || ''}`),
-      } as CategoryItem;
-    }).filter(Boolean) as CategoryItem[];
+        return {
+          id: slug,
+          title,
+          count,
+          iconKey: mapIconKey(c.iconKey, `${c.slug || ''} ${c.nome || ''}`),
+        } as CategoryItem;
+      })
+      .filter(Boolean) as CategoryItem[];
 
     if (adminCats.length > 0) {
       adminCats.sort((a, b) => a.title.localeCompare(b.title, 'pt-BR'));
@@ -334,7 +384,7 @@ export default function HomeScreenClient({
     for (const [slug, count] of bySlugCount.entries()) {
       fallback.push({
         id: slug,
-        title: slug, // sem nome do admin, mostra o próprio slug (melhor que sumir)
+        title: slug,
         count,
         iconKey: mapIconKey(null, slug),
       });
@@ -361,10 +411,10 @@ export default function HomeScreenClient({
         const rawCid = norm(o?.categoryId ?? o?.category ?? o?.categoriaId);
         const slugCid = catMaps.resolveToSlug(rawCid);
         const catTitle = (slugCid && categoryTitleById.get(slugCid)) || 'Categoria';
-        return mapToSponsoredOffer(o, catTitle);
+        return mapToSponsoredOffer(o, catTitle, regionLabel);
       })
       .filter(Boolean) as SponsoredOffer[];
-  }, [publishedOffers, categoryTitleById, catMaps]);
+  }, [publishedOffers, categoryTitleById, catMaps, regionLabel]);
 
   const bestRatedTop10 = useMemo(() => {
     const base = [...allSponsoredItems];
@@ -472,10 +522,9 @@ export default function HomeScreenClient({
 
         const priceText = (o?.priceText ?? o?.precoTexto ?? o?.price_label ?? o?.priceLabel ?? null) as string | null;
 
-        const imageUrl =
-          (o?.imageUrl ?? o?.image ?? o?.cover ?? o?.coverImage ?? o?.coverImageUrl ?? o?.banner ?? null) as
-            | string
-            | null;
+        const imageUrl = normalizeImageUrl(
+          o?.imageUrl ?? o?.image ?? o?.cover ?? o?.coverImage ?? o?.coverImageUrl ?? o?.banner
+        ) as string | null;
 
         return { id, slug, title, subtitle, categoryId, city, priceText, imageUrl };
       })
@@ -500,8 +549,8 @@ export default function HomeScreenClient({
         })
       : raw;
 
-    return filtered.map((o: any) => mapToSponsoredOffer(o, catTitle));
-  }, [publishedOffers, menuModalCategoryId, menuModalCategoryName, categories, catMaps]);
+    return filtered.map((o: any) => mapToSponsoredOffer(o, catTitle, regionLabel));
+  }, [publishedOffers, menuModalCategoryId, menuModalCategoryName, categories, catMaps, regionLabel]);
 
   /* =========================
      MENU FLUTUANTE (trigger)
