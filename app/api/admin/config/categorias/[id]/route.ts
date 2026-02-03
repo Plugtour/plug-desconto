@@ -2,7 +2,7 @@
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-import { NextResponse, type NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
 import { deleteCategoria, updateCategoria } from '@/app/admin/_store/configStore';
 
 type AdminStatus = 'rascunho' | 'publicado' | 'pausado' | 'arquivado' | 'lixeira';
@@ -11,7 +11,7 @@ function isAdminStatus(v: any): v is AdminStatus {
   return v === 'rascunho' || v === 'publicado' || v === 'pausado' || v === 'arquivado' || v === 'lixeira';
 }
 
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(req: Request, { params }: { params: { id: string } }) {
   try {
     const id = String(params?.id ?? '').trim();
     const cleanId = String(id ?? '').trim();
@@ -49,7 +49,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
   try {
     const id = String(params?.id ?? '').trim();
     const cleanId = String(id ?? '').trim();
