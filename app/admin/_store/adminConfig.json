@@ -40,9 +40,9 @@
       "nome": "Gastronomia",
       "slug": "gastronomia",
       "ativo": true,
-      "iconKey": null,
+      "iconKey": "food",
       "criadoEm": "2026-01-29T15:59:19.146Z",
-      "atualizadoEm": "2026-01-29T15:59:19.146Z"
+      "atualizadoEm": "2026-02-03T02:31:14.243Z"
     },
     {
       "id": "cat_dy4xsczml5u7i70",
@@ -61,6 +61,24 @@
       "iconKey": "transfer",
       "criadoEm": "2026-02-03T00:55:48.461Z",
       "atualizadoEm": "2026-02-03T00:55:48.461Z"
+    },
+    {
+      "id": "cat_mz6jnmmml5zevt0",
+      "nome": "Hospedagens",
+      "slug": "hospedagens",
+      "ativo": true,
+      "iconKey": "hotel",
+      "criadoEm": "2026-02-03T02:30:51.009Z",
+      "atualizadoEm": "2026-02-03T02:30:51.009Z"
+    },
+    {
+      "id": "cat_ywvf1czml6144n7",
+      "nome": "Serviços",
+      "slug": "servicos",
+      "ativo": true,
+      "iconKey": "service",
+      "criadoEm": "2026-02-03T03:18:28.479Z",
+      "atualizadoEm": "2026-02-03T03:18:28.479Z"
     }
   ]
 }

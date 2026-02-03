@@ -14,15 +14,34 @@ import MenuCarousel from './menu/MenuCarousel';
 import FloatingTopMenu from './menu/FloatingTopMenu';
 import MenuCarouselModal from './menu/MenuCarouselModal';
 
-import { SPONSORED_OFFERS } from '../../_data/sponsoredOffers';
-import { EXPOSED_GASTRONOMY } from '../../_data/exposedOffers';
-
 import BottomNav from './bottom-nav/BottomNav';
 import { BOTTOM_NAV_ITEMS } from './bottom-nav/items';
 
-import type { SponsoredOffer } from '../../_data/sponsoredOffers';
-
 type OfferLike = any;
+
+/** ✅ Tipo local */
+type SponsoredOffer = {
+  id: string;
+  title: string;
+  href: string;
+  imageUrl?: string | null;
+  rating?: number | null;
+  reviews?: number | null;
+  savingsText?: string | null;
+  priceText?: string | null;
+  tags?: string[] | null;
+  city?: string | null;
+  vendorName?: string | null;
+  vendorAbout?: string | null;
+
+  subtitle?: string | null;
+  whatsappHref?: string | null;
+  address?: string | null;
+  addressText?: string | null;
+  calendar?: any | null;
+  times?: any | null;
+  exceptions?: any | null;
+};
 
 type IconKey =
   | 'pin'
@@ -41,7 +60,7 @@ type IconKey =
   | 'attraction';
 
 type CategoryItem = {
-  id: string; // usamos o slug (bate com offer.categoryId)
+  id: string; // ✅ chave canônica do menu (slug quando existir)
   title: string;
   count: number;
   iconKey: IconKey;
@@ -108,7 +127,7 @@ function mapIconKey(raw: any, slugOrName: string): IconKey {
   return 'service';
 }
 
-/** Mapeia "offers" genérico -> SponsoredOffer (o formato que o SponsoredOffersList usa) */
+/** Mapeia "offers" genérico -> SponsoredOffer */
 function mapToSponsoredOffer(o: any, fallbackCategoryTitle: string): SponsoredOffer {
   const id = norm(o?.id ?? o?._id) || `tmp-${Math.random().toString(16).slice(2)}`;
   const title = norm(o?.title ?? o?.name ?? o?.nome ?? o?.titulo) || 'Benefício';
@@ -116,18 +135,18 @@ function mapToSponsoredOffer(o: any, fallbackCategoryTitle: string): SponsoredOf
   const slug = norm(o?.slug ?? o?.seoSlug ?? o?.slugId);
   const href = safeHref(o?.href ?? (slug ? `/beneficio/${encodeURIComponent(slug)}` : o?.link ?? '/'));
 
-  const imageUrl = norm(o?.imageUrl ?? o?.image ?? o?.cover ?? o?.coverImage ?? o?.banner) || null;
+  const imageUrl = norm(o?.imageUrl ?? o?.image ?? o?.cover ?? o?.coverImage ?? o?.coverImageUrl ?? o?.banner) || null;
 
-  const rating = safeNumber(o?.rating ?? o?.nota ?? o?.stars, 4.7);
-  const reviews = safeNumber(o?.reviews ?? o?.reviewsCount ?? o?.avaliacoes, 320);
+  const rating = safeNumber(o?.rating ?? o?.nota ?? o?.stars, 0);
+  const reviews = safeNumber(o?.reviews ?? o?.reviewsCount ?? o?.avaliacoes, 0);
 
   const savingsText = o?.savingsText ?? o?.economyText ?? o?.economizeText ?? null;
-  const priceText = o?.priceText ?? o?.precoTexto ?? o?.discountText ?? o?.desconto ?? '20%';
+  const priceText = o?.priceText ?? o?.precoTexto ?? o?.discountText ?? o?.desconto ?? null;
 
   const city = norm(o?.city ?? o?.cidade) || null;
 
   const tags =
-    Array.isArray(o?.tags) && o.tags.length ? o.tags : [city || 'Serra Gaúcha', fallbackCategoryTitle, 'Top'];
+    Array.isArray(o?.tags) && o.tags.length ? o.tags : [city || 'Serra Gaúcha', fallbackCategoryTitle];
 
   const vendorName = o?.vendorName ?? o?.parceiro ?? o?.partnerName ?? null;
   const vendorAbout = o?.vendorAbout ?? o?.description ?? o?.descricao ?? o?.shortDescription ?? null;
@@ -155,6 +174,12 @@ function mapToSponsoredOffer(o: any, fallbackCategoryTitle: string): SponsoredOf
   } as any;
 }
 
+function isPublished(o: any) {
+  const s = norm(o?.status ?? o?.offerStatus ?? o?.state).toLowerCase();
+  if (!s) return true;
+  return s === 'publicado' || s === 'published' || s === 'active' || s === 'ativo';
+}
+
 export default function HomeScreenClient({
   regionLabel = 'Serra Gaúcha',
   offers = [],
@@ -163,9 +188,7 @@ export default function HomeScreenClient({
   offers: OfferLike[];
 }) {
   /* =========================
-     OFERTAS (100% dinâmico)
-     - se vier via props, usa
-     - se vier vazio, busca /api/offers
+     OFERTAS
   ========================= */
   const [apiOffers, setApiOffers] = useState<OfferLike[]>([]);
   const [offersErr, setOffersErr] = useState<string | null>(null);
@@ -176,7 +199,6 @@ export default function HomeScreenClient({
     let alive = true;
 
     async function loadOffersIfNeeded() {
-      // se já veio cheio, não busca
       if (inputOffers.length > 0) return;
 
       try {
@@ -203,10 +225,13 @@ export default function HomeScreenClient({
 
   const usedOffers = inputOffers.length > 0 ? inputOffers : apiOffers;
 
+  const publishedOffers = useMemo(() => {
+    const list = Array.isArray(usedOffers) ? usedOffers : [];
+    return list.filter(isPublished);
+  }, [usedOffers]);
+
   /* =========================
-     CATEGORIAS (100% dinâmico)
-     - nome + iconKey do cadastro
-     - count calculado pelas ofertas publicadas
+     CATEGORIAS (Admin)
   ========================= */
   const [cats, setCats] = useState<ApiCategoria[]>([]);
   const [catsErr, setCatsErr] = useState<string | null>(null);
@@ -235,45 +260,175 @@ export default function HomeScreenClient({
     };
   }, []);
 
-  const categories: CategoryItem[] = useMemo(() => {
+  /**
+   * ✅ resolve o "0":
+   * - offer pode vir com categoryId = slug OU id
+   * - menu usa slug como chave canônica
+   */
+  const catMaps = useMemo(() => {
     const rawCats = Array.isArray(cats) ? cats : [];
     const activeCats = rawCats.filter((c) => !!c && c.ativo !== false);
 
-    const publishedOffers = Array.isArray(usedOffers) ? usedOffers : [];
-    const byCategoryIdCount = new Map<string, number>();
+    const idToSlug = new Map<string, string>();
+    const slugSet = new Set<string>();
 
-    for (const o of publishedOffers) {
-      const cid = norm(o?.categoryId ?? o?.category ?? o?.categoriaId);
-      if (!cid) continue;
-      byCategoryIdCount.set(cid, (byCategoryIdCount.get(cid) ?? 0) + 1);
+    for (const c of activeCats) {
+      const cid = norm(c.id);
+      const slug = norm(c.slug) || cid;
+      if (cid && slug) idToSlug.set(cid, slug);
+      if (slug) slugSet.add(slug);
     }
 
-    const mapped = activeCats
-      .map((c) => {
-        const id = norm(c.slug) || norm(c.id);
-        if (!id) return null;
+    function resolveToSlug(key: any) {
+      const k = norm(key);
+      if (!k) return '';
+      if (slugSet.has(k)) return k; // já é slug
+      if (idToSlug.has(k)) return idToSlug.get(k) || '';
+      return k; // fallback
+    }
 
-        const title = norm(c.nome) || id || 'Categoria';
-        const count = byCategoryIdCount.get(id) ?? 0;
+    return { activeCats, resolveToSlug };
+  }, [cats]);
 
-        return {
-          id,
-          title,
-          count,
-          iconKey: mapIconKey(c.iconKey, `${c.slug || ''} ${c.nome || ''}`),
-        } as CategoryItem;
+  /**
+   * ✅ MENU
+   * - usa categorias do admin quando existir
+   * - se vier vazio, cria fallback pelas ofertas (para nunca sumir)
+   */
+  const categories: CategoryItem[] = useMemo(() => {
+    const bySlugCount = new Map<string, number>();
+
+    for (const o of publishedOffers) {
+      const raw = norm(o?.categoryId ?? o?.category ?? o?.categoriaId);
+      if (!raw) continue;
+
+      const slugKey = catMaps.resolveToSlug(raw);
+      if (!slugKey) continue;
+
+      bySlugCount.set(slugKey, (bySlugCount.get(slugKey) ?? 0) + 1);
+    }
+
+    // 1) Preferência: categorias do admin
+    const adminCats = (catMaps.activeCats || []).map((c) => {
+      const slug = norm(c.slug) || norm(c.id);
+      if (!slug) return null;
+
+      const title = norm(c.nome) || slug || 'Categoria';
+      const count = bySlugCount.get(slug) ?? 0;
+
+      return {
+        id: slug,
+        title,
+        count,
+        iconKey: mapIconKey(c.iconKey, `${c.slug || ''} ${c.nome || ''}`),
+      } as CategoryItem;
+    }).filter(Boolean) as CategoryItem[];
+
+    if (adminCats.length > 0) {
+      adminCats.sort((a, b) => a.title.localeCompare(b.title, 'pt-BR'));
+      return adminCats;
+    }
+
+    // 2) Fallback: cria categorias a partir das ofertas
+    const fallback: CategoryItem[] = [];
+    for (const [slug, count] of bySlugCount.entries()) {
+      fallback.push({
+        id: slug,
+        title: slug, // sem nome do admin, mostra o próprio slug (melhor que sumir)
+        count,
+        iconKey: mapIconKey(null, slug),
+      });
+    }
+
+    fallback.sort((a, b) => a.title.localeCompare(b.title, 'pt-BR'));
+    return fallback;
+  }, [publishedOffers, catMaps]);
+
+  const categoryTitleById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const c of categories) m.set(c.id, c.title);
+    return m;
+  }, [categories]);
+
+  /* =========================
+     ITENS (HOME)
+  ========================= */
+  const allSponsoredItems: SponsoredOffer[] = useMemo(() => {
+    const raw = Array.isArray(publishedOffers) ? publishedOffers : [];
+
+    return raw
+      .map((o: any) => {
+        const rawCid = norm(o?.categoryId ?? o?.category ?? o?.categoriaId);
+        const slugCid = catMaps.resolveToSlug(rawCid);
+        const catTitle = (slugCid && categoryTitleById.get(slugCid)) || 'Categoria';
+        return mapToSponsoredOffer(o, catTitle);
       })
-      .filter(Boolean) as CategoryItem[];
+      .filter(Boolean) as SponsoredOffer[];
+  }, [publishedOffers, categoryTitleById, catMaps]);
 
-    mapped.sort((a, b) => a.title.localeCompare(b.title, 'pt-BR'));
-    return mapped;
-  }, [cats, usedOffers]);
+  const bestRatedTop10 = useMemo(() => {
+    const base = [...allSponsoredItems];
+    base.sort((a: any, b: any) => {
+      const ar = safeNumber(a?.rating, 0);
+      const br = safeNumber(b?.rating, 0);
+      if (br !== ar) return br - ar;
+      const av = safeNumber(a?.reviews, 0);
+      const bv = safeNumber(b?.reviews, 0);
+      return bv - av;
+    });
+    return base.slice(0, 10);
+  }, [allSponsoredItems]);
+
+  const bestRatedCount = bestRatedTop10.length;
+
+  const bestRatedCarouselItems = useMemo(() => {
+    return bestRatedTop10.map((o: any) => ({
+      id: o.id,
+      title: o.title,
+      imageUrl: o.imageUrl ?? null,
+      href: o.href,
+      savingsText: o.savingsText ?? (o.priceText ? `Economize ${o.priceText}` : null),
+      rating: safeNumber(o.rating, 0),
+      reviews: safeNumber(o.reviews, 0),
+    }));
+  }, [bestRatedTop10]);
+
+  const mainListItems = useMemo(() => {
+    const base = [...allSponsoredItems];
+    base.sort((a: any, b: any) => {
+      const ar = safeNumber(a?.rating, 0);
+      const br = safeNumber(b?.rating, 0);
+      if (br !== ar) return br - ar;
+      const av = safeNumber(a?.reviews, 0);
+      const bv = safeNumber(b?.reviews, 0);
+      return bv - av;
+    });
+    return base.slice(0, 30);
+  }, [allSponsoredItems]);
+
+  const sponsoredRowItems = useMemo(() => {
+    const base = [...allSponsoredItems];
+
+    const withSavings = base.filter((x: any) => norm(x?.savingsText) || norm(x?.priceText));
+    const src = withSavings.length ? withSavings : base;
+
+    src.sort((a: any, b: any) => {
+      const ar = safeNumber(a?.rating, 0);
+      const br = safeNumber(b?.rating, 0);
+      if (br !== ar) return br - ar;
+      const av = safeNumber(a?.reviews, 0);
+      const bv = safeNumber(b?.reviews, 0);
+      return bv - av;
+    });
+
+    return src.slice(0, 12);
+  }, [allSponsoredItems]);
 
   /* =========================
      MODAL (Categorias)
   ========================= */
   const [menuModalOpen, setMenuModalOpen] = useState(false);
-  const [menuModalCategoryId, setMenuModalCategoryId] = useState<string>('');
+  const [menuModalCategoryId, setMenuModalCategoryId] = useState<string>(''); // slug
   const [menuModalCategoryName, setMenuModalCategoryName] = useState<string>('');
   const [menuModalCategoryCount, setMenuModalCategoryCount] = useState<number>(0);
 
@@ -293,72 +448,12 @@ export default function HomeScreenClient({
   const openSearchModal = () => setSearchModalOpen(true);
   const closeSearchModal = () => setSearchModalOpen(false);
 
-  const top10Items = useMemo(() => {
-    const base = Array.isArray(EXPOSED_GASTRONOMY) ? [...EXPOSED_GASTRONOMY] : [];
-    base.sort((a: any, b: any) => {
-      const ar = Number(a?.rating ?? 0);
-      const br = Number(b?.rating ?? 0);
-      if (br !== ar) return br - ar;
-      const av = Number(a?.reviews ?? 0);
-      const bv = Number(b?.reviews ?? 0);
-      return bv - av;
-    });
-
-    const list = base.slice(0, 10);
-    while (list.length < 10) {
-      const idx = list.length + 1;
-      list.push({
-        id: `top10-extra-${idx}`,
-        title: idx === 9 ? 'Café Colonial Premium' : 'Rodízio Especial da Casa',
-        imageUrl: null,
-        href: '/oferta/top10',
-        savingsText: 'Economize até 40%',
-        rating: 5,
-        reviews: idx === 9 ? 1280 : 980,
-      } as any);
-    }
-    return list.slice(0, 10);
-  }, []);
-
-  const top10Count = 10;
-
-  const top10ListItems = useMemo(() => {
-    const mk = (n: number, title: string, priceText: string, rating: number, reviews: number) =>
-      ({
-        id: `top10list-${n}`,
-        title,
-        imageUrl: null,
-        tags: ['Gramado', 'Gastronomia', 'Top 10'],
-        priceText,
-        rating,
-        reviews,
-      } as any);
-
-    return [
-      mk(1, 'Sequência de Fondue da Serra', '35%', 4.9, 2140),
-      mk(2, 'Café Colonial da Vila', '30%', 4.8, 1875),
-      mk(3, 'Parmegiana Gigante Artesanal', '25%', 4.8, 1422),
-      mk(4, 'Pizza Napoletana Premium', '20%', 4.7, 1650),
-      mk(5, 'Churrasco na Parrilla', '28%', 4.9, 980),
-      mk(6, 'Hambúrguer Smash + Refri', '22%', 4.7, 1210),
-      mk(7, 'Massas Italianas da Casa', '26%', 4.8, 1334),
-      mk(8, 'Bistrô Francês no Centro', '18%', 4.6, 905),
-      mk(9, 'Tábua de Frios Especial', '24%', 4.7, 776),
-      mk(10, 'Sobremesas & Cafés Gourmet', '15%', 4.6, 690),
-      mk(11, 'Menu Executivo do Chef', '19%', 4.7, 812),
-      mk(12, 'Rodízio de Sushi Selecionado', '27%', 4.8, 1540),
-      mk(13, 'Brunch Completo de Domingo', '21%', 4.6, 508),
-      mk(14, 'Cervejaria Artesanal + Tour', '17%', 4.7, 932),
-      mk(15, 'Noite de Vinhos e Tábuas', '20%', 4.8, 1104),
-    ];
-  }, []);
-
   const searchCategories: SearchCategory[] = useMemo(() => {
     return categories.map((c) => ({ id: c.id, title: c.title, count: c.count }));
   }, [categories]);
 
   const searchData: SearchOffer[] = useMemo(() => {
-    const list = Array.isArray(usedOffers) ? usedOffers : [];
+    const list = Array.isArray(publishedOffers) ? publishedOffers : [];
     return list
       .map((o: any): SearchOffer | null => {
         const id = String(o?.id ?? o?._id ?? '').trim();
@@ -370,51 +465,43 @@ export default function HomeScreenClient({
         const subtitle =
           (o?.subtitle ?? o?.subTitle ?? o?.descricaoCurta ?? o?.shortDescription ?? null) as string | null;
 
-        const categoryId = (o?.categoryId ?? o?.category ?? o?.categoriaId ?? null) as string | null;
+        const rawCid = (o?.categoryId ?? o?.category ?? o?.categoriaId ?? null) as string | null;
+        const categoryId = rawCid ? catMaps.resolveToSlug(rawCid) : null;
 
         const city = (o?.city ?? o?.cidade ?? o?.locationCity ?? null) as string | null;
 
-        const priceText =
-          (o?.priceText ?? o?.precoTexto ?? o?.price_label ?? o?.priceLabel ?? null) as string | null;
+        const priceText = (o?.priceText ?? o?.precoTexto ?? o?.price_label ?? o?.priceLabel ?? null) as string | null;
 
         const imageUrl =
-          (o?.imageUrl ?? o?.image ?? o?.cover ?? o?.coverImage ?? o?.banner ?? null) as string | null;
+          (o?.imageUrl ?? o?.image ?? o?.cover ?? o?.coverImage ?? o?.coverImageUrl ?? o?.banner ?? null) as
+            | string
+            | null;
 
         return { id, slug, title, subtitle, categoryId, city, priceText, imageUrl };
       })
       .filter(Boolean) as SearchOffer[];
-  }, [usedOffers]);
+  }, [publishedOffers, catMaps]);
 
   /* =========================
      LISTA DO MODAL POR CATEGORIA
   ========================= */
   const modalItems: SponsoredOffer[] = useMemo(() => {
-    const selectedId = norm(menuModalCategoryId);
-    const catTitle = categories.find((c) => c.id === selectedId)?.title || menuModalCategoryName || 'Categoria';
+    const selectedSlug = norm(menuModalCategoryId);
+    const catTitle = categories.find((c) => c.id === selectedSlug)?.title || menuModalCategoryName || 'Categoria';
 
-    const raw = Array.isArray(usedOffers) ? usedOffers : [];
-    const filtered = selectedId ? raw.filter((o: any) => norm(o?.categoryId ?? o?.category ?? o?.categoriaId) === selectedId) : raw;
+    const raw = Array.isArray(publishedOffers) ? publishedOffers : [];
 
-    const mapped = filtered.map((o: any) => mapToSponsoredOffer(o, catTitle));
-    if (mapped.length) return mapped;
+    const filtered = selectedSlug
+      ? raw.filter((o: any) => {
+          const rawCid = norm(o?.categoryId ?? o?.category ?? o?.categoriaId);
+          if (!rawCid) return false;
+          const offerSlug = catMaps.resolveToSlug(rawCid);
+          return offerSlug === selectedSlug;
+        })
+      : raw;
 
-    return Array.from({ length: 12 }).map((_, i) =>
-      mapToSponsoredOffer(
-        {
-          id: `mock-${selectedId || 'cat'}-${i + 1}`,
-          title: `${catTitle} em destaque ${i + 1}`,
-          imageUrl: null,
-          href: '/beneficio/mock',
-          rating: i % 3 === 0 ? 4.9 : 4.7,
-          reviews: 200 + i * 37,
-          priceText: i % 2 === 0 ? '25%' : '20%',
-          savingsText: 'Economize agora',
-          tags: [regionLabel, catTitle, 'Destaque'],
-        },
-        catTitle
-      )
-    );
-  }, [usedOffers, menuModalCategoryId, menuModalCategoryName, categories, regionLabel]);
+    return filtered.map((o: any) => mapToSponsoredOffer(o, catTitle));
+  }, [publishedOffers, menuModalCategoryId, menuModalCategoryName, categories, catMaps]);
 
   /* =========================
      MENU FLUTUANTE (trigger)
@@ -522,7 +609,7 @@ export default function HomeScreenClient({
 
       {/* MENU CARROSSEL */}
       <div ref={gridMenuRef}>
-        {(catsErr || offersErr) ? (
+        {catsErr || offersErr ? (
           <div className="px-4 pt-3 text-[12px] text-red-600">
             {catsErr ? `Categorias: ${catsErr}` : null}
             {catsErr && offersErr ? ' • ' : null}
@@ -536,38 +623,31 @@ export default function HomeScreenClient({
       <HomeBanner className="mt-4" />
 
       {/* MENU FLUTUANTE */}
-      <FloatingTopMenu
-        categories={categories as any}
-        visible={showFloatingMenu}
-        onCategoryClick={handleCategoryClick}
-      />
+      <FloatingTopMenu categories={categories as any} visible={showFloatingMenu} onCategoryClick={handleCategoryClick} />
 
       <div className="pt-1">
         <div className="px-4 mt-1 pb-2">
-          <QuickSearch
-            offers={searchData}
-            categories={searchCategories}
-            useExternalModal
-            onOpenExternal={openSearchModal}
-          />
+          <QuickSearch offers={searchData} categories={searchCategories} useExternalModal onOpenExternal={openSearchModal} />
         </div>
       </div>
 
-      <SponsoredOffersRow items={SPONSORED_OFFERS} className="mt-4" />
+      {sponsoredRowItems.length ? <SponsoredOffersRow items={sponsoredRowItems as any} className="mt-4" /> : null}
 
-      <ExposedCarouselRow
-        className="mt-6"
-        title="Top 10 mais bem avaliados"
-        categoryLabel="Mais bem avaliados"
-        categoryCount={top10Count}
-        viewAllHref="/top-10"
-        items={top10Items}
-      />
+      {bestRatedCarouselItems.length ? (
+        <ExposedCarouselRow
+          className="mt-6"
+          title="Top 10 mais bem avaliados"
+          categoryLabel="Mais bem avaliados"
+          categoryCount={bestRatedCount}
+          viewAllHref="/ofertas"
+          items={bestRatedCarouselItems as any}
+        />
+      ) : null}
 
       <SponsoredOffersList
         className="mt-7"
         title=""
-        items={top10ListItems as any}
+        items={mainListItems as any}
         initialCount={5}
         step={5}
         categories={categories.map((c) => ({ id: c.id, title: c.title }))}

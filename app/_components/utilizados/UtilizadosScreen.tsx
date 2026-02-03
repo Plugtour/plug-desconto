@@ -12,6 +12,7 @@ function moneyBRL(cents: number) {
 
 export default function UtilizadosScreen() {
   const items = useMemo(() => {
+    // ✅ mocks removidos: mantém estrutura, mas não cria fallback
     return [...USED_MOCK].sort((a, b) => +new Date(b.usedAt) - +new Date(a.usedAt));
   }, []);
 
@@ -34,9 +35,7 @@ export default function UtilizadosScreen() {
       <div className="sticky top-0 z-10 border-b border-zinc-200 bg-zinc-50/90 backdrop-blur">
         <div className="mx-auto max-w-md px-4 py-3">
           <h1 className="text-[18px] font-extrabold text-zinc-900">Utilizados</h1>
-          <p className="mt-0.5 text-[12px] text-zinc-600">
-            Seu histórico completo e quanto você já economizou.
-          </p>
+          <p className="mt-0.5 text-[12px] text-zinc-600">Seu histórico completo e quanto você já economizou.</p>
         </div>
       </div>
 
@@ -50,9 +49,7 @@ export default function UtilizadosScreen() {
         {items.length === 0 ? (
           <div className="mt-10 rounded-2xl bg-white p-5 text-center shadow-sm ring-1 ring-zinc-200">
             <div className="text-[15px] font-bold text-zinc-900">Nenhum desconto utilizado ainda</div>
-            <div className="mt-1 text-[13px] text-zinc-600">
-              Quando você usar um benefício, ele aparece aqui.
-            </div>
+            <div className="mt-1 text-[13px] text-zinc-600">Quando você usar um benefício, ele aparece aqui.</div>
             <button
               type="button"
               className="mt-4 rounded-full bg-zinc-900 px-4 py-2 text-[13px] font-semibold text-white"

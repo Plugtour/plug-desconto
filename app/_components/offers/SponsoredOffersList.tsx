@@ -2,7 +2,6 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState, useLayoutEffect } from 'react';
-import type { SponsoredOffer } from '../../../_data/sponsoredOffers';
 import OfferEconomyLine from './OfferEconomyLine';
 
 // ✅ Modal (sheet)
@@ -11,12 +10,44 @@ import MenuCarouselModalRight from '@/app/_components/modals/MenuCarouselModalRi
 // ✅ Modal padrão “modelo”
 import ProductDetailContent, { type ProductModalData } from '@/app/_components/product/ProductDetailContent';
 
-import {
-  getFavorites,
-  onFavoritesChange,
-  toggleFavorite,
-  type FavoriteItem,
-} from '@/app/_components/favorites/favoritesStore';
+import { getFavorites, onFavoritesChange, toggleFavorite, type FavoriteItem } from '@/app/_components/favorites/favoritesStore';
+
+type SponsoredOffer = {
+  id: string;
+  title: string;
+  href: string;
+
+  imageUrl?: string | null;
+
+  rating?: number | null;
+  reviews?: number | null;
+
+  savingsText?: string | null;
+  priceText?: string | null;
+
+  tags?: string[] | null;
+  city?: string | null;
+
+  subtitle?: string | null;
+
+  vendorName?: string | null;
+  vendorAbout?: string | null;
+
+  whatsappHref?: string | null;
+
+  address?: any | null;
+  addressText?: string | null;
+
+  calendar?: any | null;
+  times?: any | null;
+  exceptions?: any | null;
+
+  headline?: string | null;
+  detailsHtml?: string | null;
+
+  categoryLabel?: string | null;
+  categoryId?: string | null;
+};
 
 type FilterCategory = {
   id: string;
@@ -309,7 +340,6 @@ export default function SponsoredOffersList({
   title,
   initialCount = 5,
   step = 5,
-  categories = [],
 }: Props) {
   const [modalOpen, setModalOpen] = useState(false);
   const [selected, setSelected] = useState<SponsoredOffer | null>(null);
@@ -375,19 +405,6 @@ export default function SponsoredOffersList({
     setModalOpen(false);
     setSelected(null);
   }
-
-  useMemo(() => {
-    const seen = new Set<string>();
-    const out: FilterCategory[] = [];
-    for (const c of categories) {
-      const key = c.title.trim().toLowerCase();
-      if (!key) continue;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      out.push(c);
-    }
-    return out;
-  }, [categories]);
 
   const filteredItems = useMemo(() => {
     const list = Array.isArray(items) ? [...items] : [];
@@ -476,7 +493,6 @@ export default function SponsoredOffersList({
 
   const showTitle = !!title && title.trim().length > 0;
 
-  const listTopRef = useRef<HTMLDivElement | null>(null);
   const [filterIsStuck, setFilterIsStuck] = useState(false);
 
   const FILTER_TOP = 'calc(var(--app-header-h, 54px) + var(--sticky-stack-h, 0px))';
@@ -554,7 +570,7 @@ export default function SponsoredOffersList({
   }, [active, total]);
 
   /* =========================
-     ✅ MODAL CONTENT PADRÃO (igual patrocinado)
+     ✅ MODAL CONTENT PADRÃO
   ========================= */
   const modalContent = useMemo(() => {
     if (!selected) return <div className="p-2" />;
@@ -567,7 +583,6 @@ export default function SponsoredOffersList({
     const rating = Number(o.rating ?? 4.8);
     const reviews = Number(o.reviews ?? 0);
     const imageUrl = o.imageUrl ?? null;
-    const hrefSafe = safeHref(o.href);
 
     const data: ProductModalData = {
       id,
@@ -686,8 +701,6 @@ export default function SponsoredOffersList({
           }
         `}</style>
       </div>
-
-      <div ref={listTopRef} className="no-anchor" style={{ scrollMarginTop: FILTER_TOP }} />
 
       <div className="px-3 no-anchor" style={total <= 6 ? { minHeight: `90vh` } : {}}>
         {total === 0 ? (

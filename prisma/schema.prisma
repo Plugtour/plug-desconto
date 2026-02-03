@@ -31,7 +31,7 @@ model Offer {
   imageUrl    String?
 
   imageUrls String[] @default([])
-  priceText String?
+  priceText  String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -46,7 +46,7 @@ model AdminAuditLog {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
 
-  // Multi-tenant (jÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ preparado)
+  // Multi-tenant (já preparado)
   tenantId String?
 
   // Quem fez

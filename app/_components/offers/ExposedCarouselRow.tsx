@@ -59,6 +59,15 @@ function isAllowedMediaSrc(src: string) {
   return s.startsWith('/') || s.startsWith('http://') || s.startsWith('https://');
 }
 
+function safeNumber(v: any) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function formatPtOne(n: number) {
+  return n.toFixed(1);
+}
+
 /* =========================
    ESTRELAS
 ========================= */
@@ -203,8 +212,8 @@ export default function ExposedCarouselRow({
     const id = String(o.id ?? '');
     const isFav = !!favIds[id];
 
-    const rating = Number(o.rating ?? 4.8);
-    const reviews = Number(o.reviews ?? 0);
+    const rating = safeNumber(o.rating) ?? 0;
+    const reviews = safeNumber(o.reviews) ?? 0;
     const hrefSafe = safeHref(o.href);
     const imageUrl = o.imageUrl ?? null;
 
@@ -288,9 +297,9 @@ export default function ExposedCarouselRow({
       {/* Carrossel */}
       <div ref={scrollRef} className="no-scrollbar flex gap-4 px-4 overflow-x-auto scroll-smooth">
         {list.map((item) => {
-          const rating = item.rating ?? 4.8;
-          const reviews = item.reviews ?? 812;
-          const savings = item.savingsText ?? 'Economia de R$30 a R$90';
+          const rating = safeNumber(item.rating);
+          const reviews = safeNumber(item.reviews);
+          const savings = (typeof item.savingsText === 'string' ? item.savingsText.trim() : '') || '';
           const isFav = !!favIds[item.id];
 
           return (
@@ -350,17 +359,25 @@ export default function ExposedCarouselRow({
                   {item.title}
                 </div>
 
-                <div className="mt-3">
-                  <div className="text-[12px] font-normal text-zinc-600 leading-[1.2]">{categoryLabel}</div>
-                  <div className="mt-[3px] text-[12px] font-medium text-zinc-900 leading-[1.2]">{savings}</div>
-                </div>
+                {(categoryLabel || savings) ? (
+                  <div className="mt-3">
+                    {categoryLabel ? (
+                      <div className="text-[12px] font-normal text-zinc-600 leading-[1.2]">{categoryLabel}</div>
+                    ) : null}
+                    {savings ? (
+                      <div className="mt-[3px] text-[12px] font-medium text-zinc-900 leading-[1.2]">{savings}</div>
+                    ) : null}
+                  </div>
+                ) : null}
 
                 <div className="mt-3 flex items-end justify-between">
                   <div>
-                    <StarsRow rating={rating} />
+                    {rating !== null ? <StarsRow rating={rating} /> : null}
                     <div className="text-[12px] text-zinc-500">
-                      <span className="font-semibold text-zinc-700">{Number(rating).toFixed(1)}</span> de{' '}
-                      <span className="font-semibold text-zinc-700">{reviews}</span>
+                      <span className="font-semibold text-zinc-700">
+                        {rating !== null ? formatPtOne(rating) : '—'}
+                      </span>{' '}
+                      de <span className="font-semibold text-zinc-700">{reviews !== null ? reviews : '—'}</span>
                     </div>
                   </div>
 

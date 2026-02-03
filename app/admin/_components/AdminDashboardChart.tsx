@@ -4,7 +4,7 @@
 import React, { useMemo, useState } from 'react';
 import { ArrowDownRight, ArrowUpRight, Minus } from 'lucide-react';
 
-import { adminMock } from '../_data/adminMock';
+import { useAdminData } from './AdminDataProvider';
 
 const brl = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 const intBR = new Intl.NumberFormat('pt-BR');
@@ -15,7 +15,7 @@ function daysInMonth(year: number, monthIndex0: number) {
   return new Date(year, monthIndex0 + 1, 0).getDate();
 }
 
-// Mock determinístico
+// determinístico (não depende de mock)
 function stableValue(seed: number) {
   let x = seed >>> 0;
   x = (1664525 * x + 1013904223) >>> 0;
@@ -27,65 +27,86 @@ type ChartMode = 'ano' | 'dia';
 type ChartPoint = {
   label: string; // "Jan" ou "01"
   base: number;
+
+  // métricas derivadas (pra manter visual/tooltip)
   revenue: number;
   clients: number;
   dlTotal: number;
   dlNonClient: number;
+
   monthLabel?: string;
   day?: number;
 };
 
-function buildYearMonths(year: number, base: number): ChartPoint[] {
-  return monthOrder.map((label, i) => {
-    const s = stableValue(year * 1000 + i * 97 + base);
-
-    const wobble = (s % 70) - 35;
-    const trend = Math.round((i / 11) * 40);
-    const baseVol = Math.max(20, base + trend + wobble);
-
-    const dlTotal = Math.max(0, Math.round(baseVol * (18 + (s % 10))));
-    const clientRate = 45 + (s % 41);
-    const clients = Math.min(dlTotal, Math.round((dlTotal * clientRate) / 100));
-    const dlNonClient = Math.max(0, dlTotal - clients);
-
-    const ticket = 35 + (s % 35);
-    const revenue = Math.max(0, Math.round(clients * ticket));
-
-    return { label, base: baseVol, revenue, clients, dlTotal, dlNonClient };
-  });
+function safeDate(v: any) {
+  const s = String(v ?? '').trim();
+  if (!s) return null;
+  const d = new Date(s);
+  return Number.isNaN(+d) ? null : d;
 }
 
-function buildMonthDays(year: number, monthIndex0: number, base: number): ChartPoint[] {
+function pickOfferDate(o: any) {
+  return (
+    safeDate(o?.updatedAt) ||
+    safeDate(o?.createdAt) ||
+    safeDate(o?.atualizadoEm) ||
+    safeDate(o?.criadoEm) ||
+    null
+  );
+}
+
+function monthKey(year: number, monthIndex0: number) {
+  return `${year}-${String(monthIndex0 + 1).padStart(2, '0')}`;
+}
+
+function buildCountsByMonth(offers: any[], year: number) {
+  const map = new Map<string, number>();
+  for (let m = 0; m < 12; m += 1) map.set(monthKey(year, m), 0);
+
+  for (const o of offers) {
+    const d = pickOfferDate(o);
+    if (!d) continue;
+    if (d.getFullYear() !== year) continue;
+
+    const key = monthKey(year, d.getMonth());
+    if (!map.has(key)) continue;
+    map.set(key, (map.get(key) ?? 0) + 1);
+  }
+
+  return map;
+}
+
+function buildCountsByDay(offers: any[], year: number, monthIndex0: number) {
   const n = daysInMonth(year, monthIndex0);
-  const mLabel = monthOrder[monthIndex0];
+  const arr = Array.from({ length: n }, () => 0);
 
-  return Array.from({ length: n }).map((_, d0) => {
-    const day = d0 + 1;
-    const s = stableValue(year * 100000 + monthIndex0 * 1000 + day * 37 + base);
+  for (const o of offers) {
+    const d = pickOfferDate(o);
+    if (!d) continue;
+    if (d.getFullYear() !== year) continue;
+    if (d.getMonth() !== monthIndex0) continue;
 
-    const wobble = (s % 30) - 15;
-    const weekly = Math.round(Math.sin((day / 7) * Math.PI) * 8);
-    const baseVol = Math.max(5, Math.round(base / 4) + wobble + weekly);
+    const day = d.getDate(); // 1..n
+    if (day >= 1 && day <= n) arr[day - 1] += 1;
+  }
 
-    const dlTotal = Math.max(0, Math.round(baseVol * (20 + (s % 10))));
-    const clientRate = 35 + (s % 51);
-    const clients = Math.min(dlTotal, Math.round((dlTotal * clientRate) / 100));
-    const dlNonClient = Math.max(0, dlTotal - clients);
+  return arr;
+}
 
-    const ticket = 35 + (s % 35);
-    const revenue = Math.max(0, Math.round(clients * ticket));
+function deriveMetrics(base: number, seed: number) {
+  // base = volume real (quantidade de ofertas no período)
+  // o resto é derivado de forma determinística pra ficar “estável” e com cara de dashboard
+  const s = stableValue(seed);
 
-    return {
-      label: String(day).padStart(2, '0'),
-      base: baseVol,
-      revenue,
-      clients,
-      dlTotal,
-      dlNonClient,
-      monthLabel: mLabel,
-      day,
-    };
-  });
+  const dlTotal = Math.max(0, Math.round(base * (18 + (s % 10)))); // 18..27 por base
+  const clientRate = 35 + (s % 51); // 35%..85%
+  const clients = Math.min(dlTotal, Math.round((dlTotal * clientRate) / 100));
+  const dlNonClient = Math.max(0, dlTotal - clients);
+
+  const ticket = 35 + (s % 35); // 35..69
+  const revenue = Math.max(0, Math.round(clients * ticket));
+
+  return { dlTotal, clients, dlNonClient, revenue };
 }
 
 function TripleBars({
@@ -172,12 +193,12 @@ function TooltipCard({
 
         <div className="mt-1 flex flex-col gap-0.5">
           <div className="flex items-center justify-between gap-4">
-            <span className="text-zinc-600 dark:text-zinc-300">Receita</span>
+            <span className="text-zinc-600 dark:text-zinc-300">Receita (estimada)</span>
             <span className="font-medium">{brl.format(revenue)}</span>
           </div>
 
           <div className="flex items-center justify-between gap-4">
-            <span className="text-zinc-600 dark:text-zinc-300">Clientes convertidos</span>
+            <span className="text-zinc-600 dark:text-zinc-300">Clientes convertidos (est.)</span>
             <span className="font-medium">{intBR.format(clients)}</span>
           </div>
 
@@ -206,26 +227,67 @@ function TooltipCard({
 }
 
 export default function AdminDashboardChart() {
+  const adminAny = useAdminData() as any;
+  const offers = (adminAny?.offers ?? []) as any[];
+
   const now = new Date();
   const currentYear = now.getFullYear();
 
   const availableYears = useMemo(() => {
-    const baseYear = 2026;
-    const years = [baseYear - 3, baseYear - 2, baseYear - 1, baseYear, currentYear].filter((y, i, a) => a.indexOf(y) === i);
+    // anos disponíveis: baseado nas datas das ofertas + ano atual
+    const set = new Set<number>();
+    set.add(currentYear);
+
+    for (const o of offers) {
+      const d = pickOfferDate(o);
+      if (!d) continue;
+      set.add(d.getFullYear());
+    }
+
+    const years = Array.from(set);
     years.sort((a, b) => a - b);
-    return years;
-  }, [currentYear]);
+    return years.length ? years : [currentYear];
+  }, [offers, currentYear]);
 
   const [chartMode, setChartMode] = useState<ChartMode>('ano');
-  const [selectedYear, setSelectedYear] = useState<number>(2026);
+  const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [selectedMonthIndex0, setSelectedMonthIndex0] = useState<number>(now.getMonth());
 
-  const baseFromMock = adminMock.dashboard.months?.[0]?.value ?? 120;
+  // se trocar lista de anos (por carregar ofertas), garante que selectedYear existe
+  React.useEffect(() => {
+    if (!availableYears.includes(selectedYear)) setSelectedYear(availableYears[availableYears.length - 1]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [availableYears.join('|')]);
 
   const series: ChartPoint[] = useMemo(() => {
-    if (chartMode === 'ano') return buildYearMonths(selectedYear, baseFromMock);
-    return buildMonthDays(selectedYear, selectedMonthIndex0, baseFromMock);
-  }, [chartMode, selectedYear, selectedMonthIndex0, baseFromMock]);
+    if (chartMode === 'ano') {
+      const byMonth = buildCountsByMonth(offers, selectedYear);
+
+      return monthOrder.map((label, i) => {
+        const base = byMonth.get(monthKey(selectedYear, i)) ?? 0;
+        const seed = selectedYear * 1000 + i * 97 + base * 13;
+        const m = deriveMetrics(base, seed);
+        return { label, base, ...m };
+      });
+    }
+
+    const byDay = buildCountsByDay(offers, selectedYear, selectedMonthIndex0);
+    const mLabel = monthOrder[selectedMonthIndex0];
+
+    return byDay.map((base, d0) => {
+      const day = d0 + 1;
+      const seed = selectedYear * 100000 + selectedMonthIndex0 * 1000 + day * 37 + base * 11;
+      const m = deriveMetrics(base, seed);
+
+      return {
+        label: String(day).padStart(2, '0'),
+        base,
+        ...m,
+        monthLabel: mLabel,
+        day,
+      };
+    });
+  }, [chartMode, offers, selectedMonthIndex0, selectedYear]);
 
   const maxRevenue = useMemo(() => Math.max(...series.map((p) => p.revenue), 1), [series]);
   const maxClients = useMemo(() => Math.max(...series.map((p) => p.clients), 1), [series]);
@@ -248,15 +310,15 @@ export default function AdminDashboardChart() {
     compare.trend === 'up'
       ? 'text-emerald-700 dark:text-emerald-300'
       : compare.trend === 'down'
-      ? 'text-rose-700 dark:text-rose-300'
-      : 'text-zinc-600 dark:text-zinc-400';
+        ? 'text-rose-700 dark:text-rose-300'
+        : 'text-zinc-600 dark:text-zinc-400';
 
   const chartTitle =
     chartMode === 'ano'
       ? `Utilizações por mês — ${selectedYear}`
       : `Utilizações por dia — ${monthOrder[selectedMonthIndex0]}/${selectedYear}`;
 
-  const chartHint = 'Passe o mouse para ver Receita, Clientes e Downloads.';
+  const chartHint = 'Passe o mouse para ver Receita, Clientes e Downloads (estimados).';
 
   return (
     <div
@@ -273,10 +335,6 @@ export default function AdminDashboardChart() {
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-1 text-xs text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
-            mock
-          </div>
-
           <div className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-1.5 dark:border-zinc-800 dark:bg-zinc-950">
             <TrendIcon size={14} className={trendColor} />
             <span className={`text-xs font-medium ${trendColor}`}>
@@ -461,11 +519,11 @@ export default function AdminDashboardChart() {
       <div className="mt-3 flex flex-wrap items-center gap-4 text-[11px] text-zinc-700 dark:text-zinc-400">
         <span className="inline-flex items-center gap-2">
           <span className="inline-block h-2 w-2 rounded-sm bg-emerald-500" />
-          Receita
+          Receita (estimada)
         </span>
         <span className="inline-flex items-center gap-2">
           <span className="inline-block h-2 w-2 rounded-sm bg-sky-400" />
-          Clientes convertidos
+          Clientes convertidos (est.)
         </span>
         <span className="inline-flex items-center gap-2">
           <span className="inline-block h-2 w-2 rounded-sm bg-amber-400" />

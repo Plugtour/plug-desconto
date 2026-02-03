@@ -1,50 +1,76 @@
 // app/admin/_data/adminSelectors.ts
-import { adminMock, countByStatus } from './adminMock';
-import { mapOffer, mapPartner, mapAffiliate } from './adminMappers';
+import type { OfferStatus, PartnerStatus } from './adminMappers';
 
-export function getAdminUiData() {
-  const offers = adminMock.offers.map(mapOffer);
-  const partners = adminMock.partners.map(mapPartner);
-  const affiliates = adminMock.affiliates.map(mapAffiliate);
+/**
+ * Status usados no Admin (mesmo padrão do app)
+ */
+export type AdminStatus = 'rascunho' | 'publicado' | 'pausado' | 'arquivado' | 'lixeira';
 
-  return { offers, partners, affiliates };
+export function countByStatus<T extends { status: AdminStatus }>(items: T[]) {
+  return (items || []).reduce(
+    (acc, item) => {
+      const s = (item?.status ?? '') as AdminStatus;
+      if (s in acc) acc[s] += 1;
+      return acc;
+    },
+    {
+      rascunho: 0,
+      publicado: 0,
+      pausado: 0,
+      arquivado: 0,
+      lixeira: 0,
+    } as Record<AdminStatus, number>
+  );
 }
 
-export function getDashboardData() {
-  const { offers, partners } = getAdminUiData();
+export function filterByStatus<T extends { status: AdminStatus }>(items: T[], status: AdminStatus | 'todos') {
+  if (status === 'todos') return items || [];
+  return (items || []).filter((i) => i.status === status);
+}
 
-  const offersByStatus = countByStatus(adminMock.offers);
-  const partnersByStatus = countByStatus(adminMock.partners);
+export function searchIn<T>(items: T[], q: string, pick: (item: T) => string[]) {
+  const query = String(q ?? '').trim().toLowerCase();
+  if (!query) return items || [];
+  return (items || []).filter((item) => pick(item).join(' ').toLowerCase().includes(query));
+}
 
-  const chart = {
-    yearLabel: '2026',
-    isMock: true,
-    months: adminMock.dashboard.months,
-    bars: adminMock.dashboard.months.map((m) => m.value),
-  };
+/**
+ * Dashboard (real)
+ * - recebe dados já mapeados do AdminDataProvider
+ * - se não passar nada, devolve tudo zerado
+ */
+export function getDashboardData(input?: {
+  offers?: Array<{ status: OfferStatus | AdminStatus }>;
+  partners?: Array<{ status: PartnerStatus | AdminStatus }>;
+}) {
+  const offers = (input?.offers ?? []) as Array<{ status: AdminStatus }>;
+  const partners = (input?.partners ?? []) as Array<{ status: AdminStatus }>;
+
+  const offersByStatus = countByStatus(offers);
+  const partnersByStatus = countByStatus(partners);
 
   const stats = [
     {
       label: 'Ofertas publicadas',
       value: String(offersByStatus.publicado),
-      hint: 'Base atual (mock central)',
+      hint: 'Base atual (dados reais)',
     },
     {
       label: 'Parceiros ativos',
       value: String(partnersByStatus.publicado),
-      hint: 'Publicados e visíveis (mock)',
+      hint: 'Publicados e visíveis',
     },
     {
-      label: 'Cupons utilizados',
-      value: '912',
-      hint: 'Total acumulado (mock)',
+      label: 'Itens em rascunho',
+      value: String(offersByStatus.rascunho + partnersByStatus.rascunho),
+      hint: 'Somando ofertas + parceiros',
     },
     {
-      label: 'Receita estimada',
-      value: 'R$ 18.420',
-      hint: 'Simulação (MVP)',
+      label: 'Itens na lixeira',
+      value: String(offersByStatus.lixeira + partnersByStatus.lixeira),
+      hint: 'Somando ofertas + parceiros',
     },
   ];
 
-  return { stats, chart, offers, partners };
+  return { stats };
 }

@@ -2,15 +2,42 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import Link from 'next/link';
 
-import type { SponsoredOffer } from '../../../_data/sponsoredOffers';
 import OfferEconomyLine from './OfferEconomyLine';
 
 import MenuCarouselModalRight from '../modals/MenuCarouselModalRight';
 import ProductDetailContent, { type ProductModalData } from '@/app/_components/product/ProductDetailContent';
 
 import { getFavorites, onFavoritesChange, toggleFavorite } from '../favorites/favoritesStore';
+
+type SponsoredOffer = {
+  id: string;
+  title: string;
+  href: string;
+  imageUrl?: string | null;
+
+  rating?: number | null;
+  reviews?: number | null;
+
+  savingsText?: string | null;
+  priceText?: string | null;
+
+  tags?: string[] | null;
+  vendorName?: string | null;
+  vendorAbout?: string | null;
+  subtitle?: string | null;
+  whatsappHref?: string | null;
+
+  address?: any | null;
+  addressText?: string | null;
+
+  calendar?: any | null;
+  times?: any | null;
+  exceptions?: any | null;
+
+  headline?: string | null;
+  detailsHtml?: string | null;
+};
 
 function safeHref(v: any) {
   const s = typeof v === 'string' ? v.trim() : '';
