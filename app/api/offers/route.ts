@@ -15,6 +15,43 @@ function normalizeCat(value: string) {
   return (value || '').trim();
 }
 
+/**
+ * ✅ Normaliza imageUrl vindo do banco para o formato público correto
+ * - troca \ por /
+ * - garante "/" no início
+ * - troca /uploads/offers/ -> /offers/
+ * - remove sufixo -w### antes da extensão (evita duplicar -w128-w128)
+ */
+function normalizeImageUrl(value: string | null) {
+  const s0 = (value || '').trim();
+  if (!s0) return null;
+
+  // remoto: mantém como está
+  if (/^https?:\/\//i.test(s0)) return s0;
+
+  const [pathPart, queryPart] = s0.split('?');
+  let p = String(pathPart || '').trim();
+  if (!p) return null;
+
+  p = p.replace(/\\/g, '/').trim();
+
+  if (!p.startsWith('/')) p = `/${p}`;
+
+  // remove -w### antes da extensão (qualquer extensão)
+  p = p.replace(/-w\d+(?=\.[a-z0-9]+$)/i, '');
+
+  // /uploads/offers -> /offers
+  p = p.replace(/^\/uploads\/offers\//i, '/offers/');
+
+  // se veio só "/arquivo.webp" (sem pasta), assume /offers/
+  const parts = p.split('/').filter(Boolean);
+  if (parts.length === 1) {
+    p = `/offers/${parts[0]}`;
+  }
+
+  return queryPart ? `${p}?${queryPart}` : p;
+}
+
 type ApiOffer = {
   id: string;
   slug: string;
@@ -69,6 +106,8 @@ function mapOffer(
   const catId = (db.categoryId || '').trim();
   const catName = categoryNameById.get(catId) || catId || '';
 
+  const normalizedImageUrl = normalizeImageUrl(db.imageUrl);
+
   return {
     id: db.id,
     slug: db.slug,
@@ -77,7 +116,7 @@ function mapOffer(
     status: db.status,
 
     categoryId: db.categoryId,
-    category: catName, // ✅ agora é o nome real (se conseguir ler)
+    category: catName,
 
     title: db.title,
 
@@ -89,8 +128,8 @@ function mapOffer(
     priceText: db.priceText ?? null,
     benefit: (db.priceText || '').trim() ? String(db.priceText) : db.title,
 
-    imageUrl: db.imageUrl ?? null,
-    images: pickImages(db.imageUrl),
+    imageUrl: normalizedImageUrl,
+    images: pickImages(normalizedImageUrl),
 
     createdAt: db.createdAt.toISOString(),
     updatedAt: db.updatedAt.toISOString(),
@@ -103,8 +142,6 @@ async function safeListCategorias() {
   try {
     return await listCategorias();
   } catch (e: unknown) {
-    // ✅ Em produção (Vercel), o FS pode ser read-only e essa leitura pode falhar.
-    // Não vamos derrubar a rota por isso: apenas devolve sem nome de categoria.
     return [];
   }
 }
@@ -117,14 +154,12 @@ export async function GET(request: Request) {
     const categoryParam = searchParams.get('categoryId');
 
     const where: Prisma.OfferWhereInput = {
-      // ✅ site/app só mostra publicado
       status: OfferStatus.publicado,
     };
 
     if (cityParamRaw) where.city = normalizeCity(cityParamRaw);
     if (categoryParam) where.categoryId = normalizeCat(categoryParam);
 
-    // ✅ tenta carregar categorias do Admin (se falhar, segue sem quebrar)
     const categorias = await safeListCategorias();
     const categoryNameById = new Map<string, string>();
     for (const c of categorias || []) {

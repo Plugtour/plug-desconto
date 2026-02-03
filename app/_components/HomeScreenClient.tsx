@@ -90,9 +90,9 @@ function safeHref(v: any) {
 
 /**
  * ✅ NORMALIZA imageUrl para funcionar com seus componentes responsivos:
- * - se vier "/offers/foto-w256.webp" => vira "/offers/foto.webp"
- * - se vier "foto.webp" => vira "/offers/foto.webp" (padrão do seu projeto)
- * - se vier "/public/offers/foto.webp" => vira "/offers/foto.webp"
+ * - remove sufixo -w### (ex: -w128, -w256)
+ * - converte /uploads/offers/... -> /offers/...
+ * - se vier só "arquivo.webp" -> /offers/arquivo.webp
  * - mantém URLs remotas (http/https)
  */
 function normalizeImageUrl(raw: any) {
@@ -107,25 +107,23 @@ function normalizeImageUrl(raw: any) {
   let p = String(pathPart || '').trim();
   if (!p) return null;
 
-  // remove prefixos comuns que aparecem por engano
-  p = p.replace(/\\/g, '/'); // windows
-  p = p.replace(/^(\.\/)+/g, '');
-  p = p.replace(/^public\//i, '');
-  p = p.replace(/^\/public\//i, '/');
+  // normaliza barras (windows)
+  p = p.replace(/\\/g, '/').trim();
 
-  // garante que comece com /
+  // garante / no início para paths locais
   if (!p.startsWith('/')) p = `/${p}`;
 
-  // se veio "/offers/arquivo.webp" ok
-  // se veio "/images/arquivo.webp" ok
-  // se veio "/arquivo.webp" (sem pasta), assume /offers/
-  const isBareAtRoot = /^\/[^/]+\.(webp|jpg|jpeg|png|avif)$/i.test(p);
-  if (isBareAtRoot) {
-    p = p.replace(/^\/+/, '/offers/');
-  }
+  // remove -w### antes da extensão (qualquer extensão)
+  p = p.replace(/-w\d+(?=\.[a-z0-9]+$)/i, '');
 
-  // remove -w### antes da extensão
-  p = p.replace(/-w\d+(?=\.(webp|jpg|jpeg|png|avif)$)/i, '');
+  // 🔥 AJUSTE CRÍTICO: /uploads/offers -> /offers
+  p = p.replace(/^\/uploads\/offers\//i, '/offers/');
+
+  // se veio só "/arquivo.webp" (sem pasta), assume /offers/
+  const parts = p.split('/').filter(Boolean);
+  if (parts.length === 1) {
+    p = `/offers/${parts[0]}`;
+  }
 
   return queryPart ? `${p}?${queryPart}` : p;
 }
@@ -170,14 +168,14 @@ function mapIconKey(raw: any, slugOrName: string): IconKey {
 }
 
 /** Mapeia "offers" genérico -> SponsoredOffer */
-function mapToSponsoredOffer(o: any, fallbackCategoryTitle: string, fallbackRegionLabel: string): SponsoredOffer {
+function mapToSponsoredOffer(o: any, fallbackCategoryTitle: string): SponsoredOffer {
   const id = norm(o?.id ?? o?._id) || `tmp-${Math.random().toString(16).slice(2)}`;
   const title = norm(o?.title ?? o?.name ?? o?.nome ?? o?.titulo) || 'Benefício';
 
   const slug = norm(o?.slug ?? o?.seoSlug ?? o?.slugId);
   const href = safeHref(o?.href ?? (slug ? `/beneficio/${encodeURIComponent(slug)}` : o?.link ?? '/'));
 
-  // ✅ aqui: normaliza URL pra base (sem -w###)
+  // ✅ aqui: normaliza URL pra base (sem -w###) e corrige /uploads/offers -> /offers
   const imageUrl = normalizeImageUrl(
     o?.imageUrl ?? o?.image ?? o?.cover ?? o?.coverImage ?? o?.coverImageUrl ?? o?.banner
   );
@@ -190,11 +188,7 @@ function mapToSponsoredOffer(o: any, fallbackCategoryTitle: string, fallbackRegi
 
   const city = norm(o?.city ?? o?.cidade) || null;
 
-  // ✅ IMPORTANTÍSSIMO: seus componentes montam tagsLine só quando tem 3 tags.
-  const tags =
-    Array.isArray(o?.tags) && o.tags.length
-      ? o.tags
-      : [city || fallbackRegionLabel || 'Serra Gaúcha', fallbackCategoryTitle, 'Oferta'];
+  const tags = Array.isArray(o?.tags) && o.tags.length ? o.tags : [city || 'Serra Gaúcha', fallbackCategoryTitle];
 
   const vendorName = o?.vendorName ?? o?.parceiro ?? o?.partnerName ?? null;
   const vendorAbout = o?.vendorAbout ?? o?.description ?? o?.descricao ?? o?.shortDescription ?? null;
@@ -411,10 +405,10 @@ export default function HomeScreenClient({
         const rawCid = norm(o?.categoryId ?? o?.category ?? o?.categoriaId);
         const slugCid = catMaps.resolveToSlug(rawCid);
         const catTitle = (slugCid && categoryTitleById.get(slugCid)) || 'Categoria';
-        return mapToSponsoredOffer(o, catTitle, regionLabel);
+        return mapToSponsoredOffer(o, catTitle);
       })
       .filter(Boolean) as SponsoredOffer[];
-  }, [publishedOffers, categoryTitleById, catMaps, regionLabel]);
+  }, [publishedOffers, categoryTitleById, catMaps]);
 
   const bestRatedTop10 = useMemo(() => {
     const base = [...allSponsoredItems];
@@ -529,7 +523,7 @@ export default function HomeScreenClient({
         return { id, slug, title, subtitle, categoryId, city, priceText, imageUrl };
       })
       .filter(Boolean) as SearchOffer[];
-  }, [publishedOffers, catMaps]);
+  }, [publishedOffers, catMaps, categories]);
 
   /* =========================
      LISTA DO MODAL POR CATEGORIA
@@ -549,8 +543,8 @@ export default function HomeScreenClient({
         })
       : raw;
 
-    return filtered.map((o: any) => mapToSponsoredOffer(o, catTitle, regionLabel));
-  }, [publishedOffers, menuModalCategoryId, menuModalCategoryName, categories, catMaps, regionLabel]);
+    return filtered.map((o: any) => mapToSponsoredOffer(o, catTitle));
+  }, [publishedOffers, menuModalCategoryId, menuModalCategoryName, categories, catMaps]);
 
   /* =========================
      MENU FLUTUANTE (trigger)

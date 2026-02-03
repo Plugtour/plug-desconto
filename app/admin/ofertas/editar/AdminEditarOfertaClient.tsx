@@ -78,6 +78,57 @@ function move<T>(arr: T[], from: number, to: number) {
   return copy;
 }
 
+function isRemoteUrl(url: string) {
+  return /^https?:\/\//i.test(String(url || '').trim());
+}
+
+/**
+ * Normaliza URL de imagem para o padrão atual do site:
+ * - mantém remotas (http/https)
+ * - remove -w### antes da extensão
+ * - converte /uploads/offers/... -> /offers/...
+ * - garante que comece com "/"
+ */
+function normalizeImgUrl(raw: any) {
+  const s0 = typeof raw === 'string' ? raw.trim() : '';
+  if (!s0) return '';
+
+  if (isRemoteUrl(s0)) return s0;
+
+  const [pathPart, queryPart] = s0.split('?');
+  let p = String(pathPart || '').trim();
+  if (!p) return '';
+
+  p = p.replace(/\\/g, '/');
+
+  // remove -w### antes da extensão (ex: foto-w256.webp -> foto.webp)
+  p = p.replace(/-w\d+(?=\.(webp|jpg|jpeg|png|avif)$)/i, '');
+
+  // converte legado -> novo padrão
+  p = p.replace(/^\/?uploads\/offers\//i, 'offers/');
+
+  // se vier "offers/xxx.webp" vira "/offers/xxx.webp"
+  if (!p.startsWith('/')) p = `/${p}`;
+
+  // garantia final (caso tenha virado "/offers/..." ok)
+  // nada extra aqui
+
+  return queryPart ? `${p}?${queryPart}` : p;
+}
+
+function dedupeKeepOrder(list: string[]) {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const x of list) {
+    const v = String(x || '').trim();
+    if (!v) continue;
+    if (seen.has(v)) continue;
+    seen.add(v);
+    out.push(v);
+  }
+  return out;
+}
+
 export default function AdminEditarOfertaClient() {
   const router = useRouter();
   const params = useSearchParams();
@@ -117,11 +168,10 @@ export default function AdminEditarOfertaClient() {
   const [priceText, setPriceText] = useState('');
   const [saving, setSaving] = useState(false);
 
-  // 🔑 garante que a oferta “manda” nos selects (evita voltar pro valor antigo)
+  // garante que a oferta “manda” nos selects (evita voltar pro valor antigo)
   const [offerLoaded, setOfferLoaded] = useState(false);
 
   useEffect(() => {
-    // Só “ajuda” com default do parceiro se estiver vazio
     setParceiro((prev) => prev || partnerOptions[0] || '');
   }, [partnerOptions]);
 
@@ -207,15 +257,16 @@ export default function AdminEditarOfertaClient() {
         setStatus((o.status as OfferStatus) ?? 'rascunho');
         setDescricao((o.description ?? '') as string);
 
-        // ✅ city e categoryId podem vir antigos; normaliza e seta direto (SEM "prev ||")
         setDestinoSlug(normalizeCity(o.city ?? ''));
         setCategoriaSlug(normalizeCategoryId(o.categoryId ?? ''));
 
         const fromList = Array.isArray(o.imageUrls) ? o.imageUrls.filter(Boolean) : [];
         const fromSingle = o.imageUrl ? [String(o.imageUrl)] : [];
-        const merged = (fromList.length ? fromList : fromSingle).map((x) => String(x)).filter(Boolean);
+        const merged = (fromList.length ? fromList : fromSingle)
+          .map((x) => normalizeImgUrl(x))
+          .filter(Boolean);
 
-        setImageUrls(merged);
+        setImageUrls(dedupeKeepOrder(merged));
         setPriceText((o.priceText ?? '') as string);
 
         setOfferLoaded(true);
@@ -233,7 +284,7 @@ export default function AdminEditarOfertaClient() {
     };
   }, [id]);
 
-  // defaults APENAS se: config carregou e AINDA não carregou oferta (evita “voltar”)
+  // defaults APENAS se: config carregou e AINDA não carregou oferta
   useEffect(() => {
     if (loadingConfig) return;
     if (offerLoaded) return;
@@ -256,7 +307,12 @@ export default function AdminEditarOfertaClient() {
 
     setSaving(true);
     try {
-      const cleanImageUrls = imageUrls.map((u) => String(u).trim()).filter(Boolean);
+      const cleanImageUrls = dedupeKeepOrder(
+        imageUrls
+          .map((u) => normalizeImgUrl(u))
+          .map((u) => String(u).trim())
+          .filter(Boolean)
+      );
 
       const payload = {
         title: titulo.trim(),
@@ -417,13 +473,10 @@ export default function AdminEditarOfertaClient() {
                     return;
                   }
 
-                  const newOnes = data.urls.map((u: any) => String(u)).filter(Boolean);
+                  const newOnes = data.urls.map((u: any) => normalizeImgUrl(u)).filter(Boolean);
                   if (!newOnes.length) return;
 
-                  setImageUrls((prev) => {
-                    const set = new Set<string>([...prev, ...newOnes]);
-                    return Array.from(set);
-                  });
+                  setImageUrls((prev) => dedupeKeepOrder([...prev, ...newOnes]));
 
                   e.currentTarget.value = '';
                 }}
@@ -435,6 +488,8 @@ export default function AdminEditarOfertaClient() {
                     {imageUrls.map((url, idx) => {
                       const isPrimary = idx === 0;
                       const isDragging = dragFrom === idx;
+
+                      const src0 = normalizeImgUrl(url);
 
                       return (
                         <div
@@ -452,7 +507,7 @@ export default function AdminEditarOfertaClient() {
                           title={isPrimary ? 'Imagem principal (1ª)' : 'Arraste para ordenar'}
                         >
                           {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={url} alt={`Imagem ${idx + 1}`} className="h-full w-full object-cover" />
+                          <img src={src0} alt={`Imagem ${idx + 1}`} className="h-full w-full object-cover" />
 
                           <div className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-md bg-black/55 px-2 py-1 text-[11px] text-white">
                             <GripVertical className="h-3.5 w-3.5" />

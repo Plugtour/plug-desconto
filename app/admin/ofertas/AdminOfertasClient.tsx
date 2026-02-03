@@ -70,6 +70,47 @@ const statusWeight: Record<OfferStatus, number> = {
   lixeira: 5,
 };
 
+/**
+ * ✅ Normaliza URLs de imagem no Admin:
+ * - mantém http/https
+ * - troca \ por /
+ * - garante "/" no início
+ * - /uploads/offers/... -> /offers/...
+ * - remove sufixo -w### antes da extensão (evita duplicar)
+ * - se vier só "arquivo.webp" -> /offers/arquivo.webp
+ */
+function normalizeImageUrl(raw: any) {
+  const s0 = typeof raw === 'string' ? raw.trim() : '';
+  if (!s0) return null;
+
+  if (/^https?:\/\//i.test(s0)) return s0;
+
+  const [pathPart, queryPart] = s0.split('?');
+  let p = String(pathPart || '').trim();
+  if (!p) return null;
+
+  p = p.replace(/\\/g, '/').trim();
+
+  // remove -w### antes da extensão
+  p = p.replace(/-w\d+(?=\.[a-z0-9]+$)/i, '');
+
+  // corrige /uploads/offers -> /offers (com ou sem "/" no início)
+  p = p.replace(/^\/?uploads\/offers\//i, '/offers/');
+
+  // garante "/" no início
+  if (!p.startsWith('/')) {
+    // se veio só "arquivo.webp" sem pasta, assume /offers/
+    if (!p.includes('/')) p = `/offers/${p}`;
+    else p = `/${p}`;
+  } else {
+    // se veio "/arquivo.webp" sem pasta, assume /offers/
+    const parts = p.split('/').filter(Boolean);
+    if (parts.length === 1) p = `/offers/${parts[0]}`;
+  }
+
+  return queryPart ? `${p}?${queryPart}` : p;
+}
+
 function SortIcon({
   colKey,
   activeKey,
@@ -128,16 +169,18 @@ function ThSort({
 }
 
 function RowThumb({ src, alt }: { src?: string | null; alt: string }) {
+  const normalized = normalizeImageUrl(src);
+
   return (
     <div
       className={['h-[44px] w-[44px] flex-none overflow-hidden rounded-md', 'bg-blue-600/90 dark:bg-blue-500/80'].join(
         ' '
       )}
-      aria-hidden={!src}
+      aria-hidden={!normalized}
     >
-      {src ? (
+      {normalized ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={src} alt={alt} className="h-full w-full object-cover" loading="lazy" />
+        <img src={normalized} alt={alt} className="h-full w-full object-cover" loading="lazy" />
       ) : null}
     </div>
   );
@@ -291,7 +334,7 @@ export default function AdminOfertasClient() {
     ],
     [counts]
   );
- 
+
   const hasFilters = q.trim().length > 0 || status !== 'todos';
 
   const clearFilters = () => {

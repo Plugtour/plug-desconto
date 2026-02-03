@@ -18,6 +18,15 @@ async function requireMaster() {
   return session;
 }
 
+function safeBaseName(input: string) {
+  const ext = path.extname(input).toLowerCase();
+  return path
+    .basename(input, ext)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)+/g, '');
+}
+
 export async function POST(req: Request) {
   const session = await requireMaster();
   if (!session) {
@@ -32,31 +41,27 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'no_files' }, { status: 400 });
     }
 
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'partners');
+    // public/partners -> /partners/...
+    const uploadDir = path.join(process.cwd(), 'public', 'partners');
     await fs.mkdir(uploadDir, { recursive: true });
 
     const urls: string[] = [];
 
     for (const file of files) {
       const buffer = Buffer.from(await file.arrayBuffer());
-      const ext = path.extname(file.name).toLowerCase();
-      const baseName = path
-        .basename(file.name, ext)
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/(^-|-$)+/g, '');
 
-      // sempre grava em webp (se já for webp, mantém)
-      const filename = `${baseName}-${Date.now()}.webp`;
+      const baseName = safeBaseName(file.name) || 'imagem';
+      const stamp = Date.now();
+      const filename = `${baseName}-${stamp}.webp`;
       const outputPath = path.join(uploadDir, filename);
 
-      if (ext === '.webp') {
-        await fs.writeFile(outputPath, buffer);
-      } else {
-        await sharp(buffer).webp({ quality: 82 }).toFile(outputPath);
-      }
+      await sharp(buffer)
+        .rotate()
+        .resize({ width: 1200, withoutEnlargement: true })
+        .webp({ quality: 82 })
+        .toFile(outputPath);
 
-      urls.push(`/uploads/partners/${filename}`);
+      urls.push(`/partners/${filename}`);
     }
 
     return NextResponse.json({ ok: true, urls }, { status: 200 });

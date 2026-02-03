@@ -103,6 +103,36 @@ function ensureExt(pathname: string) {
   return hasExt ? pathname : `${pathname}.webp`;
 }
 
+/* =========================
+   ✅ NORMALIZA CAMINHO LOCAL
+   - remove -w### (se vier salvo no dado)
+   - troca /uploads/offers -> /offers
+   - troca \ por /
+   - garante / no começo para caminhos locais
+========================= */
+function normalizeLocalImageUrl(url: any) {
+  const raw = typeof url === 'string' ? url.trim() : '';
+  if (!raw) return '';
+  if (isRemoteUrl(raw)) return raw;
+
+  const { clean, q } = splitUrl(raw);
+
+  let p = clean.replace(/\\/g, '/').trim();
+
+  if (!p.startsWith('/')) p = `/${p}`;
+
+  if (p.startsWith('/uploads/offers/')) p = p.replace('/uploads/offers/', '/offers/');
+  if (p.startsWith('/offers/')) {
+    // ok
+  } else if (p.startsWith('/uploads/')) {
+    // se vier algo como /uploads/qualquercoisa, mantemos, mas sem sufixo de width
+  }
+
+  p = stripWidthSuffix(p);
+
+  return `${p}${q}`;
+}
+
 function localVariant(url: string, width: number) {
   // /offers/cafe-colonial            -> /offers/cafe-colonial-w128.webp
   // /offers/cafe-colonial.webp       -> /offers/cafe-colonial-w128.webp
@@ -433,7 +463,7 @@ export default function SponsoredOffersList({ items, className, title, initialCo
       title: String(o.title ?? '').trim(),
       href: safeHref(o.href),
 
-      imageUrl: o.imageUrl ?? null,
+      imageUrl: o.imageUrl ? normalizeLocalImageUrl(o.imageUrl) : null,
       subtitle: o.subtitle ?? null,
       city: o.city ?? null,
       priceText: o.priceText ?? null,
@@ -636,7 +666,7 @@ export default function SponsoredOffersList({ items, className, title, initialCo
     const tagsLine = buildTags(selected);
     const rating = Number(o.rating ?? 4.8);
     const reviews = Number(o.reviews ?? 0);
-    const imageUrl = o.imageUrl ?? null;
+    const imageUrl = o.imageUrl ? normalizeLocalImageUrl(o.imageUrl) : null;
 
     const data: ProductModalData = {
       id,
@@ -757,7 +787,8 @@ export default function SponsoredOffersList({ items, className, title, initialCo
               const rating = o.rating ?? 4.8;
               const reviews = o.reviews ?? 0;
 
-              const imgUrl = String(o.imageUrl ?? '').trim();
+              const rawImgUrl = String(o.imageUrl ?? '').trim();
+              const imgUrl = rawImgUrl ? normalizeLocalImageUrl(rawImgUrl) : '';
               const imgSrc = imgUrl ? variantUrl(imgUrl, 128) || imgUrl : '';
               const imgSrcSet = imgUrl ? buildSrcSet(imgUrl, THUMB_WIDTHS) : '';
 

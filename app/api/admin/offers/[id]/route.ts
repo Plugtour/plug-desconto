@@ -15,17 +15,12 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
 }
 
 function requireMaster() {
-  // ✅ Next atual: cookies() pode ser async (no seu erro ele virou Promise)
-  // então usamos await via "any" safe aqui mantendo compat sem quebrar runtime.
-  // (o TS do seu projeto está acusando Promise, então tratamos como Promise)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const c: any = cookies();
   const getCookieValue = (obj: any) => obj?.get?.(getSessionCookieName())?.value ?? null;
 
   const raw = typeof c?.then === 'function' ? null : getCookieValue(c);
 
-  // Se cookies() veio como Promise, vamos resolver do jeito correto no runtime:
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const resolve = async () => {
     if (typeof c?.then === 'function') {
       const cc = await c;
@@ -42,7 +37,6 @@ function requireMaster() {
 }
 
 async function getTenantId() {
-  // ✅ Next atual: headers() pode ser async (no seu erro ele virou Promise)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const h: any = headers();
   const readHeader = (obj: any) => obj?.get?.('x-tenant-id') ?? undefined;
@@ -56,9 +50,7 @@ async function getTenantId() {
 
 function pickStatus(raw: unknown): OfferStatus {
   const s = String(raw ?? OfferStatus.rascunho);
-  return (Object.values(OfferStatus).includes(s as OfferStatus)
-    ? (s as OfferStatus)
-    : OfferStatus.rascunho) as OfferStatus;
+  return (Object.values(OfferStatus).includes(s as OfferStatus) ? (s as OfferStatus) : OfferStatus.rascunho) as OfferStatus;
 }
 
 function toStringOrNull(v: unknown) {
@@ -118,20 +110,12 @@ export async function PATCH(req: NextRequest, context: Ctx) {
 
     const status = Object.prototype.hasOwnProperty.call(body, 'status') ? pickStatus(body.status) : before.status;
 
-    const imageUrlsFromBody = Object.prototype.hasOwnProperty.call(body, 'imageUrls')
-      ? toStringArrayOrNull(body.imageUrls)
-      : null;
+    const imageUrlsFromBody = Object.prototype.hasOwnProperty.call(body, 'imageUrls') ? toStringArrayOrNull(body.imageUrls) : null;
 
-    const compatImageUrlFromBody = Object.prototype.hasOwnProperty.call(body, 'imageUrl')
-      ? toStringOrNull(body.imageUrl)
-      : null;
+    const compatImageUrlFromBody = Object.prototype.hasOwnProperty.call(body, 'imageUrl') ? toStringOrNull(body.imageUrl) : null;
 
     const finalImageUrls =
-      imageUrlsFromBody !== null
-        ? imageUrlsFromBody
-        : Array.isArray(before.imageUrls)
-          ? before.imageUrls
-          : [];
+      imageUrlsFromBody !== null ? imageUrlsFromBody : Array.isArray(before.imageUrls) ? before.imageUrls : [];
 
     const imageUrl =
       (finalImageUrls.length ? finalImageUrls[0] : null) ??
@@ -192,28 +176,16 @@ export async function PUT(req: NextRequest, context: Ctx) {
     const categoryId = String(body.categoryId ?? before.categoryId).trim();
     const status = Object.prototype.hasOwnProperty.call(body, 'status') ? pickStatus(body.status) : before.status;
 
-    const description = Object.prototype.hasOwnProperty.call(body, 'description')
-      ? toStringOrNull(body.description)
-      : before.description ?? null;
+    const description = Object.prototype.hasOwnProperty.call(body, 'description') ? toStringOrNull(body.description) : before.description ?? null;
 
-    const priceText = Object.prototype.hasOwnProperty.call(body, 'priceText')
-      ? toStringOrNull(body.priceText)
-      : before.priceText ?? null;
+    const priceText = Object.prototype.hasOwnProperty.call(body, 'priceText') ? toStringOrNull(body.priceText) : before.priceText ?? null;
 
-    const imageUrlsFromBody = Object.prototype.hasOwnProperty.call(body, 'imageUrls')
-      ? toStringArrayOrNull(body.imageUrls)
-      : null;
+    const imageUrlsFromBody = Object.prototype.hasOwnProperty.call(body, 'imageUrls') ? toStringArrayOrNull(body.imageUrls) : null;
 
-    const imageUrlFallback = Object.prototype.hasOwnProperty.call(body, 'imageUrl')
-      ? toStringOrNull(body.imageUrl)
-      : null;
+    const imageUrlFallback = Object.prototype.hasOwnProperty.call(body, 'imageUrl') ? toStringOrNull(body.imageUrl) : null;
 
     const finalImageUrls =
-      imageUrlsFromBody !== null
-        ? imageUrlsFromBody
-        : Array.isArray(before.imageUrls)
-          ? before.imageUrls
-          : [];
+      imageUrlsFromBody !== null ? imageUrlsFromBody : Array.isArray(before.imageUrls) ? before.imageUrls : [];
 
     const imageUrl = (finalImageUrls.length ? finalImageUrls[0] : null) ?? imageUrlFallback ?? before.imageUrl ?? null;
 
@@ -272,10 +244,7 @@ export async function DELETE(_req: NextRequest, context: Ctx) {
     if (!before) return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 });
 
     if (before.status !== OfferStatus.lixeira) {
-      return NextResponse.json(
-        { ok: false, error: 'Só é permitido excluir definitivamente ofertas na lixeira.' },
-        { status: 400 }
-      );
+      return NextResponse.json({ ok: false, error: 'Só é permitido excluir definitivamente ofertas na lixeira.' }, { status: 400 });
     }
 
     await prisma.offer.delete({ where: { id: cleanId } });
