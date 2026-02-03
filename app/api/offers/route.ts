@@ -77,7 +77,7 @@ function mapOffer(
     status: db.status,
 
     categoryId: db.categoryId,
-    category: catName, // ✅ agora é o nome real
+    category: catName, // ✅ agora é o nome real (se conseguir ler)
 
     title: db.title,
 
@@ -99,6 +99,16 @@ function mapOffer(
   };
 }
 
+async function safeListCategorias() {
+  try {
+    return await listCategorias();
+  } catch (e: unknown) {
+    // ✅ Em produção (Vercel), o FS pode ser read-only e essa leitura pode falhar.
+    // Não vamos derrubar a rota por isso: apenas devolve sem nome de categoria.
+    return [];
+  }
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -114,12 +124,12 @@ export async function GET(request: Request) {
     if (cityParamRaw) where.city = normalizeCity(cityParamRaw);
     if (categoryParam) where.categoryId = normalizeCat(categoryParam);
 
-    // ✅ carrega categorias do Admin pra devolver o nome (category)
-    const categorias = await listCategorias();
+    // ✅ tenta carregar categorias do Admin (se falhar, segue sem quebrar)
+    const categorias = await safeListCategorias();
     const categoryNameById = new Map<string, string>();
     for (const c of categorias || []) {
       if (!c) continue;
-      categoryNameById.set(String(c.id), String(c.nome ?? '').trim());
+      categoryNameById.set(String((c as any).id), String((c as any).nome ?? '').trim());
     }
 
     const rows = await prisma.offer.findMany({

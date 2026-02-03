@@ -46,12 +46,23 @@ function uid(prefix: string) {
   return `${prefix}_${Math.random().toString(36).slice(2, 9)}${Date.now().toString(36)}`;
 }
 
+function isReadOnlyFsError(e: unknown) {
+  const code = (e as any)?.code;
+  return code === 'EROFS' || code === 'EPERM' || code === 'EACCES';
+}
+
 async function ensureFile() {
   try {
     await fs.access(DB_PATH);
   } catch {
     const initial: AdminConfigDB = { destinos: [], categorias: [] };
-    await fs.writeFile(DB_PATH, JSON.stringify(initial, null, 2), 'utf-8');
+    try {
+      await fs.writeFile(DB_PATH, JSON.stringify(initial, null, 2), 'utf-8');
+    } catch (e: unknown) {
+      // Em ambientes read-only (ex: Vercel), não dá pra criar/alterar arquivo.
+      // Para evitar derrubar rotas públicas, seguimos sem escrever.
+      if (!isReadOnlyFsError(e)) throw e;
+    }
   }
 }
 
@@ -100,8 +111,7 @@ function normalizeCategoria(c: any): AdminCategoria {
   const ativo = typeof c?.ativo === 'boolean' ? c.ativo : true;
 
   const iconKeyRaw = c?.iconKey;
-  const iconKey =
-    typeof iconKeyRaw === 'string' && iconKeyRaw.trim() ? iconKeyRaw.trim() : null;
+  const iconKey = typeof iconKeyRaw === 'string' && iconKeyRaw.trim() ? iconKeyRaw.trim() : null;
 
   return {
     id: String(c?.id ?? uid('cat')),
@@ -116,20 +126,49 @@ function normalizeCategoria(c: any): AdminCategoria {
 
 export async function readConfig(): Promise<{ destinos: AdminDestino[]; categorias: AdminCategoria[] }> {
   await ensureFile();
-  const raw = await fs.readFile(DB_PATH, 'utf-8');
-  const parsed = JSON.parse(raw) as AdminConfigDB;
+
+  let raw = '';
+  try {
+    raw = await fs.readFile(DB_PATH, 'utf-8');
+  } catch (e: unknown) {
+    // Se não conseguir ler, devolve vazio (não derruba SSR/rotas públicas)
+    if (isReadOnlyFsError(e) || (e as any)?.code === 'ENOENT') {
+      return { destinos: [], categorias: [] };
+    }
+    throw e;
+  }
+
+  let parsed: AdminConfigDB;
+  try {
+    parsed = JSON.parse(raw) as AdminConfigDB;
+  } catch {
+    parsed = { destinos: [], categorias: [] };
+  }
 
   const destinos = Array.isArray(parsed.destinos) ? parsed.destinos.map(normalizeDestino) : [];
   const categorias = Array.isArray(parsed.categorias) ? parsed.categorias.map(normalizeCategoria) : [];
 
   // ✅ grava de volta já normalizado (migração silenciosa)
-  await fs.writeFile(DB_PATH, JSON.stringify({ destinos, categorias }, null, 2), 'utf-8');
+  // Em ambiente read-only, apenas ignora.
+  try {
+    await fs.writeFile(DB_PATH, JSON.stringify({ destinos, categorias }, null, 2), 'utf-8');
+  } catch (e: unknown) {
+    if (!isReadOnlyFsError(e)) throw e;
+  }
 
   return { destinos, categorias };
 }
 
 export async function writeConfig(db: { destinos: AdminDestino[]; categorias: AdminCategoria[] }) {
-  await fs.writeFile(DB_PATH, JSON.stringify(db, null, 2), 'utf-8');
+  try {
+    await fs.writeFile(DB_PATH, JSON.stringify(db, null, 2), 'utf-8');
+  } catch (e: unknown) {
+    // Aqui é usado por rotas de admin (criar/editar). Em produção read-only não dá pra persistir.
+    if (isReadOnlyFsError(e)) {
+      throw new Error('Armazenamento de configurações está indisponível neste ambiente (read-only).');
+    }
+    throw e;
+  }
 }
 
 export async function listDestinos(): Promise<AdminDestino[]> {
@@ -222,8 +261,7 @@ export async function createCategoria(nome: string, iconKey?: string | null) {
   const exists = db.categorias.some((c) => c.slug === slug);
   if (exists) throw new Error('Já existe uma categoria com esse nome.');
 
-  const cleanIcon =
-    typeof iconKey === 'string' && iconKey.trim() ? iconKey.trim() : null;
+  const cleanIcon = typeof iconKey === 'string' && iconKey.trim() ? iconKey.trim() : null;
 
   const item: AdminCategoria = {
     id: uid('cat'),
@@ -257,12 +295,11 @@ export async function updateCategoria(
   const conflict = db.categorias.some((c) => c.id !== id && c.slug === nextSlug);
   if (conflict) throw new Error('Já existe outra categoria com esse nome.');
 
-  const nextIcon =
-    patch.hasOwnProperty('iconKey')
-      ? typeof patch.iconKey === 'string' && patch.iconKey.trim()
-        ? patch.iconKey.trim()
-        : null
-      : current.iconKey ?? null;
+  const nextIcon = patch.hasOwnProperty('iconKey')
+    ? typeof patch.iconKey === 'string' && patch.iconKey.trim()
+      ? patch.iconKey.trim()
+      : null
+    : current.iconKey ?? null;
 
   db.categorias[idx] = {
     ...current,
