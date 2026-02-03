@@ -95,6 +95,44 @@ function withWebp(url: string) {
   return `${url}${sep}fm=webp`;
 }
 
+/**
+ * ✅ Variantes responsivas:
+ * - Se URL for remota (http/https): adiciona ?w=XXXX (se o seu CDN ignorar, não quebra).
+ * - Se URL for local (/...): espera arquivos no padrão: nome-w480.webp / nome-w960.webp etc.
+ */
+function isRemoteUrl(url: string) {
+  return /^https?:\/\//i.test(url);
+}
+
+function addQuery(url: string, key: string, val: string | number) {
+  const sep = url.includes('?') ? '&' : '?';
+  return `${url}${sep}${encodeURIComponent(key)}=${encodeURIComponent(String(val))}`;
+}
+
+function localVariant(url: string, width: number) {
+  // /img/banner.webp -> /img/banner-w960.webp
+  const clean = url.split('?')[0] || url;
+  const q = url.includes('?') ? url.slice(url.indexOf('?')) : '';
+  const lastDot = clean.lastIndexOf('.');
+  if (lastDot <= 0) return `${clean}-w${width}${q}`;
+  const base = clean.slice(0, lastDot);
+  const ext = clean.slice(lastDot);
+  return `${base}-w${width}${ext}${q}`;
+}
+
+function variantUrl(url: string, width: number) {
+  const u = withWebp(url);
+  if (!u) return u;
+  if (isRemoteUrl(u)) return addQuery(u, 'w', width);
+  return localVariant(u, width);
+}
+
+function buildSrcSet(url: string, widths: number[]) {
+  const u = withWebp(url);
+  if (!u) return '';
+  return widths.map((w) => `${variantUrl(u, w)} ${w}w`).join(', ');
+}
+
 // ✅ helper: map rápido de favoritos
 function buildFavMapFromStore(): Record<string, boolean> {
   const list = getFavorites?.() ?? [];
@@ -158,6 +196,15 @@ export default function HomeBanner({ className }: Props) {
 
   const autoplayPaused = userPaused || isDragging || isSlideAnimating || isFading;
 
+  // ✅ LCP: primeiro banner, na primeira renderização (sem fade)
+  const isLcpImage = active === 0 && !isFading && fadeTo == null;
+
+  // ✅ sizes para max-w-md (mobile: 100vw; desktop: ~448px)
+  const bannerSizes = '(max-width: 480px) 100vw, 448px';
+
+  // ✅ widths sugeridos para banner dentro de max-w-md
+  const BANNER_WIDTHS = [480, 960, 1280];
+
   // ✅ sync favorites do store
   useEffect(() => {
     const sync = () => setFavIds(buildFavMapFromStore());
@@ -194,13 +241,15 @@ export default function HomeBanner({ className }: Props) {
     };
   }, []);
 
-  // preload
+  // preload (leve): current + vizinhos em tamanho menor
   useEffect(() => {
     const urls = [
-      withWebp(prevItem?.imageUrl),
-      withWebp(current?.imageUrl),
-      withWebp(nextItem?.imageUrl),
-      fadeTo != null ? withWebp(items[fadeTo]?.imageUrl) : '',
+      // current: usa 960 (2x do mobile) para ficar rápido e nítido
+      current?.imageUrl ? variantUrl(current.imageUrl as any, 960) : '',
+      // vizinhos: 480 (mais leve)
+      prevItem?.imageUrl ? variantUrl(prevItem.imageUrl as any, 480) : '',
+      nextItem?.imageUrl ? variantUrl(nextItem.imageUrl as any, 480) : '',
+      fadeTo != null && items[fadeTo]?.imageUrl ? variantUrl(items[fadeTo].imageUrl as any, 480) : '',
     ].filter(Boolean);
 
     urls.forEach((u) => {
@@ -223,11 +272,9 @@ export default function HomeBanner({ className }: Props) {
       href: (current as any)?.href ?? '/',
       imageUrl: (current as any)?.imageUrl ?? null,
       subtitle: (current as any)?.subtitle ?? null,
-      // categoryLabel opcional, se quiser
       categoryLabel: (current as any)?.tag ?? null,
     } as any);
 
-    // pop só quando vira favorito
     const becameFav = !!(res && typeof res === 'object' && (res as any).active === true);
     if (becameFav) {
       setHeartPop(false);
@@ -509,6 +556,18 @@ export default function HomeBanner({ className }: Props) {
   const fadeItem = fadeTo != null ? items[fadeTo] : null;
   const elapsedMs = clamp(DURATION_MS - remainingRef.current, 0, DURATION_MS);
 
+  // ✅ srcSet pronto para picture/img
+  const currentSrcSet = buildSrcSet((current as any).imageUrl, BANNER_WIDTHS);
+  const prevSrcSet = buildSrcSet((prevItem as any).imageUrl, BANNER_WIDTHS);
+  const nextSrcSet = buildSrcSet((nextItem as any).imageUrl, BANNER_WIDTHS);
+  const fadeSrcSet = fadeItem ? buildSrcSet((fadeItem as any).imageUrl, BANNER_WIDTHS) : '';
+
+  // ✅ fallback src (pequeno por padrão, browser escolhe pelo srcSet)
+  const currentSrc = variantUrl((current as any).imageUrl, 480) || withWebp((current as any).imageUrl);
+  const prevSrc = variantUrl((prevItem as any).imageUrl, 480) || withWebp((prevItem as any).imageUrl);
+  const nextSrc = variantUrl((nextItem as any).imageUrl, 480) || withWebp((nextItem as any).imageUrl);
+  const fadeSrc = fadeItem ? variantUrl((fadeItem as any).imageUrl, 480) || withWebp((fadeItem as any).imageUrl) : '';
+
   return (
     <section className={className}>
       <div className="relative w-full">
@@ -525,14 +584,17 @@ export default function HomeBanner({ className }: Props) {
             <>
               <div className="absolute inset-0">
                 <picture>
-                  <source srcSet={withWebp((current as any).imageUrl)} type="image/webp" />
+                  <source srcSet={currentSrcSet} sizes={bannerSizes} type="image/webp" />
                   <img
-                    src={(current as any).imageUrl}
+                    src={currentSrc}
                     alt={(current as any).title}
                     className="absolute inset-0 h-full w-full object-cover"
-                    loading="lazy"
+                    loading={isLcpImage ? 'eager' : 'lazy'}
+                    fetchPriority={isLcpImage ? ('high' as const) : ('auto' as const)}
                     draggable={false}
                     decoding="async"
+                    sizes={bannerSizes}
+                    srcSet={currentSrcSet || undefined}
                   />
                 </picture>
               </div>
@@ -542,14 +604,17 @@ export default function HomeBanner({ className }: Props) {
                 style={{ opacity: 1 }}
               >
                 <picture>
-                  <source srcSet={withWebp((fadeItem as any).imageUrl)} type="image/webp" />
+                  <source srcSet={fadeSrcSet} sizes={bannerSizes} type="image/webp" />
                   <img
-                    src={(fadeItem as any).imageUrl}
+                    src={fadeSrc}
                     alt={(fadeItem as any).title}
                     className="absolute inset-0 h-full w-full object-cover"
                     loading="lazy"
+                    fetchPriority="auto"
                     draggable={false}
                     decoding="async"
+                    sizes={bannerSizes}
+                    srcSet={fadeSrcSet || undefined}
                   />
                 </picture>
 
@@ -569,14 +634,17 @@ export default function HomeBanner({ className }: Props) {
                 }}
               >
                 <picture>
-                  <source srcSet={withWebp((prevItem as any).imageUrl)} type="image/webp" />
+                  <source srcSet={prevSrcSet} sizes={bannerSizes} type="image/webp" />
                   <img
-                    src={(prevItem as any).imageUrl}
+                    src={prevSrc}
                     alt={(prevItem as any).title}
                     className="absolute inset-0 h-full w-full object-cover"
                     loading="lazy"
+                    fetchPriority="auto"
                     draggable={false}
                     decoding="async"
+                    sizes={bannerSizes}
+                    srcSet={prevSrcSet || undefined}
                   />
                 </picture>
                 <SlideContent item={prevItem as any} />
@@ -591,14 +659,17 @@ export default function HomeBanner({ className }: Props) {
                 }}
               >
                 <picture>
-                  <source srcSet={withWebp((current as any).imageUrl)} type="image/webp" />
+                  <source srcSet={currentSrcSet} sizes={bannerSizes} type="image/webp" />
                   <img
-                    src={(current as any).imageUrl}
+                    src={currentSrc}
                     alt={(current as any).title}
                     className="absolute inset-0 h-full w-full object-cover"
-                    loading="lazy"
+                    loading={isLcpImage ? 'eager' : 'lazy'}
+                    fetchPriority={isLcpImage ? ('high' as const) : ('auto' as const)}
                     draggable={false}
                     decoding="async"
+                    sizes={bannerSizes}
+                    srcSet={currentSrcSet || undefined}
                   />
                 </picture>
                 <SlideContent item={current as any} />
@@ -613,14 +684,17 @@ export default function HomeBanner({ className }: Props) {
                 }}
               >
                 <picture>
-                  <source srcSet={withWebp((nextItem as any).imageUrl)} type="image/webp" />
+                  <source srcSet={nextSrcSet} sizes={bannerSizes} type="image/webp" />
                   <img
-                    src={(nextItem as any).imageUrl}
+                    src={nextSrc}
                     alt={(nextItem as any).title}
                     className="absolute inset-0 h-full w-full object-cover"
                     loading="lazy"
+                    fetchPriority="auto"
                     draggable={false}
                     decoding="async"
+                    sizes={bannerSizes}
+                    srcSet={nextSrcSet || undefined}
                   />
                 </picture>
                 <SlideContent item={nextItem as any} />
@@ -675,9 +749,9 @@ export default function HomeBanner({ className }: Props) {
           <div
             data-banner-control
             className="absolute right-2 top-6 z-[70] flex items-center gap-3 text-white"
-            onPointerDown={stop}
-            onPointerUp={stop}
-            onClick={stop}
+            onPointerDown={(e) => e.stopPropagation()}
+            onPointerUp={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
           >
             <button
               type="button"
@@ -747,28 +821,54 @@ export default function HomeBanner({ className }: Props) {
 
         <style jsx global>{`
           @keyframes floatArrow {
-            0% { transform: translateY(0); }
-            50% { transform: translateY(-3px); }
-            100% { transform: translateY(0); }
+            0% {
+              transform: translateY(0);
+            }
+            50% {
+              transform: translateY(-3px);
+            }
+            100% {
+              transform: translateY(0);
+            }
           }
-          .arrow-float { animation: floatArrow 1.8s ease-in-out infinite; }
+          .arrow-float {
+            animation: floatArrow 1.8s ease-in-out infinite;
+          }
 
           @keyframes heartPop {
-            0% { transform: scale(1); }
-            30% { transform: scale(1.25); }
-            60% { transform: scale(0.95); }
-            100% { transform: scale(1); }
+            0% {
+              transform: scale(1);
+            }
+            30% {
+              transform: scale(1.25);
+            }
+            60% {
+              transform: scale(0.95);
+            }
+            100% {
+              transform: scale(1);
+            }
           }
-          .heart-pop { animation: heartPop 320ms ease-out; }
+          .heart-pop {
+            animation: heartPop 320ms ease-out;
+          }
 
           @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
+            from {
+              opacity: 0;
+            }
+            to {
+              opacity: 1;
+            }
           }
 
           @keyframes storyFill {
-            from { transform: scaleX(0); }
-            to { transform: scaleX(1); }
+            from {
+              transform: scaleX(0);
+            }
+            to {
+              transform: scaleX(1);
+            }
           }
         `}</style>
       </div>

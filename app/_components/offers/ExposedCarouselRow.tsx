@@ -54,8 +54,6 @@ function safeHref(v: any) {
 
 function isAllowedMediaSrc(src: string) {
   const s = String(src || '').trim();
-  // ✅ garante que o banner funcione mesmo com seu filtro atual no ProductTabDetalhes (que aceita apenas "/")
-  // Se você já corrigiu o filtro lá pra aceitar https/http, isso também continua funcionando.
   return s.startsWith('/') || s.startsWith('http://') || s.startsWith('https://');
 }
 
@@ -66,6 +64,42 @@ function safeNumber(v: any) {
 
 function formatPtOne(n: number) {
   return n.toFixed(1);
+}
+
+/* =========================
+   IMG RESPONSIVA (cards)
+========================= */
+function isRemoteUrl(url: string) {
+  return /^https?:\/\//i.test(url);
+}
+
+function addQuery(url: string, key: string, val: string | number) {
+  const sep = url.includes('?') ? '&' : '?';
+  return `${url}${sep}${encodeURIComponent(key)}=${encodeURIComponent(String(val))}`;
+}
+
+function localVariant(url: string, width: number) {
+  // /img/foto.webp -> /img/foto-w512.webp
+  const clean = url.split('?')[0] || url;
+  const q = url.includes('?') ? url.slice(url.indexOf('?')) : '';
+  const lastDot = clean.lastIndexOf('.');
+  if (lastDot <= 0) return `${clean}-w${width}${q}`;
+  const base = clean.slice(0, lastDot);
+  const ext = clean.slice(lastDot);
+  return `${base}-w${width}${ext}${q}`;
+}
+
+function variantUrl(url: string, width: number) {
+  const u = String(url || '').trim();
+  if (!u) return '';
+  if (isRemoteUrl(u)) return addQuery(u, 'w', width);
+  return localVariant(u, width);
+}
+
+function buildSrcSet(url: string, widths: number[]) {
+  const u = String(url || '').trim();
+  if (!u) return '';
+  return widths.map((w) => `${variantUrl(u, w)} ${w}w`).join(', ');
 }
 
 /* =========================
@@ -217,9 +251,6 @@ export default function ExposedCarouselRow({
     const hrefSafe = safeHref(o.href);
     const imageUrl = o.imageUrl ?? null;
 
-    // ✅ garante banner rotativo (>= 3 slides)
-    // - se a imagem do item for válida, entra também
-    // - sempre inclui banners locais
     const mediaList = [
       ...(imageUrl && isAllowedMediaSrc(String(imageUrl)) ? [{ src: String(imageUrl), alt: String(o.title ?? '') }] : []),
       { src: '/banners/banner-1.webp', alt: 'Banner 1' },
@@ -271,6 +302,11 @@ export default function ExposedCarouselRow({
     );
   }, [selectedItem, favIds, categoryLabel]);
 
+  // ✅ card fixo 228px, então sizes é constante
+  const cardSizes = '228px';
+  // ✅ escolhas práticas: 256 (normal) e 512 (retina)
+  const CARD_WIDTHS = [256, 512];
+
   return (
     <section className={className}>
       {/* ✅ Modal 2 */}
@@ -302,6 +338,9 @@ export default function ExposedCarouselRow({
           const savings = (typeof item.savingsText === 'string' ? item.savingsText.trim() : '') || '';
           const isFav = !!favIds[item.id];
 
+          const src = item.imageUrl ? variantUrl(item.imageUrl, 256) || item.imageUrl : '';
+          const srcSet = item.imageUrl ? buildSrcSet(item.imageUrl, CARD_WIDTHS) : '';
+
           return (
             <div
               key={item.id}
@@ -317,7 +356,19 @@ export default function ExposedCarouselRow({
               <div className="relative h-[144px] bg-zinc-200">
                 {item.imageUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={item.imageUrl} alt={item.title} className="h-full w-full object-cover" loading="lazy" />
+                  <img
+                    src={src}
+                    srcSet={srcSet || undefined}
+                    sizes={cardSizes}
+                    width={228}
+                    height={144}
+                    alt={item.title}
+                    className="h-full w-full object-cover"
+                    loading="lazy"
+                    decoding="async"
+                    fetchPriority="auto"
+                    draggable={false}
+                  />
                 ) : (
                   <div className="h-full w-full bg-zinc-300" />
                 )}

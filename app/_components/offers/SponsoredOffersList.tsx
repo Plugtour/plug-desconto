@@ -10,7 +10,12 @@ import MenuCarouselModalRight from '@/app/_components/modals/MenuCarouselModalRi
 // ✅ Modal padrão “modelo”
 import ProductDetailContent, { type ProductModalData } from '@/app/_components/product/ProductDetailContent';
 
-import { getFavorites, onFavoritesChange, toggleFavorite, type FavoriteItem } from '@/app/_components/favorites/favoritesStore';
+import {
+  getFavorites,
+  onFavoritesChange,
+  toggleFavorite,
+  type FavoriteItem,
+} from '@/app/_components/favorites/favoritesStore';
 
 type SponsoredOffer = {
   id: string;
@@ -69,6 +74,42 @@ type Props = {
 function safeHref(v: any) {
   const s = typeof v === 'string' ? v.trim() : '';
   return s.length ? s : '/';
+}
+
+/* =========================
+   IMG RESPONSIVA (thumb 106)
+========================= */
+function isRemoteUrl(url: string) {
+  return /^https?:\/\//i.test(url);
+}
+
+function addQuery(url: string, key: string, val: string | number) {
+  const sep = url.includes('?') ? '&' : '?';
+  return `${url}${sep}${encodeURIComponent(key)}=${encodeURIComponent(String(val))}`;
+}
+
+function localVariant(url: string, width: number) {
+  // /img/foto.webp -> /img/foto-w256.webp
+  const clean = url.split('?')[0] || url;
+  const q = url.includes('?') ? url.slice(url.indexOf('?')) : '';
+  const lastDot = clean.lastIndexOf('.');
+  if (lastDot <= 0) return `${clean}-w${width}${q}`;
+  const base = clean.slice(0, lastDot);
+  const ext = clean.slice(lastDot);
+  return `${base}-w${width}${ext}${q}`;
+}
+
+function variantUrl(url: string, width: number) {
+  const u = String(url || '').trim();
+  if (!u) return '';
+  if (isRemoteUrl(u)) return addQuery(u, 'w', width);
+  return localVariant(u, width);
+}
+
+function buildSrcSet(url: string, widths: number[]) {
+  const u = String(url || '').trim();
+  if (!u) return '';
+  return widths.map((w) => `${variantUrl(u, w)} ${w}w`).join(', ');
 }
 
 /* =========================
@@ -619,6 +660,10 @@ export default function SponsoredOffersList({
     );
   }, [selected, favIds]);
 
+  // ✅ thumb é 106px, então use 128 e 256
+  const THUMB_WIDTHS = [128, 256];
+  const thumbSizes = '106px';
+
   return (
     <section className={['w-full', className || ''].join(' ')}>
       <MenuCarouselModalRight open={modalOpen} onClose={closeModal} hideHeader>
@@ -714,7 +759,10 @@ export default function SponsoredOffersList({
               const tagsLine = buildTags(item);
               const rating = o.rating ?? 4.8;
               const reviews = o.reviews ?? 0;
-              const imageUrl = o.imageUrl ?? null;
+
+              const imgUrl = String(o.imageUrl ?? '').trim();
+              const imgSrc = imgUrl ? variantUrl(imgUrl, 128) || imgUrl : '';
+              const imgSrcSet = imgUrl ? buildSrcSet(imgUrl, THUMB_WIDTHS) : '';
 
               const handleCardClick = () => openModal(item);
 
@@ -731,9 +779,21 @@ export default function SponsoredOffersList({
                   >
                     <div className="flex gap-3">
                       <div className="h-[106px] w-[106px] flex-none overflow-hidden rounded-md bg-zinc-200">
-                        {imageUrl ? (
+                        {imgUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={imageUrl} alt={o.title} className="h-full w-full object-cover" loading="lazy" />
+                          <img
+                            src={imgSrc}
+                            srcSet={imgSrcSet || undefined}
+                            sizes={thumbSizes}
+                            width={106}
+                            height={106}
+                            alt={String(o.title ?? '')}
+                            className="h-full w-full object-cover"
+                            loading="lazy"
+                            decoding="async"
+                            fetchPriority="auto"
+                            draggable={false}
+                          />
                         ) : (
                           <TempImagePlaceholder />
                         )}

@@ -44,6 +44,42 @@ function safeHref(v: any) {
   return s.length ? s : '/';
 }
 
+/* =========================
+   IMG RESPONSIVA (thumb 106)
+========================= */
+function isRemoteUrl(url: string) {
+  return /^https?:\/\//i.test(url);
+}
+
+function addQuery(url: string, key: string, val: string | number) {
+  const sep = url.includes('?') ? '&' : '?';
+  return `${url}${sep}${encodeURIComponent(key)}=${encodeURIComponent(String(val))}`;
+}
+
+function localVariant(url: string, width: number) {
+  // /img/foto.webp -> /img/foto-w256.webp
+  const clean = url.split('?')[0] || url;
+  const q = url.includes('?') ? url.slice(url.indexOf('?')) : '';
+  const lastDot = clean.lastIndexOf('.');
+  if (lastDot <= 0) return `${clean}-w${width}${q}`;
+  const base = clean.slice(0, lastDot);
+  const ext = clean.slice(lastDot);
+  return `${base}-w${width}${ext}${q}`;
+}
+
+function variantUrl(url: string, width: number) {
+  const u = String(url || '').trim();
+  if (!u) return '';
+  if (isRemoteUrl(u)) return addQuery(u, 'w', width);
+  return localVariant(u, width);
+}
+
+function buildSrcSet(url: string, widths: number[]) {
+  const u = String(url || '').trim();
+  if (!u) return '';
+  return widths.map((w) => `${variantUrl(u, w)} ${w}w`).join(', ');
+}
+
 function Star({ fillPct }: { fillPct: number }) {
   const id = React.useId();
   const pct = Math.max(0, Math.min(100, fillPct));
@@ -360,6 +396,10 @@ export default function SponsoredOffersRow({ items, className, title = 'Patrocin
     );
   }, [selectedItem, favIds]);
 
+  // ✅ thumb é 106px, então use 128 e 256
+  const THUMB_WIDTHS = [128, 256];
+  const thumbSizes = '106px';
+
   return (
     <section className={['w-full', className || ''].join(' ')}>
       <MenuCarouselModalRight open={modalOpen} onClose={closeModal} hideHeader>
@@ -404,6 +444,10 @@ export default function SponsoredOffersRow({ items, className, title = 'Patrocin
 
               const disableHeart = !expanded && idx >= 1;
 
+              const imgUrl = String((item as any).imageUrl ?? '').trim();
+              const imgSrc = imgUrl ? variantUrl(imgUrl, 128) || imgUrl : '';
+              const imgSrcSet = imgUrl ? buildSrcSet(imgUrl, THUMB_WIDTHS) : '';
+
               return (
                 <div key={item.id} className="relative">
                   <div
@@ -417,13 +461,24 @@ export default function SponsoredOffersRow({ items, className, title = 'Patrocin
                   >
                     <div className="flex gap-3">
                       <div className="h-[106px] w-[106px] flex-none overflow-hidden rounded-md bg-zinc-200">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={(item as any).imageUrl}
-                          alt={(item as any).title}
-                          className="h-full w-full object-cover"
-                          loading="lazy"
-                        />
+                        {imgUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={imgSrc}
+                            srcSet={imgSrcSet || undefined}
+                            sizes={thumbSizes}
+                            width={106}
+                            height={106}
+                            alt={(item as any).title}
+                            className="h-full w-full object-cover"
+                            loading="lazy"
+                            decoding="async"
+                            fetchPriority="auto"
+                            draggable={false}
+                          />
+                        ) : (
+                          <div className="h-full w-full bg-zinc-300" />
+                        )}
                       </div>
 
                       <div className="min-w-0 flex-1">
