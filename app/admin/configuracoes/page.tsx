@@ -1,3 +1,5 @@
+// caminho: app/admin/configuracoes/page.tsx
+
 import Link from 'next/link';
 
 export default function AdminConfiguracoesPage() {
@@ -9,10 +11,33 @@ export default function AdminConfiguracoesPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <ConfigCard href="/admin/configuracoes/destinos" title="Destinos" desc="Cadastrar e gerenciar cidades/regiões." />
-        <ConfigCard href="/admin/configuracoes/categorias" title="Categorias" desc="Cadastrar e gerenciar tipos de oferta." />
-        <ConfigCard href="#" title="Regras e comissões" desc="Percentuais, repasses e regras de exibição." disabled />
-        <ConfigCard href="#" title="Acessos" desc="Perfis e permissões do painel administrativo." disabled />
+        <ConfigCard
+          href="/admin/configuracoes/banners"
+          title="Banners da Home"
+          desc="Cadastrar e gerenciar banners exibidos na página inicial."
+        />
+        <ConfigCard
+          href="/admin/configuracoes/destinos"
+          title="Destinos"
+          desc="Cadastrar e gerenciar cidades/regiões."
+        />
+        <ConfigCard
+          href="/admin/configuracoes/categorias"
+          title="Categorias"
+          desc="Cadastrar e gerenciar tipos de oferta."
+        />
+        <ConfigCard
+          href="#"
+          title="Regras e comissões"
+          desc="Percentuais, repasses e regras de exibição."
+          disabled
+        />
+        <ConfigCard
+          href="#"
+          title="Acessos"
+          desc="Perfis e permissões do painel administrativo."
+          disabled
+        />
       </div>
     </div>
   );

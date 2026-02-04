@@ -16,17 +16,17 @@ function normalizeCat(value: string) {
 }
 
 /**
- * ✅ Normaliza imageUrl vindo do banco para o formato público correto
+ * Normaliza imageUrl vindo do banco para o formato público correto
  * - troca \ por /
  * - garante "/" no início
  * - troca /uploads/offers/ -> /offers/
- * - remove sufixo -w### antes da extensão (evita duplicar -w128-w128)
+ * - remove sufixo -w### antes da extensão
  */
 function normalizeImageUrl(value: string | null) {
   const s0 = (value || '').trim();
   if (!s0) return null;
 
-  // remoto: mantém como está
+  // remoto: mantém
   if (/^https?:\/\//i.test(s0)) return s0;
 
   const [pathPart, queryPart] = s0.split('?');
@@ -37,13 +37,13 @@ function normalizeImageUrl(value: string | null) {
 
   if (!p.startsWith('/')) p = `/${p}`;
 
-  // remove -w### antes da extensão (qualquer extensão)
+  // remove -w### antes da extensão
   p = p.replace(/-w\d+(?=\.[a-z0-9]+$)/i, '');
 
   // /uploads/offers -> /offers
   p = p.replace(/^\/uploads\/offers\//i, '/offers/');
 
-  // se veio só "/arquivo.webp" (sem pasta), assume /offers/
+  // se veio só "/arquivo.webp", assume /offers/
   const parts = p.split('/').filter(Boolean);
   if (parts.length === 1) {
     p = `/offers/${parts[0]}`;
@@ -60,7 +60,7 @@ type ApiOffer = {
   status: string;
 
   categoryId: string;
-  category: string; // ✅ nome da categoria (quando existir)
+  category: string;
 
   title: string;
 
@@ -141,7 +141,7 @@ function mapOffer(
 async function safeListCategorias() {
   try {
     return await listCategorias();
-  } catch (e: unknown) {
+  } catch {
     return [];
   }
 }
@@ -167,25 +167,35 @@ export async function GET(request: Request) {
       categoryNameById.set(String((c as any).id), String((c as any).nome ?? '').trim());
     }
 
-    const rows = await prisma.offer.findMany({
-      where,
-      orderBy: { updatedAt: 'desc' },
-      take: 200,
-      select: {
-        id: true,
-        slug: true,
-        city: true,
-        status: true,
-        categoryId: true,
-        title: true,
-        partnerName: true,
-        description: true,
-        imageUrl: true,
-        priceText: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
+    // ✅ IMPORTANTE: se o Prisma falhar por env/DB, não derruba a Home
+    let rows: any[] = [];
+    try {
+      rows = await prisma.offer.findMany({
+        where,
+        orderBy: { updatedAt: 'desc' },
+        take: 200,
+        select: {
+          id: true,
+          slug: true,
+          city: true,
+          status: true,
+          categoryId: true,
+          title: true,
+          partnerName: true,
+          description: true,
+          imageUrl: true,
+          priceText: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+    } catch (err: any) {
+      // fallback: devolve vazio com 200 (pra Home renderizar)
+      return NextResponse.json(
+        { items: [], total: 0, warning: 'Prisma/DB indisponível no momento.' },
+        { status: 200 }
+      );
+    }
 
     const items = Array.isArray(rows) ? rows.map((r) => mapOffer(r as any, categoryNameById)) : [];
     return NextResponse.json({ items, total: items.length }, { status: 200 });

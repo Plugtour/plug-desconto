@@ -95,11 +95,6 @@ function withWebp(url: string) {
   return `${url}${sep}fm=webp`;
 }
 
-/**
- * ✅ Variantes responsivas:
- * - Se URL for remota (http/https): adiciona ?w=XXXX (se o seu CDN ignorar, não quebra).
- * - Se URL for local (/...): espera arquivos no padrão: nome-w480.webp / nome-w960.webp etc.
- */
 function isRemoteUrl(url: string) {
   return /^https?:\/\//i.test(url);
 }
@@ -109,27 +104,17 @@ function addQuery(url: string, key: string, val: string | number) {
   return `${url}${sep}${encodeURIComponent(key)}=${encodeURIComponent(String(val))}`;
 }
 
-function localVariant(url: string, width: number) {
-  // /img/banner.webp -> /img/banner-w960.webp
-  const clean = url.split('?')[0] || url;
-  const q = url.includes('?') ? url.slice(url.indexOf('?')) : '';
-  const lastDot = clean.lastIndexOf('.');
-  if (lastDot <= 0) return `${clean}-w${width}${q}`;
-  const base = clean.slice(0, lastDot);
-  const ext = clean.slice(lastDot);
-  return `${base}-w${width}${ext}${q}`;
-}
-
 function variantUrl(url: string, width: number) {
   const u = withWebp(url);
   if (!u) return u;
   if (isRemoteUrl(u)) return addQuery(u, 'w', width);
-  return localVariant(u, width);
+  return u; // ✅ local: usa a URL original
 }
 
 function buildSrcSet(url: string, widths: number[]) {
   const u = withWebp(url);
   if (!u) return '';
+  if (!isRemoteUrl(u)) return ''; // ✅ local: sem srcSet (evita 404 em variantes inexistentes)
   return widths.map((w) => `${variantUrl(u, w)} ${w}w`).join(', ');
 }
 
@@ -144,11 +129,107 @@ function buildFavMapFromStore(): Record<string, boolean> {
   return map;
 }
 
+/** ----------- Tipagem segura do payload da API ----------- */
+type ApiBanner = {
+  id?: unknown;
+  title?: unknown;
+  subtitle?: unknown;
+  highlight?: unknown;
+  tag?: unknown;
+  href?: unknown;
+  imageUrl?: unknown;
+  align?: unknown;
+  status?: unknown;
+  order?: unknown;
+};
+
+function isObject(v: unknown): v is Record<string, unknown> {
+  return !!v && typeof v === 'object';
+}
+
+function toApiBanner(v: unknown): ApiBanner | null {
+  if (!isObject(v)) return null;
+  return v as ApiBanner;
+}
+
+function toBannerItem(b: ApiBanner): BannerItem {
+  const subtitleStr = b.subtitle != null ? String(b.subtitle) : '';
+  const highlightStr = b.highlight != null ? String(b.highlight) : '';
+  const tagStr = b.tag != null ? String(b.tag) : '';
+
+  return {
+    id: String(b.id ?? '').trim() || `ban_${Math.random().toString(36).slice(2)}`,
+    title: String(b.title ?? '').trim() || 'Oferta',
+    subtitle: subtitleStr,
+    highlight: highlightStr,
+    tag: tagStr,
+    href: b.href != null ? String(b.href) : undefined,
+    imageUrl: String(b.imageUrl ?? '').trim(),
+    align: b.align === 'left' || b.align === 'center' || b.align === 'right' ? (b.align as any) : undefined,
+    order: Number.isFinite(Number(b.order)) ? Number(b.order) : 0,
+  };
+}
+
+function isPublicado(b: ApiBanner) {
+  return String(b.status ?? '').toLowerCase() === 'publicado';
+}
+
+function compareOrder(a: ApiBanner, b: ApiBanner) {
+  return Number(a.order ?? 0) - Number(b.order ?? 0);
+}
+
 export default function HomeBanner({ className }: Props) {
-  const items = useMemo(() => BANNERS.slice(0, 3), []);
+  // ✅ carrega banners do Admin (fallback: BANNERS estático)
+  const [remoteBanners, setRemoteBanners] = useState<BannerItem[] | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+
+    fetch('/api/banners', { cache: 'no-store' as RequestCache })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: any) => {
+        if (!alive) return;
+
+        const rawList: unknown[] = Array.isArray(data?.banners) ? (data.banners as unknown[]) : [];
+
+        const normalized: BannerItem[] = rawList
+          .map((x: unknown) => toApiBanner(x))
+          .filter((x: ApiBanner | null): x is ApiBanner => x !== null)
+          .filter(isPublicado)
+          .sort(compareOrder)
+          .map((b: ApiBanner) => toBannerItem(b))
+          .filter((b: BannerItem) => !!b.imageUrl);
+
+        setRemoteBanners(normalized);
+      })
+      .catch(() => {
+        if (!alive) return;
+        setRemoteBanners([]);
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const baseItems = useMemo(() => {
+    const source = remoteBanners && remoteBanners.length ? remoteBanners : BANNERS;
+    return (source || []).slice(0, 3);
+  }, [remoteBanners]);
+
+  const items = useMemo(() => baseItems, [baseItems]);
   const count = items.length;
 
   const [active, setActive] = useState(0);
+
+  // ✅ se a lista mudar, garante índice válido
+  useEffect(() => {
+    if (!count) return;
+    setActive((v) => (v >= count ? 0 : v));
+  }, [count]);
+
+  // ✅ evita NaN quando count = 0
+  if (!count) return null;
 
   // swipe/slide
   const [isDragging, setIsDragging] = useState(false);
@@ -202,7 +283,7 @@ export default function HomeBanner({ className }: Props) {
   // ✅ sizes para max-w-md (mobile: 100vw; desktop: ~448px)
   const bannerSizes = '(max-width: 480px) 100vw, 448px';
 
-  // ✅ widths sugeridos para banner dentro de max-w-md
+  // ✅ widths sugeridos para banner dentro de max-w-md (só vale para remoto)
   const BANNER_WIDTHS = [480, 960, 1280];
 
   // ✅ sync favorites do store
@@ -244,12 +325,10 @@ export default function HomeBanner({ className }: Props) {
   // preload (leve): current + vizinhos em tamanho menor
   useEffect(() => {
     const urls = [
-      // current: usa 960 (2x do mobile) para ficar rápido e nítido
-      current?.imageUrl ? variantUrl(current.imageUrl as any, 960) : '',
-      // vizinhos: 480 (mais leve)
-      prevItem?.imageUrl ? variantUrl(prevItem.imageUrl as any, 480) : '',
-      nextItem?.imageUrl ? variantUrl(nextItem.imageUrl as any, 480) : '',
-      fadeTo != null && items[fadeTo]?.imageUrl ? variantUrl(items[fadeTo].imageUrl as any, 480) : '',
+      current?.imageUrl ? variantUrl(current.imageUrl, 960) : '',
+      prevItem?.imageUrl ? variantUrl(prevItem.imageUrl, 480) : '',
+      nextItem?.imageUrl ? variantUrl(nextItem.imageUrl, 480) : '',
+      fadeTo != null && items[fadeTo]?.imageUrl ? variantUrl(items[fadeTo].imageUrl, 480) : '',
     ].filter(Boolean);
 
     urls.forEach((u) => {
@@ -509,38 +588,48 @@ export default function HomeBanner({ className }: Props) {
   const SHADOW_SOFT = '0 2px 16px rgba(0,0,0,0.82)';
 
   function SlideContent({ item }: { item: BannerItem }) {
-    const contentAlign = alignClasses((item as any).align);
-    const centerLiftClass = (item as any).align === 'center' ? '-translate-y-[15px]' : '';
+    const contentAlign = alignClasses(item.align);
+    const centerLiftClass = item.align === 'center' ? '-translate-y-[15px]' : '';
 
     const titleClass = [
       'text-[25px] font-extrabold leading-[1.05] text-white',
-      (item as any).align === 'left' || (item as any).align === 'right' ? 'max-w-[220px] whitespace-normal' : '',
-      (item as any).align === 'center' ? 'whitespace-nowrap' : '',
+      item.align === 'left' || item.align === 'right' ? 'max-w-[220px] whitespace-normal' : '',
+      item.align === 'center' ? 'whitespace-nowrap' : '',
     ].join(' ');
+
+    const tag = String(item.tag ?? '');
+    const subtitle = String(item.subtitle ?? '');
+    const highlight = String(item.highlight ?? '');
 
     return (
       <div className="absolute inset-0 z-[35] px-14 pb-4 pt-6 -translate-y-[0px]">
         <div className={[`flex h-full w-full flex-col justify-end gap-1 ${contentAlign}`, centerLiftClass].join(' ')}>
-          <div className="text-[11px] font-semibold tracking-wide" style={{ color: '#7CFFB2', textShadow: SHADOW_SOFT }}>
-            {(item as any).tag}
-          </div>
+          {tag ? (
+            <div className="text-[11px] font-semibold tracking-wide" style={{ color: '#7CFFB2', textShadow: SHADOW_SOFT }}>
+              {tag}
+            </div>
+          ) : null}
 
           <div className={titleClass} style={{ textShadow: SHADOW_STRONG }}>
-            {(item as any).title}
+            {item.title}
           </div>
 
-          <div className="text-[16px] font-semibold text-white" style={{ textShadow: SHADOW_MED }}>
-            {(item as any).subtitle}
-          </div>
+          {subtitle ? (
+            <div className="text-[16px] font-semibold text-white" style={{ textShadow: SHADOW_MED }}>
+              {subtitle}
+            </div>
+          ) : null}
 
-          <div className="text-[15px] font-semibold -mt-[8px]" style={{ color: '#7CCBFF', textShadow: SHADOW_SOFT }}>
-            {(item as any).highlight}
-          </div>
+          {highlight ? (
+            <div className="text-[15px] font-semibold -mt-[8px]" style={{ color: '#7CCBFF', textShadow: SHADOW_SOFT }}>
+              {highlight}
+            </div>
+          ) : null}
 
-          {(item as any).href ? (
+          {item.href ? (
             <div className="mt-2">
               <Link
-                href={(item as any).href}
+                href={item.href}
                 className="inline-flex text-[15px] font-semibold text-white -translate-y-[10px]"
                 style={{ textShadow: SHADOW_MED }}
               >
@@ -556,17 +645,17 @@ export default function HomeBanner({ className }: Props) {
   const fadeItem = fadeTo != null ? items[fadeTo] : null;
   const elapsedMs = clamp(DURATION_MS - remainingRef.current, 0, DURATION_MS);
 
-  // ✅ srcSet pronto para picture/img
-  const currentSrcSet = buildSrcSet((current as any).imageUrl, BANNER_WIDTHS);
-  const prevSrcSet = buildSrcSet((prevItem as any).imageUrl, BANNER_WIDTHS);
-  const nextSrcSet = buildSrcSet((nextItem as any).imageUrl, BANNER_WIDTHS);
-  const fadeSrcSet = fadeItem ? buildSrcSet((fadeItem as any).imageUrl, BANNER_WIDTHS) : '';
+  // ✅ srcSet pronto para picture/img (remoto) — local fica vazio
+  const currentSrcSet = buildSrcSet(current.imageUrl, BANNER_WIDTHS);
+  const prevSrcSet = buildSrcSet(prevItem.imageUrl, BANNER_WIDTHS);
+  const nextSrcSet = buildSrcSet(nextItem.imageUrl, BANNER_WIDTHS);
+  const fadeSrcSet = fadeItem ? buildSrcSet(fadeItem.imageUrl, BANNER_WIDTHS) : '';
 
-  // ✅ fallback src (pequeno por padrão, browser escolhe pelo srcSet)
-  const currentSrc = variantUrl((current as any).imageUrl, 480) || withWebp((current as any).imageUrl);
-  const prevSrc = variantUrl((prevItem as any).imageUrl, 480) || withWebp((prevItem as any).imageUrl);
-  const nextSrc = variantUrl((nextItem as any).imageUrl, 480) || withWebp((nextItem as any).imageUrl);
-  const fadeSrc = fadeItem ? variantUrl((fadeItem as any).imageUrl, 480) || withWebp((fadeItem as any).imageUrl) : '';
+  // ✅ fallback src
+  const currentSrc = variantUrl(current.imageUrl, 480) || withWebp(current.imageUrl);
+  const prevSrc = variantUrl(prevItem.imageUrl, 480) || withWebp(prevItem.imageUrl);
+  const nextSrc = variantUrl(nextItem.imageUrl, 480) || withWebp(nextItem.imageUrl);
+  const fadeSrc = fadeItem ? variantUrl(fadeItem.imageUrl, 480) || withWebp(fadeItem.imageUrl) : '';
 
   return (
     <section className={className}>
@@ -584,10 +673,10 @@ export default function HomeBanner({ className }: Props) {
             <>
               <div className="absolute inset-0">
                 <picture>
-                  <source srcSet={currentSrcSet} sizes={bannerSizes} type="image/webp" />
+                  {currentSrcSet ? <source srcSet={currentSrcSet} sizes={bannerSizes} type="image/webp" /> : null}
                   <img
                     src={currentSrc}
-                    alt={(current as any).title}
+                    alt={current.title}
                     className="absolute inset-0 h-full w-full object-cover"
                     loading={isLcpImage ? 'eager' : 'lazy'}
                     fetchPriority={isLcpImage ? ('high' as const) : ('auto' as const)}
@@ -604,10 +693,10 @@ export default function HomeBanner({ className }: Props) {
                 style={{ opacity: 1 }}
               >
                 <picture>
-                  <source srcSet={fadeSrcSet} sizes={bannerSizes} type="image/webp" />
+                  {fadeSrcSet ? <source srcSet={fadeSrcSet} sizes={bannerSizes} type="image/webp" /> : null}
                   <img
                     src={fadeSrc}
-                    alt={(fadeItem as any).title}
+                    alt={fadeItem.title}
                     className="absolute inset-0 h-full w-full object-cover"
                     loading="lazy"
                     fetchPriority="auto"
@@ -619,7 +708,7 @@ export default function HomeBanner({ className }: Props) {
                 </picture>
 
                 <div className="absolute inset-0" style={{ animation: `fadeIn ${FADE_MS}ms ease-out both` }}>
-                  <SlideContent item={fadeItem as any} />
+                  <SlideContent item={fadeItem} />
                 </div>
               </div>
             </>
@@ -634,10 +723,10 @@ export default function HomeBanner({ className }: Props) {
                 }}
               >
                 <picture>
-                  <source srcSet={prevSrcSet} sizes={bannerSizes} type="image/webp" />
+                  {prevSrcSet ? <source srcSet={prevSrcSet} sizes={bannerSizes} type="image/webp" /> : null}
                   <img
                     src={prevSrc}
-                    alt={(prevItem as any).title}
+                    alt={prevItem.title}
                     className="absolute inset-0 h-full w-full object-cover"
                     loading="lazy"
                     fetchPriority="auto"
@@ -647,7 +736,7 @@ export default function HomeBanner({ className }: Props) {
                     srcSet={prevSrcSet || undefined}
                   />
                 </picture>
-                <SlideContent item={prevItem as any} />
+                <SlideContent item={prevItem} />
               </div>
 
               <div
@@ -659,10 +748,10 @@ export default function HomeBanner({ className }: Props) {
                 }}
               >
                 <picture>
-                  <source srcSet={currentSrcSet} sizes={bannerSizes} type="image/webp" />
+                  {currentSrcSet ? <source srcSet={currentSrcSet} sizes={bannerSizes} type="image/webp" /> : null}
                   <img
                     src={currentSrc}
-                    alt={(current as any).title}
+                    alt={current.title}
                     className="absolute inset-0 h-full w-full object-cover"
                     loading={isLcpImage ? 'eager' : 'lazy'}
                     fetchPriority={isLcpImage ? ('high' as const) : ('auto' as const)}
@@ -672,7 +761,7 @@ export default function HomeBanner({ className }: Props) {
                     srcSet={currentSrcSet || undefined}
                   />
                 </picture>
-                <SlideContent item={current as any} />
+                <SlideContent item={current} />
               </div>
 
               <div
@@ -684,10 +773,10 @@ export default function HomeBanner({ className }: Props) {
                 }}
               >
                 <picture>
-                  <source srcSet={nextSrcSet} sizes={bannerSizes} type="image/webp" />
+                  {nextSrcSet ? <source srcSet={nextSrcSet} sizes={bannerSizes} type="image/webp" /> : null}
                   <img
                     src={nextSrc}
-                    alt={(nextItem as any).title}
+                    alt={nextItem.title}
                     className="absolute inset-0 h-full w-full object-cover"
                     loading="lazy"
                     fetchPriority="auto"
@@ -697,7 +786,7 @@ export default function HomeBanner({ className }: Props) {
                     srcSet={nextSrcSet || undefined}
                   />
                 </picture>
-                <SlideContent item={nextItem as any} />
+                <SlideContent item={nextItem} />
               </div>
             </>
           )}

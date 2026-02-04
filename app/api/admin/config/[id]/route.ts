@@ -1,4 +1,5 @@
-// app/api/admin/config/[id]/route.ts
+// caminho: app/api/admin/config/[id]/route.ts
+
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
