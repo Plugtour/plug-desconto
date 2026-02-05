@@ -57,6 +57,20 @@
       "order": 1,
       "criadoEm": "2026-02-05T02:57:13.882Z",
       "atualizadoEm": "2026-02-05T02:57:36.249Z"
+    },
+    {
+      "id": "ban_7ugtbmlml8zr7d2",
+      "title": "aaaaaaaaaa",
+      "subtitle": "bbbbbbbbbbbb",
+      "highlight": "ccccccccccc",
+      "tag": "ddd",
+      "href": "",
+      "imageUrl": "/banners/2-1770267802529.webp",
+      "align": "right",
+      "status": "publicado",
+      "order": 5,
+      "criadoEm": "2026-02-05T05:03:44.390Z",
+      "atualizadoEm": "2026-02-05T05:03:44.390Z"
     }
   ]
 }
