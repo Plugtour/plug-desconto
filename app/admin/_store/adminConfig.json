@@ -1,5 +1,48 @@
 {
   "destinos": [],
   "categorias": [],
-  "banners": []
+  "banners": [
+    {
+      "id": "ban_869twwoml8t3yxp",
+      "title": "1234567890",
+      "subtitle": "1234567890",
+      "highlight": "1234567890",
+      "tag": "1234567890",
+      "href": "",
+      "imageUrl": "/banners/1-snowland-1-1770256642805.webp",
+      "align": "left",
+      "status": "publicado",
+      "order": 1,
+      "criadoEm": "2026-02-05T01:57:42.685Z",
+      "atualizadoEm": "2026-02-05T02:27:14.948Z"
+    },
+    {
+      "id": "ban_m0a1mmqml8t4ezr",
+      "title": "1234567890",
+      "subtitle": "1234567890",
+      "highlight": "1234567890",
+      "tag": "1234567890",
+      "href": "",
+      "imageUrl": "/banners/1tjto-1467209548-1770256681448.webp",
+      "align": "center",
+      "status": "publicado",
+      "order": 2,
+      "criadoEm": "2026-02-05T01:58:03.495Z",
+      "atualizadoEm": "2026-02-05T02:38:49.206Z"
+    },
+    {
+      "id": "ban_3boyaq2ml8t51kg",
+      "title": "1234567890",
+      "subtitle": "1234567890",
+      "highlight": "1234567890",
+      "tag": "1234567890",
+      "href": "",
+      "imageUrl": "/banners/1300x0-1670272667-638e569babde9-hd-1770256710458.webp",
+      "align": "right",
+      "status": "publicado",
+      "order": 3,
+      "criadoEm": "2026-02-05T01:58:32.752Z",
+      "atualizadoEm": "2026-02-05T01:58:32.752Z"
+    }
+  ]
 }

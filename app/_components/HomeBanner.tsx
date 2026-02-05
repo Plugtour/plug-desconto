@@ -1,86 +1,31 @@
+// caminho: app/_components/HomeBanner.tsx
 'use client';
 
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { BANNERS, type BannerItem } from '@/_data/banners';
+import { Heart, Play, Pause, ChevronsLeft, ChevronsRight } from 'lucide-react';
 
-// ✅ favoritesStore
-import { getFavorites, onFavoritesChange, toggleFavorite } from './favorites/favoritesStore';
+import { getFavorites, onFavoritesChange, toggleFavorite, isFavorite } from './favorites/favoritesStore';
 
 type Props = { className?: string };
 
-const DURATION_MS = 6500;
-const SWIPE_THRESHOLD = 45;
-const DEADZONE_PX = 10;
-const SLIDE_MS = 420;
-const FADE_MS = 280;
+type BannerItem = {
+  id: string;
+  title: string;
+  subtitle?: string;
+  highlight?: string;
+  tag?: string;
+  href?: string;
+  imageUrl: string;
+  align?: 'left' | 'center' | 'right';
+  order?: number;
+  status?: string;
+};
 
-function clamp(n: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, n));
-}
+const ROTATE_MS = 6500;
 
-function DoubleChevronOpen({ dir, className }: { dir: 'left' | 'right'; className?: string }) {
-  const flip = dir === 'left';
-  return (
-    <svg viewBox="0 0 28 28" className={className} aria-hidden="true" fill="none">
-      <g
-        transform={flip ? 'translate(28 0) scale(-1 1)' : undefined}
-        stroke="currentColor"
-        strokeWidth="2.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M9 7.5 14.5 14 9 20.5" />
-        <path d="M15 7.5 20.5 14 15 20.5" />
-      </g>
-    </svg>
-  );
-}
-
-function HeartIcon({ className, active = false }: { className?: string; active?: boolean }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
-      <path
-        d="M12 21C12 21 4 15.36 4 9.5C4 7.02 6.02 5 8.5 5C10.04 5 11.4 5.81 12 7C12.6 5.81 13.96 5 15.5 5C17.98 5 20 7.02 20 9.5C20 15.36 12 21 12 21Z"
-        fill={active ? 'currentColor' : 'none'}
-        stroke={active ? 'none' : 'currentColor'}
-        strokeWidth={active ? 0 : 1.8}
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function PlaneIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} fill="none" aria-hidden="true">
-      <path d="M21.8 2.2 9.1 14.9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-      <path
-        d="M21.8 2.2 14.2 21.6c-.2.6-.9.6-1.2.1l-3.7-6.6-6.6-3.7c-.5-.3-.5-1 .1-1.2L21.8 2.2z"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function PlayIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} fill="none" aria-hidden="true">
-      <path d="M9 7.5v9l8-4.5-8-4.5z" fill="currentColor" />
-    </svg>
-  );
-}
-
-function PauseIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} fill="none" aria-hidden="true">
-      <path d="M8 7.5v9" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
-      <path d="M16 7.5v9" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
-    </svg>
-  );
-}
+const BANNER_WIDTHS = [480, 960, 1280];
+const sizes = '(max-width: 480px) 100vw, 448px';
 
 function alignClasses(align?: BannerItem['align']) {
   if (align === 'center') return 'items-center text-center';
@@ -88,15 +33,15 @@ function alignClasses(align?: BannerItem['align']) {
   return 'items-start text-left';
 }
 
+function isRemoteUrl(url: string) {
+  return /^https?:\/\//i.test(url);
+}
+
 function withWebp(url: string) {
   if (!url) return url;
   if (url.toLowerCase().endsWith('.webp')) return url;
   const sep = url.includes('?') ? '&' : '?';
   return `${url}${sep}fm=webp`;
-}
-
-function isRemoteUrl(url: string) {
-  return /^https?:\/\//i.test(url);
 }
 
 function addQuery(url: string, key: string, val: string | number) {
@@ -108,103 +53,144 @@ function variantUrl(url: string, width: number) {
   const u = withWebp(url);
   if (!u) return u;
   if (isRemoteUrl(u)) return addQuery(u, 'w', width);
-  return u; // ✅ local: usa a URL original
+  return u;
 }
 
 function buildSrcSet(url: string, widths: number[]) {
   const u = withWebp(url);
   if (!u) return '';
-  if (!isRemoteUrl(u)) return ''; // ✅ local: sem srcSet (evita 404 em variantes inexistentes)
+  if (!isRemoteUrl(u)) return '';
   return widths.map((w) => `${variantUrl(u, w)} ${w}w`).join(', ');
 }
 
-// ✅ helper: map rápido de favoritos
-function buildFavMapFromStore(): Record<string, boolean> {
-  const list = getFavorites?.() ?? [];
-  const map: Record<string, boolean> = {};
-  for (const it of list as any[]) {
-    const id = String((it as any)?.id ?? '').trim();
-    if (id) map[id] = true;
-  }
-  return map;
+function SlideContent({ item }: { item: BannerItem }) {
+  const contentAlign = alignClasses(item.align);
+
+  // ✅ alinhamento correto:
+  // - left: margem/padding à esquerda
+  // - center: centralizado real (auto/auto)
+  // - right: encosta no lado direito com respiro e mantém texto alinhado à direita
+  const style: React.CSSProperties =
+    item.align === 'left'
+      ? {
+          maxWidth: '78%',
+          marginLeft: '24px',
+          paddingLeft: '24px',
+        }
+      : item.align === 'right'
+      ? {
+          maxWidth: '78%',
+          marginLeft: 'auto',
+          marginRight: '24px',
+          paddingRight: '24px',
+        }
+      : {
+          maxWidth: '78%',
+          marginLeft: 'auto',
+          marginRight: 'auto',
+        };
+
+  return (
+    <div className="pointer-events-none absolute inset-0 z-[30] py-6">
+      <div className={`flex h-full flex-col justify-center gap-1 ${contentAlign}`} style={style}>
+        {item.tag ? <div className="text-[11px] font-semibold text-[#7CFFB2]">{item.tag}</div> : null}
+
+        <div className="text-[25px] font-extrabold text-white">{item.title}</div>
+
+        {item.subtitle ? <div className="text-[16px] font-semibold text-white">{item.subtitle}</div> : null}
+
+        {item.highlight ? <div className="text-[15px] font-semibold text-[#7CCBFF]">{item.highlight}</div> : null}
+
+        {item.href ? <div className="mt-2 text-[15px] font-semibold text-white">Ver ofertas →</div> : null}
+      </div>
+    </div>
+  );
 }
 
-/** ----------- Tipagem segura do payload da API ----------- */
-type ApiBanner = {
-  id?: unknown;
-  title?: unknown;
-  subtitle?: unknown;
-  highlight?: unknown;
-  tag?: unknown;
-  href?: unknown;
-  imageUrl?: unknown;
-  align?: unknown;
-  status?: unknown;
-  order?: unknown;
-};
+function BannerImage({ item }: { item: BannerItem }) {
+  const srcSet = buildSrcSet(item.imageUrl, BANNER_WIDTHS);
+  const src = variantUrl(item.imageUrl, 480) || item.imageUrl;
 
-function isObject(v: unknown): v is Record<string, unknown> {
-  return !!v && typeof v === 'object';
+  return (
+    <picture>
+      {srcSet ? <source srcSet={srcSet} sizes={sizes} type="image/webp" /> : null}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={src} alt={item.title} className="h-full w-full object-cover" draggable={false} decoding="async" />
+    </picture>
+  );
 }
 
-function toApiBanner(v: unknown): ApiBanner | null {
-  if (!isObject(v)) return null;
-  return v as ApiBanner;
-}
-
-function toBannerItem(b: ApiBanner): BannerItem {
-  const subtitleStr = b.subtitle != null ? String(b.subtitle) : '';
-  const highlightStr = b.highlight != null ? String(b.highlight) : '';
-  const tagStr = b.tag != null ? String(b.tag) : '';
-
-  return {
-    id: String(b.id ?? '').trim() || `ban_${Math.random().toString(36).slice(2)}`,
-    title: String(b.title ?? '').trim() || 'Oferta',
-    subtitle: subtitleStr,
-    highlight: highlightStr,
-    tag: tagStr,
-    href: b.href != null ? String(b.href) : undefined,
-    imageUrl: String(b.imageUrl ?? '').trim(),
-    align: b.align === 'left' || b.align === 'center' || b.align === 'right' ? (b.align as any) : undefined,
-    order: Number.isFinite(Number(b.order)) ? Number(b.order) : 0,
-  };
-}
-
-function isPublicado(b: ApiBanner) {
-  return String(b.status ?? '').toLowerCase() === 'publicado';
-}
-
-function compareOrder(a: ApiBanner, b: ApiBanner) {
-  return Number(a.order ?? 0) - Number(b.order ?? 0);
+function SharePlaneIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className={className ?? 'h-[26px] w-[26px]'} fill="none">
+      <path d="M21 3L10.2 13.8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path
+        d="M21 3l-6.7 19-3.2-7.1L4 11.7 21 3Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
 }
 
 export default function HomeBanner({ className }: Props) {
-  // ✅ carrega banners do Admin (fallback: BANNERS estático)
-  const [remoteBanners, setRemoteBanners] = useState<BannerItem[] | null>(null);
+  const [items, setItems] = useState<BannerItem[]>([]);
+  const [active, setActive] = useState(0);
+
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [progress, setProgress] = useState(0);
+
+  const rafRef = useRef<number | null>(null);
+  const startRef = useRef<number>(0);
+  const baseRef = useRef<number>(0);
+
+  // ✅ favoritos reais (store)
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const sync = () => {
+      const list = getFavorites();
+      setFavoriteIds(new Set(list.map((x) => String(x.id))));
+    };
+
+    sync();
+    const off = onFavoritesChange(sync);
+    return () => off();
+  }, []);
 
   useEffect(() => {
     let alive = true;
 
     fetch('/api/banners', { cache: 'no-store' as RequestCache })
       .then((r) => (r.ok ? r.json() : null))
-      .then((data: any) => {
+      .then((data) => {
         if (!alive) return;
 
-        const rawList: unknown[] = Array.isArray(data?.banners) ? (data.banners as unknown[]) : [];
+        const raw: unknown[] = Array.isArray(data?.banners) ? data.banners : [];
+        const list: BannerItem[] = raw
+          .filter((b: any) => !!b && typeof b === 'object')
+          .map((b: any) => ({
+            id: String(b.id ?? '').trim(),
+            title: String(b.title ?? '').trim() || 'Banner',
+            subtitle: b.subtitle != null ? String(b.subtitle) : undefined,
+            highlight: b.highlight != null ? String(b.highlight) : undefined,
+            tag: b.tag != null ? String(b.tag) : undefined,
+            href: b.href != null ? String(b.href) : undefined,
+            imageUrl: String(b.imageUrl ?? '').trim(),
+            align: b.align === 'left' || b.align === 'center' || b.align === 'right' ? b.align : undefined,
+            order: Number.isFinite(Number(b.order)) ? Number(b.order) : 0,
+            status: b.status != null ? String(b.status) : undefined,
+          }))
+          .filter((b) => !!b.id && !!b.imageUrl)
+          .sort((a, b) => Number(a.order ?? 0) - Number(b.order ?? 0))
+          .slice(0, 5);
 
-        const normalized: BannerItem[] = rawList
-          .map((x: unknown) => toApiBanner(x))
-          .filter((x: ApiBanner | null): x is ApiBanner => x !== null)
-          .filter(isPublicado)
-          .sort(compareOrder)
-          .map((b: ApiBanner) => toBannerItem(b))
-          .filter((b: BannerItem) => !!b.imageUrl);
-
-        setRemoteBanners(normalized);
+        setItems(list);
       })
       .catch(() => {
         if (!alive) return;
-        setRemoteBanners([]);
+        setItems([]);
       });
 
     return () => {
@@ -212,754 +198,275 @@ export default function HomeBanner({ className }: Props) {
     };
   }, []);
 
-  const baseItems = useMemo(() => {
-    const source = remoteBanners && remoteBanners.length ? remoteBanners : BANNERS;
-    return (source || []).slice(0, 3);
-  }, [remoteBanners]);
-
-  const items = useMemo(() => baseItems, [baseItems]);
   const count = items.length;
 
-  const [active, setActive] = useState(0);
-
-  // ✅ se a lista mudar, garante índice válido
   useEffect(() => {
     if (!count) return;
     setActive((v) => (v >= count ? 0 : v));
   }, [count]);
 
-  // ✅ evita NaN quando count = 0
-  if (!count) return null;
-
-  // swipe/slide
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragX, setDragX] = useState(0);
-  const [isSlideAnimating, setIsSlideAnimating] = useState(false);
-  const [snapping, setSnapping] = useState(false);
-  const slideTimerRef = useRef<number | null>(null);
-
-  // fade
-  const [isFading, setIsFading] = useState(false);
-  const [fadeTo, setFadeTo] = useState<number | null>(null);
-  const fadeTimerRef = useRef<number | null>(null);
-
-  // pausa
-  const [userPaused, setUserPaused] = useState(false);
-
-  // swipe refs
-  const startXRef = useRef<number | null>(null);
-  const startYRef = useRef<number | null>(null);
-  const draggingRef = useRef(false);
-  const hasMovedRef = useRef(false);
-
-  // container width
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const widthRef = useRef<number>(1);
-
-  // ✅ favoritesStore state
-  const [favIds, setFavIds] = useState<Record<string, boolean>>({});
-  const [heartPop, setHeartPop] = useState(false);
-
-  // autoplay
-  const timeoutRef = useRef<number | null>(null);
-  const startedAtRef = useRef<number>(0);
-  const remainingRef = useRef<number>(DURATION_MS);
-
-  // barra
-  const [barKey, setBarKey] = useState(0);
-  const [barArmed, setBarArmed] = useState(false);
-
-  const current = items[active];
-  const prevIndex = (active - 1 + count) % count;
-  const nextIndex = (active + 1) % count;
-  const prevItem = items[prevIndex];
-  const nextItem = items[nextIndex];
-
-  const autoplayPaused = userPaused || isDragging || isSlideAnimating || isFading;
-
-  // ✅ LCP: primeiro banner, na primeira renderização (sem fade)
-  const isLcpImage = active === 0 && !isFading && fadeTo == null;
-
-  // ✅ sizes para max-w-md (mobile: 100vw; desktop: ~448px)
-  const bannerSizes = '(max-width: 480px) 100vw, 448px';
-
-  // ✅ widths sugeridos para banner dentro de max-w-md (só vale para remoto)
-  const BANNER_WIDTHS = [480, 960, 1280];
-
-  // ✅ sync favorites do store
   useEffect(() => {
-    const sync = () => setFavIds(buildFavMapFromStore());
-    sync();
-
-    const off = onFavoritesChange?.(sync);
-    return () => {
-      if (typeof off === 'function') off();
-    };
-  }, []);
-
-  // medir largura
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-
-    const measure = () => {
-      const rect = el.getBoundingClientRect();
-      widthRef.current = Math.max(1, rect.width);
-    };
-
-    measure();
-
-    let ro: ResizeObserver | null = null;
-    if (typeof ResizeObserver !== 'undefined') {
-      ro = new ResizeObserver(measure);
-      ro.observe(el);
-    }
-
-    window.addEventListener('resize', measure);
-    return () => {
-      window.removeEventListener('resize', measure);
-      ro?.disconnect();
-    };
-  }, []);
-
-  // preload (leve): current + vizinhos em tamanho menor
-  useEffect(() => {
-    const urls = [
-      current?.imageUrl ? variantUrl(current.imageUrl, 960) : '',
-      prevItem?.imageUrl ? variantUrl(prevItem.imageUrl, 480) : '',
-      nextItem?.imageUrl ? variantUrl(nextItem.imageUrl, 480) : '',
-      fadeTo != null && items[fadeTo]?.imageUrl ? variantUrl(items[fadeTo].imageUrl, 480) : '',
-    ].filter(Boolean);
-
-    urls.forEach((u) => {
-      const img = new Image();
-      img.decoding = 'async' as any;
-      img.src = u!;
-    });
-  }, [prevItem?.imageUrl, current?.imageUrl, nextItem?.imageUrl, fadeTo, items]);
-
-  const currentId = String((current as any)?.id ?? '').trim();
-  const isFav = !!(currentId && favIds[currentId]);
-
-  function toggleFav() {
-    const id = String((current as any)?.id ?? '').trim();
-    if (!id) return;
-
-    const res = toggleFavorite?.({
-      id,
-      title: (current as any)?.title ?? 'Oferta',
-      href: (current as any)?.href ?? '/',
-      imageUrl: (current as any)?.imageUrl ?? null,
-      subtitle: (current as any)?.subtitle ?? null,
-      categoryLabel: (current as any)?.tag ?? null,
-    } as any);
-
-    const becameFav = !!(res && typeof res === 'object' && (res as any).active === true);
-    if (becameFav) {
-      setHeartPop(false);
-      requestAnimationFrame(() => setHeartPop(true));
-      window.setTimeout(() => setHeartPop(false), 380);
-    }
-  }
-
-  function clearAutoplayTimer() {
-    if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
-    timeoutRef.current = null;
-  }
-
-  function pauseAutoplayClock() {
-    clearAutoplayTimer();
-    const now = performance.now();
-    const elapsed = Math.max(0, now - startedAtRef.current);
-    remainingRef.current = Math.max(0, remainingRef.current - elapsed);
-    startedAtRef.current = now;
-  }
-
-  function resumeAutoplayClock() {
-    clearAutoplayTimer();
-    startedAtRef.current = performance.now();
-    timeoutRef.current = window.setTimeout(() => {
-      goNextFade();
-    }, Math.max(0, remainingRef.current));
-  }
-
-  // reset barra
-  useLayoutEffect(() => {
-    if (count <= 1) return;
-
-    clearAutoplayTimer();
-    remainingRef.current = DURATION_MS;
-    startedAtRef.current = performance.now();
-
-    setBarArmed(false);
-    setBarKey((k) => k + 1);
-
-    requestAnimationFrame(() => setBarArmed(true));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (!count) return;
+    setProgress(0);
+    baseRef.current = 0;
+    startRef.current = performance.now();
   }, [active, count]);
 
-  // pause/retomar
   useEffect(() => {
-    if (count <= 1) return;
-
-    if (autoplayPaused) {
-      pauseAutoplayClock();
-      return;
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
     }
 
-    resumeAutoplayClock();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoplayPaused, count]);
+    if (!count || count <= 1) return;
+    if (!isPlaying) return;
 
-  function finishSlideTransition(dir: 'next' | 'prev') {
-    const newActive = dir === 'next' ? (active + 1) % count : (active - 1 + count) % count;
+    startRef.current = performance.now();
 
-    setSnapping(true);
-    setActive(newActive);
+    const tick = (now: number) => {
+      const elapsed = now - startRef.current;
+      const p = baseRef.current + elapsed / ROTATE_MS;
 
-    setDragX(0);
-    setIsSlideAnimating(false);
-    setIsDragging(false);
-
-    requestAnimationFrame(() => setSnapping(false));
-  }
-
-  function commitSwipe(dir: 'next' | 'prev') {
-    if (isSlideAnimating || isFading) return;
-    if (slideTimerRef.current) window.clearTimeout(slideTimerRef.current);
-
-    pauseAutoplayClock();
-    remainingRef.current = 0;
-
-    setIsDragging(false);
-    setIsSlideAnimating(true);
-
-    const w = widthRef.current || 1;
-    setDragX(dir === 'next' ? -w : w);
-
-    slideTimerRef.current = window.setTimeout(() => {
-      finishSlideTransition(dir);
-    }, SLIDE_MS);
-  }
-
-  function startFadeTo(targetIndex: number) {
-    if (isFading || isSlideAnimating) return;
-    if (fadeTimerRef.current) window.clearTimeout(fadeTimerRef.current);
-
-    const safe = ((targetIndex % count) + count) % count;
-    if (safe === active) return;
-
-    setIsDragging(false);
-    draggingRef.current = false;
-    hasMovedRef.current = false;
-    startXRef.current = null;
-    startYRef.current = null;
-    setDragX(0);
-
-    pauseAutoplayClock();
-    remainingRef.current = 0;
-
-    setFadeTo(safe);
-    setIsFading(true);
-
-    fadeTimerRef.current = window.setTimeout(() => {
-      setActive(safe);
-      setFadeTo(null);
-      setIsFading(false);
-    }, FADE_MS);
-  }
-
-  function goNextFade() {
-    startFadeTo((active + 1) % count);
-  }
-
-  function goPrevFade() {
-    startFadeTo((active - 1 + count) % count);
-  }
-
-  async function onShare() {
-    try {
-      const url =
-        typeof window !== 'undefined'
-          ? (current as any)?.href
-            ? new URL((current as any).href, window.location.origin).toString()
-            : window.location.href
-          : '';
-
-      if (navigator.share) {
-        await navigator.share({
-          title: (current as any)?.title ?? 'Plug Desconto',
-          text: (current as any)?.subtitle ?? '',
-          url,
-        });
+      if (p >= 1) {
+        baseRef.current = 0;
+        setProgress(0);
+        setActive((v) => (v + 1) % count);
         return;
       }
 
-      if (navigator.clipboard && url) {
-        await navigator.clipboard.writeText(url);
-      }
-    } catch {}
-  }
+      setProgress(p);
+      rafRef.current = requestAnimationFrame(tick);
+    };
 
-  function shouldIgnoreGesture(target: EventTarget | null) {
-    const el = target as HTMLElement | null;
-    if (!el) return false;
-    return !!el.closest('[data-banner-control], button, a, input, textarea, select, [role="button"]');
-  }
+    rafRef.current = requestAnimationFrame(tick);
 
-  function onPointerDown(e: React.PointerEvent) {
-    if (shouldIgnoreGesture(e.target)) return;
-    if (isSlideAnimating || isFading) return;
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    };
+  }, [count, isPlaying, active]);
 
-    startXRef.current = e.clientX;
-    startYRef.current = e.clientY;
-    draggingRef.current = true;
-    hasMovedRef.current = false;
-
-    setDragX(0);
-    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
-  }
-
-  function onPointerMove(e: React.PointerEvent) {
-    if (!draggingRef.current) return;
-    if (startXRef.current == null || startYRef.current == null) return;
-
-    const dx = e.clientX - startXRef.current;
-    const dy = e.clientY - startYRef.current;
-
-    if (!hasMovedRef.current) {
-      if (Math.abs(dx) < DEADZONE_PX && Math.abs(dy) < DEADZONE_PX) return;
-
-      if (Math.abs(dy) > Math.abs(dx)) {
-        draggingRef.current = false;
-        setIsDragging(false);
-        setDragX(0);
-        return;
-      }
-
-      hasMovedRef.current = true;
-      setIsDragging(true);
-    }
-
-    e.preventDefault();
-
-    const w = widthRef.current || 1;
-    setDragX(clamp(dx, -w, w));
-  }
-
-  function onPointerUp(e: React.PointerEvent) {
-    if (!draggingRef.current) return;
-    draggingRef.current = false;
-
-    const sx = startXRef.current;
-    if (sx == null) return;
-
-    const dx = e.clientX - sx;
-    startXRef.current = null;
-    startYRef.current = null;
-
-    if (!hasMovedRef.current) {
-      setIsDragging(false);
-      setDragX(0);
-      return;
-    }
-
-    hasMovedRef.current = false;
-
-    const commit = Math.abs(dx) >= SWIPE_THRESHOLD;
-    if (!commit) {
-      setIsDragging(false);
-      setDragX(0);
-      return;
-    }
-
-    if (dx < 0) commitSwipe('next');
-    else commitSwipe('prev');
-  }
+  const current = useMemo(() => {
+    if (!count) return null;
+    const idx = active >= 0 && active < count ? active : 0;
+    return items[idx] ?? null;
+  }, [items, active, count]);
 
   if (!current) return null;
 
-  const slideTransitionClass = !isDragging && !snapping ? `transition-transform duration-[${SLIDE_MS}ms]` : '';
+  const safeSetActive = (idx: number) => {
+    if (!count) return;
+    const next = ((idx % count) + count) % count;
+    setActive(next);
+  };
 
-  const stop = (e: React.SyntheticEvent) => e.stopPropagation();
+  const goPrev = () => safeSetActive(active - 1);
+  const goNext = () => safeSetActive(active + 1);
 
-  const SHADOW_STRONG = '0 3px 22px rgba(0,0,0,0.92)';
-  const SHADOW_MED = '0 3px 18px rgba(0,0,0,0.88)';
-  const SHADOW_SOFT = '0 2px 16px rgba(0,0,0,0.82)';
+  const handleTogglePlay = () => {
+    if (!count || count <= 1) return;
+    setIsPlaying((v) => {
+      const next = !v;
+      baseRef.current = progress;
+      if (next) startRef.current = performance.now();
+      return next;
+    });
+  };
 
-  function SlideContent({ item }: { item: BannerItem }) {
-    const contentAlign = alignClasses(item.align);
-    const centerLiftClass = item.align === 'center' ? '-translate-y-[15px]' : '';
+  const likedNow = favoriteIds.has(String(current.id)) || isFavorite(String(current.id));
 
-    const titleClass = [
-      'text-[25px] font-extrabold leading-[1.05] text-white',
-      item.align === 'left' || item.align === 'right' ? 'max-w-[220px] whitespace-normal' : '',
-      item.align === 'center' ? 'whitespace-nowrap' : '',
-    ].join(' ');
+  const toggleLike = () => {
+    toggleFavorite({
+      id: String(current.id),
+      title: String(current.title),
+      href: String(current.href ?? '/'),
+      imageUrl: current.imageUrl ?? null,
+      subtitle: current.subtitle ?? null,
+      city: null,
+      priceText: null,
+    });
+  };
 
-    const tag = String(item.tag ?? '');
-    const subtitle = String(item.subtitle ?? '');
-    const highlight = String(item.highlight ?? '');
+  const shareWhatsApp = () => {
+    const href = current.href?.trim();
+    const url = href
+      ? href.startsWith('http')
+        ? href
+        : `${window.location.origin}${href.startsWith('/') ? href : `/${href}`}`
+      : window.location.href;
 
-    return (
-      <div className="absolute inset-0 z-[35] px-14 pb-4 pt-6 -translate-y-[0px]">
-        <div className={[`flex h-full w-full flex-col justify-end gap-1 ${contentAlign}`, centerLiftClass].join(' ')}>
-          {tag ? (
-            <div className="text-[11px] font-semibold tracking-wide" style={{ color: '#7CFFB2', textShadow: SHADOW_SOFT }}>
-              {tag}
-            </div>
-          ) : null}
+    const text = `${current.title} - ${url}`;
+    const wa = `https://wa.me/?text=${encodeURIComponent(text)}`;
+    window.open(wa, '_blank', 'noopener,noreferrer');
+  };
 
-          <div className={titleClass} style={{ textShadow: SHADOW_STRONG }}>
-            {item.title}
-          </div>
-
-          {subtitle ? (
-            <div className="text-[16px] font-semibold text-white" style={{ textShadow: SHADOW_MED }}>
-              {subtitle}
-            </div>
-          ) : null}
-
-          {highlight ? (
-            <div className="text-[15px] font-semibold -mt-[8px]" style={{ color: '#7CCBFF', textShadow: SHADOW_SOFT }}>
-              {highlight}
-            </div>
-          ) : null}
-
-          {item.href ? (
-            <div className="mt-2">
-              <Link
-                href={item.href}
-                className="inline-flex text-[15px] font-semibold text-white -translate-y-[10px]"
-                style={{ textShadow: SHADOW_MED }}
-              >
-                Ver ofertas →
-              </Link>
-            </div>
-          ) : null}
-        </div>
-      </div>
-    );
-  }
-
-  const fadeItem = fadeTo != null ? items[fadeTo] : null;
-  const elapsedMs = clamp(DURATION_MS - remainingRef.current, 0, DURATION_MS);
-
-  // ✅ srcSet pronto para picture/img (remoto) — local fica vazio
-  const currentSrcSet = buildSrcSet(current.imageUrl, BANNER_WIDTHS);
-  const prevSrcSet = buildSrcSet(prevItem.imageUrl, BANNER_WIDTHS);
-  const nextSrcSet = buildSrcSet(nextItem.imageUrl, BANNER_WIDTHS);
-  const fadeSrcSet = fadeItem ? buildSrcSet(fadeItem.imageUrl, BANNER_WIDTHS) : '';
-
-  // ✅ fallback src
-  const currentSrc = variantUrl(current.imageUrl, 480) || withWebp(current.imageUrl);
-  const prevSrc = variantUrl(prevItem.imageUrl, 480) || withWebp(prevItem.imageUrl);
-  const nextSrc = variantUrl(nextItem.imageUrl, 480) || withWebp(nextItem.imageUrl);
-  const fadeSrc = fadeItem ? variantUrl(fadeItem.imageUrl, 480) || withWebp(fadeItem.imageUrl) : '';
+  const ICONS_TOP_PX = 25;
 
   return (
     <section className={className}>
+      <style jsx>{`
+        @keyframes pdFloatLeft {
+          0%,
+          100% {
+            transform: translateY(-50%) translateX(0);
+          }
+          50% {
+            transform: translateY(-50%) translateX(-7px);
+          }
+        }
+        @keyframes pdFloatRight {
+          0%,
+          100% {
+            transform: translateY(-50%) translateX(0);
+          }
+          50% {
+            transform: translateY(-50%) translateX(7px);
+          }
+        }
+      `}</style>
+
       <div className="relative w-full">
-        <div
-          ref={containerRef}
-          className="relative h-[250px] w-full overflow-hidden"
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerUp}
-          style={{ touchAction: 'pan-y' }}
-        >
-          {isFading && fadeItem ? (
-            <>
-              <div className="absolute inset-0">
-                <picture>
-                  {currentSrcSet ? <source srcSet={currentSrcSet} sizes={bannerSizes} type="image/webp" /> : null}
-                  <img
-                    src={currentSrc}
-                    alt={current.title}
-                    className="absolute inset-0 h-full w-full object-cover"
-                    loading={isLcpImage ? 'eager' : 'lazy'}
-                    fetchPriority={isLcpImage ? ('high' as const) : ('auto' as const)}
-                    draggable={false}
-                    decoding="async"
-                    sizes={bannerSizes}
-                    srcSet={currentSrcSet || undefined}
-                  />
-                </picture>
-              </div>
-
+        <div className="relative h-[250px] w-full overflow-hidden">
+          {items.map((it, idx) => {
+            const isActiveSlide = idx === active;
+            return (
               <div
-                className={['absolute inset-0', 'transition-opacity', `duration-[${FADE_MS}ms]`, 'opacity-100'].join(' ')}
-                style={{ opacity: 1 }}
+                key={it.id}
+                className={[
+                  'absolute inset-0',
+                  'transition-opacity duration-500 ease-out',
+                  isActiveSlide ? 'opacity-100' : 'opacity-0',
+                ].join(' ')}
+                aria-hidden={!isActiveSlide}
               >
-                <picture>
-                  {fadeSrcSet ? <source srcSet={fadeSrcSet} sizes={bannerSizes} type="image/webp" /> : null}
-                  <img
-                    src={fadeSrc}
-                    alt={fadeItem.title}
-                    className="absolute inset-0 h-full w-full object-cover"
-                    loading="lazy"
-                    fetchPriority="auto"
-                    draggable={false}
-                    decoding="async"
-                    sizes={bannerSizes}
-                    srcSet={fadeSrcSet || undefined}
-                  />
-                </picture>
-
-                <div className="absolute inset-0" style={{ animation: `fadeIn ${FADE_MS}ms ease-out both` }}>
-                  <SlideContent item={fadeItem} />
-                </div>
+                <BannerImage item={it} />
+                {isActiveSlide ? <SlideContent item={it} /> : null}
               </div>
-            </>
-          ) : (
-            <>
-              <div
-                className={['absolute inset-0 will-change-transform', slideTransitionClass].join(' ')}
-                style={{
-                  transform: `translate3d(${(-widthRef.current + dragX)}px, 0, 0)`,
-                  transitionTimingFunction: 'cubic-bezier(0.22, 0.8, 0.2, 1)',
-                  backfaceVisibility: 'hidden',
+            );
+          })}
+
+          <div className="pointer-events-none absolute inset-0 z-[15] bg-gradient-to-t from-black/55 via-black/10 to-black/0" />
+
+          {/* ✅ clique no banner inteiro (ABAIXO dos controles) */}
+          {current.href ? <Link href={current.href} className="absolute inset-0 z-[20]" aria-label={current.title} /> : null}
+
+          {/* ✅ CONTROLES SEMPRE ACIMA DO LINK */}
+          <div className="pointer-events-none absolute inset-0 z-[95]">
+            {/* barras */}
+            <div className="pointer-events-auto absolute left-0 right-0 top-0 z-[70] px-3 pt-3">
+              <div className="flex items-center gap-2">
+                {Array.from({ length: count }).map((_, i) => {
+                  const fill = i < active ? 1 : i > active ? 0 : Math.max(0, Math.min(1, progress || 0));
+                  return (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        safeSetActive(i);
+                      }}
+                      className="h-[3px] flex-1 rounded-full bg-white/15 backdrop-blur-md"
+                      aria-label={`Banner ${i + 1}`}
+                      title={`Banner ${i + 1}`}
+                    >
+                      <div className="h-full rounded-full bg-white" style={{ width: `${fill * 100}%` }} />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* setas */}
+            {count > 1 ? (
+              <>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    goPrev();
+                  }}
+                  className="pointer-events-auto absolute left-2 top-1/2 z-[95] inline-flex h-16 w-16 items-center justify-center text-white"
+                  style={{ animation: 'pdFloatLeft 2.4s ease-in-out infinite' }}
+                  aria-label="Anterior"
+                  title="Anterior"
+                >
+                  <ChevronsLeft className="text-white" size={44} strokeWidth={3.4} />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    goNext();
+                  }}
+                  className="pointer-events-auto absolute right-2 top-1/2 z-[95] inline-flex h-16 w-16 items-center justify-center text-white"
+                  style={{ animation: 'pdFloatRight 2.4s ease-in-out infinite' }}
+                  aria-label="Próximo"
+                  title="Próximo"
+                >
+                  <ChevronsRight className="text-white" size={44} strokeWidth={3.4} />
+                </button>
+              </>
+            ) : null}
+
+            {/* ícones */}
+            <div className="pointer-events-auto absolute right-3 z-[95] flex items-center gap-3" style={{ top: `${ICONS_TOP_PX}px` }}>
+              {/* ✅ CORAÇÃO: agora pinta TOTAL (fill) e usa vermelho padrão */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  toggleLike();
                 }}
+                className="inline-flex items-center justify-center"
+                aria-label="Favoritar"
+                title="Favoritar"
               >
-                <picture>
-                  {prevSrcSet ? <source srcSet={prevSrcSet} sizes={bannerSizes} type="image/webp" /> : null}
-                  <img
-                    src={prevSrc}
-                    alt={prevItem.title}
-                    className="absolute inset-0 h-full w-full object-cover"
-                    loading="lazy"
-                    fetchPriority="auto"
-                    draggable={false}
-                    decoding="async"
-                    sizes={bannerSizes}
-                    srcSet={prevSrcSet || undefined}
-                  />
-                </picture>
-                <SlideContent item={prevItem} />
-              </div>
+                <Heart
+                  size={22}
+                  strokeWidth={2.6}
+                  // ✅ força o preenchimento total quando favoritado
+                  fill={likedNow ? 'currentColor' : 'none'}
+                  className={likedNow ? 'text-red-500' : 'text-white'}
+                />
+              </button>
 
-              <div
-                className={['absolute inset-0 will-change-transform', slideTransitionClass].join(' ')}
-                style={{
-                  transform: `translate3d(${dragX}px, 0, 0)`,
-                  transitionTimingFunction: 'cubic-bezier(0.22, 0.8, 0.2, 1)',
-                  backfaceVisibility: 'hidden',
+              {/* ✅ COMPARTILHAR: avião trocado pelo SVG enviado */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  shareWhatsApp();
                 }}
+                className="inline-flex items-center justify-center text-white"
+                aria-label="Compartilhar no WhatsApp"
+                title="Compartilhar no WhatsApp"
               >
-                <picture>
-                  {currentSrcSet ? <source srcSet={currentSrcSet} sizes={bannerSizes} type="image/webp" /> : null}
-                  <img
-                    src={currentSrc}
-                    alt={current.title}
-                    className="absolute inset-0 h-full w-full object-cover"
-                    loading={isLcpImage ? 'eager' : 'lazy'}
-                    fetchPriority={isLcpImage ? ('high' as const) : ('auto' as const)}
-                    draggable={false}
-                    decoding="async"
-                    sizes={bannerSizes}
-                    srcSet={currentSrcSet || undefined}
-                  />
-                </picture>
-                <SlideContent item={current} />
-              </div>
+                <SharePlaneIcon className="h-[26px] w-[26px]" />
+              </button>
 
-              <div
-                className={['absolute inset-0 will-change-transform', slideTransitionClass].join(' ')}
-                style={{
-                  transform: `translate3d(${widthRef.current + dragX}px, 0, 0)`,
-                  transitionTimingFunction: 'cubic-bezier(0.22, 0.8, 0.2, 1)',
-                  backfaceVisibility: 'hidden',
+              {/* play/pause */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleTogglePlay();
                 }}
+                className="inline-flex items-center justify-center text-white"
+                aria-label={isPlaying ? 'Pausar' : 'Reproduzir'}
+                title={isPlaying ? 'Pausar' : 'Reproduzir'}
               >
-                <picture>
-                  {nextSrcSet ? <source srcSet={nextSrcSet} sizes={bannerSizes} type="image/webp" /> : null}
-                  <img
-                    src={nextSrc}
-                    alt={nextItem.title}
-                    className="absolute inset-0 h-full w-full object-cover"
-                    loading="lazy"
-                    fetchPriority="auto"
-                    draggable={false}
-                    decoding="async"
-                    sizes={bannerSizes}
-                    srcSet={nextSrcSet || undefined}
-                  />
-                </picture>
-                <SlideContent item={nextItem} />
-              </div>
-            </>
-          )}
-
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/25 to-black/10" />
-          <div className="absolute inset-0 bg-black/10" />
-
-          {/* progress */}
-          <div className="absolute left-0 right-0 top-0 z-[60] px-3 pt-2">
-            <div className="flex gap-1.5">
-              {items.map((_, i) => {
-                const isActive = i === active;
-                const isPast = i < active;
-
-                return (
-                  <div key={i} className="h-[3px] flex-1 overflow-hidden rounded-full bg-white/35">
-                    {isPast ? (
-                      <div className="h-full w-full bg-white" />
-                    ) : isActive ? (
-                      <div
-                        key={`${active}-${barKey}`}
-                        className="h-full bg-white will-change-transform"
-                        style={
-                          !barArmed
-                            ? { width: '100%', transformOrigin: 'left', transform: 'scaleX(0)', animationName: 'none' }
-                            : {
-                                width: '100%',
-                                transformOrigin: 'left',
-                                transform: 'scaleX(0)',
-                                animationName: 'storyFill',
-                                animationDuration: `${DURATION_MS}ms`,
-                                animationTimingFunction: 'linear',
-                                animationFillMode: 'both',
-                                animationDelay: `-${elapsedMs}ms`,
-                                animationPlayState: autoplayPaused ? ('paused' as const) : ('running' as const),
-                              }
-                        }
-                      />
-                    ) : (
-                      <div className="h-full bg-white" style={{ width: '0%' }} />
-                    )}
-                  </div>
-                );
-              })}
+                {isPlaying ? <Pause className="text-white" size={24} strokeWidth={3.2} /> : <Play className="text-white" size={24} strokeWidth={3.2} />}
+              </button>
             </div>
           </div>
-
-          {/* controls */}
-          <div
-            data-banner-control
-            className="absolute right-2 top-6 z-[70] flex items-center gap-3 text-white"
-            onPointerDown={(e) => e.stopPropagation()}
-            onPointerUp={(e) => e.stopPropagation()}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              type="button"
-              aria-label={userPaused ? 'Ativar banner' : 'Pausar banner'}
-              onClick={() => setUserPaused((v) => !v)}
-              className="p2"
-              style={{ touchAction: 'manipulation' }}
-            >
-              {userPaused ? <PlayIcon className="h-10 w-10 text-white" /> : <PauseIcon className="h-10 w-10 text-white" />}
-            </button>
-
-            <button
-              type="button"
-              aria-label="Compartilhar"
-              onClick={onShare}
-              className="p2 -ml-2"
-              style={{ touchAction: 'manipulation' }}
-            >
-              <PlaneIcon className="h-7 w-7 text-white rotate-[25deg]" />
-            </button>
-
-            <button
-              type="button"
-              aria-label={isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
-              onClick={toggleFav}
-              className="p-2"
-              style={{ touchAction: 'manipulation' }}
-            >
-              <HeartIcon
-                className={['h-8 w-8', isFav ? 'text-red-500' : 'text-white', heartPop ? 'heart-pop' : ''].join(' ')}
-                active={isFav}
-              />
-            </button>
-          </div>
-
-          {/* arrows */}
-          <button
-            type="button"
-            aria-label="Banner anterior"
-            onClick={goPrevFade}
-            className="absolute left-2 top-1/2 z-[70] -translate-y-1/2 text-white"
-            data-banner-control
-            onPointerDown={stop}
-            onPointerUp={stop}
-            style={{ touchAction: 'manipulation' }}
-          >
-            <span className="arrow-float block p-2">
-              <DoubleChevronOpen dir="left" className="h-10 w-10 scale-110" />
-            </span>
-          </button>
-
-          <button
-            type="button"
-            aria-label="Próximo banner"
-            onClick={goNextFade}
-            className="absolute right-2 top-1/2 z-[70] -translate-y-1/2 text-white"
-            data-banner-control
-            onPointerDown={stop}
-            onPointerUp={stop}
-            style={{ touchAction: 'manipulation' }}
-          >
-            <span className="arrow-float block p-2">
-              <DoubleChevronOpen dir="right" className="h-10 w-10 scale-110" />
-            </span>
-          </button>
         </div>
-
-        <style jsx global>{`
-          @keyframes floatArrow {
-            0% {
-              transform: translateY(0);
-            }
-            50% {
-              transform: translateY(-3px);
-            }
-            100% {
-              transform: translateY(0);
-            }
-          }
-          .arrow-float {
-            animation: floatArrow 1.8s ease-in-out infinite;
-          }
-
-          @keyframes heartPop {
-            0% {
-              transform: scale(1);
-            }
-            30% {
-              transform: scale(1.25);
-            }
-            60% {
-              transform: scale(0.95);
-            }
-            100% {
-              transform: scale(1);
-            }
-          }
-          .heart-pop {
-            animation: heartPop 320ms ease-out;
-          }
-
-          @keyframes fadeIn {
-            from {
-              opacity: 0;
-            }
-            to {
-              opacity: 1;
-            }
-          }
-
-          @keyframes storyFill {
-            from {
-              transform: scaleX(0);
-            }
-            to {
-              transform: scaleX(1);
-            }
-          }
-        `}</style>
       </div>
     </section>
   );
