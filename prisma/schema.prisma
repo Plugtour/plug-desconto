@@ -69,3 +69,23 @@ model AdminAuditLog {
   @@index([action])
   @@index([actorRole])
 }
+
+model Banner {
+  id        String   @id @default(cuid())
+  title     String
+  subtitle  String?
+  highlight String?
+  tag       String?
+  href      String?
+  imageUrl  String
+  align     String?
+  status    OfferStatus @default(publicado)
+  order     Int      @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([order])
+}
+
