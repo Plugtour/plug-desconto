@@ -471,3 +471,4 @@ export default function HomeBanner({ className }: Props) {
     </section>
   );
 }
+ 
