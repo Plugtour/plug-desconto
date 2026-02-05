@@ -43,6 +43,20 @@
       "order": 3,
       "criadoEm": "2026-02-05T01:58:32.752Z",
       "atualizadoEm": "2026-02-05T01:58:32.752Z"
+    },
+    {
+      "id": "ban_ppsy6nqml8v8ihm",
+      "title": "aaaaaaaaaa",
+      "subtitle": "sssssssssss",
+      "highlight": "ddddddddddd",
+      "tag": "fffffffff",
+      "href": "",
+      "imageUrl": "/banners/222222222221-1770260252849.webp",
+      "align": "left",
+      "status": "publicado",
+      "order": 1,
+      "criadoEm": "2026-02-05T02:57:13.882Z",
+      "atualizadoEm": "2026-02-05T02:57:36.249Z"
     }
   ]
 }
