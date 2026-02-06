@@ -1,7 +1,7 @@
 // caminho: app/admin/configuracoes/banners/AdminBannersClient.tsx
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 
 type BannerStatus = 'rascunho' | 'publicado' | 'pausado' | 'arquivado' | 'lixeira';
 type BannerAlign = 'left' | 'center' | 'right';
@@ -39,12 +39,31 @@ function withWebp(url: string) {
   return `${url}${sep}fm=webp`;
 }
 
-// ✅ mesma regra do HomeBanner: remoto ganha ?w=..., local usa original (sem variantes)
+// ✅ Vercel Blob NÃO suporta transformações tipo ?w=... / ?fm=...
+function isVercelBlobUrl(url: string) {
+  try {
+    const u = new URL(url);
+    const host = u.hostname.toLowerCase();
+    return host.includes('vercel-storage') || host.includes('blob');
+  } catch {
+    return false;
+  }
+}
+
+// ✅ regra segura: só adiciona query de “transform” se não for Vercel Blob
 function variantUrl(url: string, width: number) {
-  const u = withWebp(url);
+  const u = url || '';
   if (!u) return u;
-  if (isRemoteUrl(u)) return addQuery(u, 'w', width);
-  return u;
+
+  // local (ex: /banners/...)
+  if (!isRemoteUrl(u)) return u;
+
+  // remoto (ex: Vercel Blob): não mexe
+  if (isVercelBlobUrl(u)) return u;
+
+  // remoto genérico: mantém como antes
+  const webp = withWebp(u);
+  return addQuery(webp, 'w', width);
 }
 
 const EMPTY_FORM = {
@@ -69,6 +88,7 @@ export default function AdminBannersClient() {
 
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [pickedName, setPickedName] = useState('');
+  const [errorMsg, setErrorMsg] = useState<string>('');
 
   const sorted = useMemo(() => {
     const base = Array.isArray(banners) ? [...banners] : [];
@@ -104,8 +124,11 @@ export default function AdminBannersClient() {
         .filter((b: Banner) => !!b.id && !!b.imageUrl);
 
       setBanners(normalized);
-    } catch {
+      setErrorMsg('');
+    } catch (e: unknown) {
       setBanners([]);
+      const msg = e instanceof Error ? e.message : 'Falha ao carregar';
+      setErrorMsg(msg);
     } finally {
       setLoading(false);
     }
@@ -127,6 +150,7 @@ export default function AdminBannersClient() {
     setEditingId(null);
     setForm({ ...EMPTY_FORM, order: (sorted[sorted.length - 1]?.order ?? 0) + 1 });
     setPickedName('');
+    setErrorMsg('');
     if (fileRef.current) fileRef.current.value = '';
   }
 
@@ -144,6 +168,7 @@ export default function AdminBannersClient() {
       imageUrl: b.imageUrl ?? '',
     });
     setPickedName('');
+    setErrorMsg('');
     if (fileRef.current) fileRef.current.value = '';
   }
 
@@ -160,28 +185,36 @@ export default function AdminBannersClient() {
       body: fd,
     });
 
-    const j = await r.json().catch(() => ({}));
+    const j = await r.json().catch(() => ({} as any));
     const url = String((j as any)?.url ?? (j as any)?.imageUrl ?? '').trim();
-    if (!r.ok || !url) throw new Error('Falha no upload');
+
+    if (!r.ok || !url) {
+      const detail = String((j as any)?.detail ?? (j as any)?.error ?? '').trim();
+      throw new Error(detail || 'Falha no upload');
+    }
+
     return url;
   }
 
   function openFilePicker() {
+    setErrorMsg('');
     fileRef.current?.click();
   }
 
-  async function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
+  async function onPickFile(e: ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     if (!f) return;
 
     setPickedName(f.name);
+    setErrorMsg('');
 
     try {
       setSaving(true);
       const url = await uploadBannerImage(f);
       setField('imageUrl', url as any);
-    } catch {
-      // mantém silencioso
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Falha no upload';
+      setErrorMsg(msg);
     } finally {
       setSaving(false);
     }
@@ -200,9 +233,13 @@ export default function AdminBannersClient() {
       imageUrl: norm(form.imageUrl),
     };
 
-    if (!payload.title || !payload.imageUrl) return;
+    if (!payload.title || !payload.imageUrl) {
+      setErrorMsg('Informe Título e Imagem.');
+      return;
+    }
 
     setSaving(true);
+    setErrorMsg('');
     try {
       if (editingId) {
         await fetch(`/api/admin/config/banners/${encodeURIComponent(editingId)}`, {
@@ -220,6 +257,9 @@ export default function AdminBannersClient() {
 
       await load();
       startNew();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Falha ao salvar';
+      setErrorMsg(msg);
     } finally {
       setSaving(false);
     }
@@ -228,10 +268,14 @@ export default function AdminBannersClient() {
   async function remove(id: string) {
     if (!id) return;
     setSaving(true);
+    setErrorMsg('');
     try {
       await fetch(`/api/admin/config/banners/${encodeURIComponent(id)}`, { method: 'DELETE' });
       await load();
       if (editingId === id) startNew();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Falha ao excluir';
+      setErrorMsg(msg);
     } finally {
       setSaving(false);
     }
@@ -257,6 +301,12 @@ export default function AdminBannersClient() {
             Novo
           </button>
         </div>
+
+        {errorMsg ? (
+          <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-200">
+            {errorMsg}
+          </div>
+        ) : null}
 
         <div className="mt-3 grid grid-cols-1 gap-3">
           <div>
@@ -360,7 +410,6 @@ export default function AdminBannersClient() {
               placeholder="/banners/banner-01.webp ou https://..."
             />
 
-            {/* ✅ input file escondido + botão (garante abrir seletor) */}
             <input ref={fileRef} type="file" accept="image/*" onChange={onPickFile} className="hidden" />
 
             <div className="mt-2 flex items-center gap-3">
@@ -384,14 +433,19 @@ export default function AdminBannersClient() {
                 {saving ? 'Salvando…' : 'Salvar'}
               </button>
 
-              {/* ✅ miniatura discreta (não gera rolagem) */}
               {form.imageUrl ? (
                 <div
                   className="ml-auto overflow-hidden rounded-md border border-zinc-200 dark:border-zinc-800"
                   style={{ width: 96, height: 56 }}
                   title="Preview"
                 >
-                  <img src={previewSrc} alt="Preview" className="h-full w-full object-cover" loading="lazy" decoding="async" />
+                  <img
+                    src={previewSrc}
+                    alt="Preview"
+                    className="h-full w-full object-cover"
+                    loading="lazy"
+                    decoding="async"
+                  />
                 </div>
               ) : null}
             </div>

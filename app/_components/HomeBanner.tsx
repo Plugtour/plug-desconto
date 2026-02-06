@@ -37,9 +37,23 @@ function isRemoteUrl(url: string) {
   return /^https?:\/\//i.test(url);
 }
 
+function isVercelBlobUrl(url: string) {
+  try {
+    const u = new URL(url);
+    const host = u.hostname.toLowerCase();
+    return host.includes('vercel-storage') || host.includes('blob');
+  } catch {
+    return false;
+  }
+}
+
 function withWebp(url: string) {
   if (!url) return url;
   if (url.toLowerCase().endsWith('.webp')) return url;
+
+  // Vercel Blob: não mexe
+  if (isRemoteUrl(url) && isVercelBlobUrl(url)) return url;
+
   const sep = url.includes('?') ? '&' : '?';
   return `${url}${sep}fm=webp`;
 }
@@ -49,27 +63,36 @@ function addQuery(url: string, key: string, val: string | number) {
   return `${url}${sep}${encodeURIComponent(key)}=${encodeURIComponent(String(val))}`;
 }
 
+// ✅ regra segura:
+// - local: usa direto
+// - remoto Blob (Vercel): usa direto (sem ?w= / ?fm=)
+// - remoto genérico: mantém ?w= e ?fm=webp
 function variantUrl(url: string, width: number) {
+  if (!url) return url;
+  if (!isRemoteUrl(url)) return url;
+
+  if (isVercelBlobUrl(url)) return url;
+
   const u = withWebp(url);
-  if (!u) return u;
-  if (isRemoteUrl(u)) return addQuery(u, 'w', width);
-  return u;
+  return addQuery(u, 'w', width);
 }
 
 function buildSrcSet(url: string, widths: number[]) {
+  if (!url) return '';
+
+  // local: sem srcset
+  if (!isRemoteUrl(url)) return '';
+
+  // Vercel Blob: sem srcset e sem query
+  if (isVercelBlobUrl(url)) return '';
+
   const u = withWebp(url);
-  if (!u) return '';
-  if (!isRemoteUrl(u)) return '';
   return widths.map((w) => `${variantUrl(u, w)} ${w}w`).join(', ');
 }
 
 function SlideContent({ item }: { item: BannerItem }) {
   const contentAlign = alignClasses(item.align);
 
-  // ✅ alinhamento correto:
-  // - left: margem/padding à esquerda
-  // - center: centralizado real (auto/auto)
-  // - right: encosta no lado direito com respiro e mantém texto alinhado à direita
   const style: React.CSSProperties =
     item.align === 'left'
       ? {
@@ -108,8 +131,11 @@ function SlideContent({ item }: { item: BannerItem }) {
 }
 
 function BannerImage({ item }: { item: BannerItem }) {
-  const srcSet = buildSrcSet(item.imageUrl, BANNER_WIDTHS);
-  const src = variantUrl(item.imageUrl, 480) || item.imageUrl;
+  const isBlob = isRemoteUrl(item.imageUrl) && isVercelBlobUrl(item.imageUrl);
+
+  // Blob: usa a URL "crua" (sem srcset/sem query)
+  const srcSet = isBlob ? '' : buildSrcSet(item.imageUrl, BANNER_WIDTHS);
+  const src = isBlob ? item.imageUrl : variantUrl(item.imageUrl, 480) || item.imageUrl;
 
   return (
     <picture>
@@ -145,7 +171,6 @@ export default function HomeBanner({ className }: Props) {
   const startRef = useRef<number>(0);
   const baseRef = useRef<number>(0);
 
-  // ✅ favoritos reais (store)
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -347,12 +372,11 @@ export default function HomeBanner({ className }: Props) {
 
           <div className="pointer-events-none absolute inset-0 z-[15] bg-gradient-to-t from-black/55 via-black/10 to-black/0" />
 
-          {/* ✅ clique no banner inteiro (ABAIXO dos controles) */}
-          {current.href ? <Link href={current.href} className="absolute inset-0 z-[20]" aria-label={current.title} /> : null}
+          {current.href ? (
+            <Link href={current.href} className="absolute inset-0 z-[20]" aria-label={current.title} />
+          ) : null}
 
-          {/* ✅ CONTROLES SEMPRE ACIMA DO LINK */}
           <div className="pointer-events-none absolute inset-0 z-[95]">
-            {/* barras */}
             <div className="pointer-events-auto absolute left-0 right-0 top-0 z-[70] px-3 pt-3">
               <div className="flex items-center gap-2">
                 {Array.from({ length: count }).map((_, i) => {
@@ -377,7 +401,6 @@ export default function HomeBanner({ className }: Props) {
               </div>
             </div>
 
-            {/* setas */}
             {count > 1 ? (
               <>
                 <button
@@ -412,9 +435,10 @@ export default function HomeBanner({ className }: Props) {
               </>
             ) : null}
 
-            {/* ícones */}
-            <div className="pointer-events-auto absolute right-3 z-[95] flex items-center gap-3" style={{ top: `${ICONS_TOP_PX}px` }}>
-              {/* ✅ CORAÇÃO: agora pinta TOTAL (fill) e usa vermelho padrão */}
+            <div
+              className="pointer-events-auto absolute right-3 z-[95] flex items-center gap-3"
+              style={{ top: `${ICONS_TOP_PX}px` }}
+            >
               <button
                 type="button"
                 onClick={(e) => {
@@ -429,13 +453,11 @@ export default function HomeBanner({ className }: Props) {
                 <Heart
                   size={22}
                   strokeWidth={2.6}
-                  // ✅ força o preenchimento total quando favoritado
                   fill={likedNow ? 'currentColor' : 'none'}
                   className={likedNow ? 'text-red-500' : 'text-white'}
                 />
               </button>
 
-              {/* ✅ COMPARTILHAR: avião trocado pelo SVG enviado */}
               <button
                 type="button"
                 onClick={(e) => {
@@ -450,7 +472,6 @@ export default function HomeBanner({ className }: Props) {
                 <SharePlaneIcon className="h-[26px] w-[26px]" />
               </button>
 
-              {/* play/pause */}
               <button
                 type="button"
                 onClick={(e) => {
@@ -462,7 +483,11 @@ export default function HomeBanner({ className }: Props) {
                 aria-label={isPlaying ? 'Pausar' : 'Reproduzir'}
                 title={isPlaying ? 'Pausar' : 'Reproduzir'}
               >
-                {isPlaying ? <Pause className="text-white" size={24} strokeWidth={3.2} /> : <Play className="text-white" size={24} strokeWidth={3.2} />}
+                {isPlaying ? (
+                  <Pause className="text-white" size={24} strokeWidth={3.2} />
+                ) : (
+                  <Play className="text-white" size={24} strokeWidth={3.2} />
+                )}
               </button>
             </div>
           </div>
@@ -471,4 +496,3 @@ export default function HomeBanner({ className }: Props) {
     </section>
   );
 }
- 
