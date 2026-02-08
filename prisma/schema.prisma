@@ -1,3 +1,5 @@
+// caminho: prisma/schema.prisma
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -32,7 +34,7 @@ model Offer {
   imageUrl    String?
 
   imageUrls String[] @default([])
-  priceText  String?
+  priceText String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -71,7 +73,7 @@ model AdminAuditLog {
 }
 
 model Banner {
-  id        String   @id @default(cuid())
+  id        String      @id @default(cuid())
   title     String
   subtitle  String?
   highlight String?
@@ -80,7 +82,7 @@ model Banner {
   imageUrl  String
   align     String?
   status    OfferStatus @default(publicado)
-  order     Int      @default(0)
+  order     Int         @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -89,3 +91,345 @@ model Banner {
   @@index([order])
 }
 
+// =========================
+// AFILIADOS (base)
+// =========================
+
+enum AfiliadoStatus {
+  ativo
+  pausado
+  bloqueado
+}
+
+enum ComissaoTipo {
+  percentual
+  valor_fixo
+  credito
+}
+
+enum ComissaoStatus {
+  pendente
+  disponivel
+  pago
+  cancelado
+}
+
+enum CupomDescontoTipo {
+  percentual
+  valor_fixo
+}
+
+enum SaqueStatus {
+  solicitado
+  aprovado
+  pago
+  recusado
+  cancelado
+}
+
+enum LancamentoTipo {
+  // aumenta saldo
+  credito
+  // reduz saldo
+  debito
+}
+
+enum LancamentoOrigem {
+  venda
+  ajuste
+  saque
+  estorno
+  bonus
+}
+
+/// Afiliado (perfil + dados de recebimento)
+/// - Mantém tudo simples e legível
+/// - tenantId opcional (multi-tenant)
+model Afiliado {
+  id       String  @id @default(cuid())
+  tenantId String?
+
+  status AfiliadoStatus @default(ativo)
+
+  nome     String
+  email    String?
+  telefone String?
+
+  // como ele divulga
+  apelido String? // ex: @meuperfil
+  bio     String?
+  fotoUrl String?
+
+  // PIX para saque (simples)
+  pixTipo  String? // cpf, cnpj, email, telefone, aleatoria
+  pixChave String?
+
+  // configuração padrão de comissão (fallback)
+  comissaoPadraoTipo  ComissaoTipo @default(percentual)
+  comissaoPadraoValor Decimal      @default(0.0) @db.Decimal(12, 2)
+
+  // override (ganho em cima de subafiliados)
+  overrideAtivo Boolean       @default(false)
+  overrideTipo  ComissaoTipo?
+  overrideValor Decimal?      @db.Decimal(12, 2)
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  // relações
+  cupons         AfiliadoCupom[]
+  regrasComissao AfiliadoRegraComissao[]
+  vendas         AfiliadoVenda[]
+  lancamentos    AfiliadoLancamentoSaldo[]
+  saques         AfiliadoSaque[]
+
+  // rede (subafiliados)
+  subAfiliados AfiliadoRede[] @relation("AfiliadoPai")
+  meuPai       AfiliadoRede[] @relation("AfiliadoFilho")
+
+  // multi-tenant friendly (sem quebrar quando tenantId for null)
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@index([status])
+  @@index([criadoEm])
+}
+
+/// Regra de comissão do afiliado
+/// - permite sobrescrever por parceiro, categoria, oferta e por período
+/// - se nada bater, usa comissaoPadrao do Afiliado
+model AfiliadoRegraComissao {
+  id       String  @id @default(cuid())
+  tenantId String?
+
+  afiliadoId String
+  afiliado   Afiliado @relation(fields: [afiliadoId], references: [id], onDelete: Cascade)
+
+  ativo Boolean @default(true)
+
+  tipo  ComissaoTipo
+  valor Decimal      @db.Decimal(12, 2)
+
+  // filtros (opcionais)
+  partnerName String?
+  categoryId  String?
+  offerId     String?
+
+  // janela de validade
+  validoDe  DateTime?
+  validoAte DateTime?
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([afiliadoId, ativo])
+  @@index([partnerName])
+  @@index([categoryId])
+  @@index([offerId])
+  @@index([validoDe, validoAte])
+}
+
+/// Cupom de desconto criado pelo afiliado
+/// - rastreia venda por cupom
+model AfiliadoCupom {
+  id       String  @id @default(cuid())
+  tenantId String?
+
+  afiliadoId String
+  afiliado   Afiliado @relation(fields: [afiliadoId], references: [id], onDelete: Cascade)
+
+  codigo String
+  ativo  Boolean @default(true)
+
+  descontoTipo  CupomDescontoTipo
+  descontoValor Decimal           @db.Decimal(12, 2)
+
+  // opcional: amarrar em parceiro/categoria/oferta
+  partnerName String?
+  categoryId  String?
+  offerId     String?
+
+  // limites
+  maxUsos Int? // null = ilimitado
+  usos    Int  @default(0)
+
+  validoDe  DateTime?
+  validoAte DateTime?
+
+  criadoEm      DateTime        @default(now())
+  atualizadoEm  DateTime        @updatedAt
+  AfiliadoVenda AfiliadoVenda[]
+
+  // multi-tenant friendly
+  @@unique([tenantId, codigo])
+  @@index([tenantId])
+  @@index([afiliadoId])
+  @@index([ativo])
+  @@index([codigo])
+  @@index([partnerName])
+  @@index([categoryId])
+  @@index([offerId])
+}
+
+/// Registro de venda atribuída ao afiliado (extrato)
+model AfiliadoVenda {
+  id       String  @id @default(cuid())
+  tenantId String?
+
+  afiliadoId String
+  afiliado   Afiliado @relation(fields: [afiliadoId], references: [id], onDelete: Cascade)
+
+  // origem da atribuição
+  origem String? // link, cupom, voucher, manual
+
+  cupomId String?
+  cupom   AfiliadoCupom? @relation(fields: [cupomId], references: [id], onDelete: SetNull)
+
+  // referência externa (pedido/pagamento) - vamos ajustar depois
+  referenciaExterna String? // ex: orderId / paymentId
+  referenciaTipo    String? // ex: "order", "payment"
+
+  // dados da venda
+  valorVenda Decimal @db.Decimal(12, 2)
+  moeda      String  @default("BRL")
+
+  partnerName String?
+  categoryId  String?
+  offerId     String?
+
+  // comissão calculada nesta venda
+  comissaoTipo   ComissaoTipo
+  comissaoValor  Decimal        @db.Decimal(12, 2)
+  comissaoStatus ComissaoStatus @default(pendente)
+
+  // quando fica disponível (D+X)
+  liberarEm DateTime?
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  // relações financeiras
+  lancamentos       AfiliadoLancamentoSaldo[]
+  AfiliadoSaqueItem AfiliadoSaqueItem[]
+
+  @@index([tenantId])
+  @@index([afiliadoId, criadoEm])
+  @@index([comissaoStatus])
+  @@index([liberarEm])
+  @@index([cupomId])
+  @@index([partnerName])
+  @@index([categoryId])
+  @@index([offerId])
+  @@index([referenciaExterna])
+}
+
+/// Razão do saldo (ledger)
+model AfiliadoLancamentoSaldo {
+  id       String  @id @default(cuid())
+  tenantId String?
+
+  afiliadoId String
+  afiliado   Afiliado @relation(fields: [afiliadoId], references: [id], onDelete: Cascade)
+
+  tipo   LancamentoTipo
+  origem LancamentoOrigem
+
+  // valores
+  valor Decimal @db.Decimal(12, 2)
+
+  // status do valor (pendente/disponível/pago) quando aplicável
+  status ComissaoStatus @default(pendente)
+
+  // vínculo com venda (quando origem=venda)
+  vendaId String?
+  venda   AfiliadoVenda? @relation(fields: [vendaId], references: [id], onDelete: SetNull)
+
+  // vínculo com saque (quando origem=saque)
+  saqueId String?
+  saque   AfiliadoSaque? @relation(fields: [saqueId], references: [id], onDelete: SetNull)
+
+  descricao String?
+  meta      Json?
+
+  criadoEm DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([afiliadoId, criadoEm])
+  @@index([status])
+  @@index([origem])
+  @@index([vendaId])
+  @@index([saqueId])
+}
+
+/// Solicitação de saque
+model AfiliadoSaque {
+  id       String  @id @default(cuid())
+  tenantId String?
+
+  afiliadoId String
+  afiliado   Afiliado @relation(fields: [afiliadoId], references: [id], onDelete: Cascade)
+
+  status SaqueStatus @default(solicitado)
+
+  // valores
+  valorSolicitado Decimal  @db.Decimal(12, 2)
+  valorPago       Decimal? @db.Decimal(12, 2)
+
+  // método e dados
+  metodo   String? // pix, credito, manual
+  pixTipo  String?
+  pixChave String?
+
+  // auditoria
+  solicitadoEm DateTime  @default(now())
+  aprovadoEm   DateTime?
+  pagoEm       DateTime?
+  motivoRecusa String?
+
+  // itens (por venda ou lançamento)
+  itens       AfiliadoSaqueItem[]
+  lancamentos AfiliadoLancamentoSaldo[]
+
+  @@index([tenantId])
+  @@index([afiliadoId, solicitadoEm])
+  @@index([status])
+}
+
+/// Itens do saque (por venda)
+model AfiliadoSaqueItem {
+  id       String  @id @default(cuid())
+  tenantId String?
+
+  saqueId String
+  saque   AfiliadoSaque @relation(fields: [saqueId], references: [id], onDelete: Cascade)
+
+  vendaId String
+  venda   AfiliadoVenda @relation(fields: [vendaId], references: [id], onDelete: Restrict)
+
+  valorComissao Decimal @db.Decimal(12, 2)
+
+  @@unique([saqueId, vendaId])
+  @@index([tenantId])
+  @@index([saqueId])
+}
+
+/// Rede de afiliados (pai → filho)
+model AfiliadoRede {
+  id       String  @id @default(cuid())
+  tenantId String?
+
+  paiId String
+  pai   Afiliado @relation("AfiliadoPai", fields: [paiId], references: [id], onDelete: Cascade)
+
+  filhoId String
+  filho   Afiliado @relation("AfiliadoFilho", fields: [filhoId], references: [id], onDelete: Cascade)
+
+  criadoEm DateTime @default(now())
+
+  @@unique([paiId, filhoId])
+  @@index([tenantId])
+  @@index([paiId])
+  @@index([filhoId])
+}
+
+// caminho: prisma/schema.prisma
